@@ -1781,6 +1781,139 @@ await multiPage.evaluate(() => {
 });
 await multiPage.close();
 
+// P3 跨标签页：后保存的标签页不得静默覆盖前一份
+const crossA = await open({ width: 1440, height: 1000 });
+await crossA.goto(BASE, { waitUntil: "networkidle0" });
+await crossA.evaluate(() => {
+  localStorage.removeItem("resume-workshop:library:v1");
+  localStorage.removeItem("resume-workshop:last-saved-at");
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: {
+        name: "跨标签基线",
+        headline: "前端工程师",
+        email: "",
+        phone: "",
+        city: "上海",
+        website: "",
+        github: "",
+        summary: "",
+        photo: "",
+      },
+      intent: { targetRole: "前端工程师" },
+      educations: [],
+      experiences: [],
+      projects: [],
+      customSections: [],
+      skills: ["React"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+});
+await crossA.reload({ waitUntil: "networkidle0" });
+await pause(500);
+
+const crossB = await open({ width: 1440, height: 1000 });
+await crossB.goto(BASE, { waitUntil: "networkidle0" });
+await pause(500);
+
+await crossB.evaluate(() => {
+  const label = [...document.querySelectorAll("label")].find((node) =>
+    node.textContent?.includes("姓名"),
+  );
+  const input = label?.querySelector("input");
+  if (!input) return;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+    input,
+    "B 的修改",
+  );
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await crossB.waitForFunction(
+  () => {
+    try {
+      return (
+        JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}").basic
+          ?.name === "B 的修改"
+      );
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 5000 },
+);
+
+const conflictBanner = await crossA
+  .waitForSelector('[data-qa="storage-conflict"]', {
+    visible: true,
+    timeout: 5000,
+  })
+  .then(() => true)
+  .catch(() => false);
+const conflictText = conflictBanner
+  ? await crossA.$eval(
+      '[data-qa="storage-conflict"]',
+      (node) => node.textContent?.trim() ?? "",
+    )
+  : "";
+expect(
+  "另一标签页修改后提示冲突",
+  conflictBanner && conflictText.includes("本页已暂停保存"),
+  conflictText,
+);
+
+await crossA.evaluate(() => {
+  const label = [...document.querySelectorAll("label")].find((node) =>
+    node.textContent?.includes("姓名"),
+  );
+  const input = label?.querySelector("input");
+  if (!input) return;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+    input,
+    "A 的修改",
+  );
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await pause(1000);
+const blockedStored = await crossA.evaluate(
+  () =>
+    JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}").basic?.name,
+);
+expect(
+  "冲突期间不覆盖另一标签页数据",
+  blockedStored === "B 的修改",
+  String(blockedStored),
+);
+
+crossA.once("dialog", async (dialog) => {
+  await dialog.accept();
+});
+await clickText(crossA, "保留我的版本");
+await crossA.waitForFunction(
+  () => {
+    try {
+      return (
+        JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}").basic
+          ?.name === "A 的修改" &&
+        !document.querySelector('[data-qa="storage-conflict"]')
+      );
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 5000 },
+);
+expect("可确认保留本页版本并恢复保存", true);
+
+await crossA.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.removeItem("resume-workshop:last-saved-at");
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await crossA.close();
+await crossB.close();
+
 // 打印前用「姓名-头衔」作 document.title，Chrome 存 PDF 时用作文件名
 const pdfNamePage = await open({ width: 1440, height: 1000 });
 await pdfNamePage.goto(BASE, { waitUntil: "networkidle0" });

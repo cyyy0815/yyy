@@ -9,6 +9,7 @@ import {
 } from "./types";
 
 export const STORAGE_KEY = "resume-workshop:v1";
+export const LAST_SAVED_KEY = "resume-workshop:last-saved-at";
 
 function asString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
@@ -102,6 +103,27 @@ export function normalizeResume(input: unknown): Resume {
   };
 }
 
+/** 只读原始字符串：用于多标签页保存前比对，不做解析。 */
+export function readStoredResumeRaw(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function readLastSavedAt(): number | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LAST_SAVED_KEY);
+    const value = raw ? Number(raw) : NaN;
+    return Number.isFinite(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 export function loadResume(): Resume | null {
   if (typeof window === "undefined") return null;
   try {
@@ -117,6 +139,7 @@ export function saveResume(resume: Resume): boolean {
   if (typeof window === "undefined") return false;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resume));
+    window.localStorage.setItem(LAST_SAVED_KEY, String(Date.now()));
     return true;
   } catch {
     // 隐私模式、配额已满或存储被禁用：交给调用方提示用户导出备份
@@ -128,6 +151,7 @@ export function clearResume(): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(LAST_SAVED_KEY);
   } catch {
     // ignore
   }

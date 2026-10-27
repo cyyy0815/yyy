@@ -40,6 +40,18 @@ function readTemplate(): TemplateId {
   return "modern";
 }
 
+function formatClock(timestamp: number): string {
+  try {
+    return new Intl.DateTimeFormat("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(timestamp);
+  } catch {
+    return new Date(timestamp).toTimeString().slice(0, 5);
+  }
+}
+
 function hasResumeContent(resume: Resume): boolean {
   return Boolean(
     resume.basic.name ||
@@ -81,6 +93,9 @@ function ResumeWorkspace() {
     updateResume,
     isSample,
     saveState,
+    lastSavedAt,
+    hasConflict,
+    keepLocalVersion,
     clearAll,
     loadSample,
     replaceResume,
@@ -159,6 +174,35 @@ function ResumeWorkspace() {
 
   const handleAccent = (accent: string) => {
     updateResume((prev) => ({ ...prev, theme: { accent } }));
+  };
+
+  const handleConflictReload = () => {
+    if (
+      !window.confirm(
+        "重新载入会丢弃本页尚未保存的修改，并显示另一个标签页的最新版本。确定吗？",
+      )
+    ) {
+      return;
+    }
+    window.location.reload();
+  };
+
+  const handleConflictKeepLocal = () => {
+    if (
+      !window.confirm(
+        "将用本页内容覆盖另一个标签页的修改，确定吗？",
+      )
+    ) {
+      return;
+    }
+    if (keepLocalVersion()) {
+      setNotice({ type: "ok", message: "已保存本页版本" });
+      return;
+    }
+    setNotice({
+      type: "error",
+      message: "保存失败：浏览器存储不可用或空间已满",
+    });
   };
 
   const handleSwitchDocument = (id: string) => {
@@ -451,6 +495,34 @@ function ResumeWorkspace() {
               </div>
             ) : null}
 
+            {hasConflict ? (
+              <div
+                role="alert"
+                data-qa="storage-conflict"
+                className="print-hide mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3"
+              >
+                <p className="text-[12.5px] leading-6 text-amber-900">
+                  另一个标签页修改了这份简历。为避免互相覆盖，本页已暂停保存。
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleConflictReload}
+                  >
+                    重新载入最新版本
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleConflictKeepLocal}
+                  >
+                    保留我的版本
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
             <div className="resume-grid grid gap-6 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)]">
               <div
                 className={`print-hide ${
@@ -467,20 +539,26 @@ function ResumeWorkspace() {
                     className={`h-1.5 w-1.5 rounded-full ${
                       isSample
                         ? "bg-amber-400"
-                        : saveState === "saved"
-                          ? "bg-emerald-500"
-                          : saveState === "error"
-                            ? "bg-red-500"
-                            : "animate-pulse bg-amber-400"
+                        : saveState === "conflict"
+                          ? "bg-orange-500"
+                          : saveState === "saved"
+                            ? "bg-emerald-500"
+                            : saveState === "error"
+                              ? "bg-red-500"
+                              : "animate-pulse bg-amber-400"
                     }`}
                   />
                   {isSample
                     ? "示例数据不会保存，编辑后自动转为你自己的简历"
-                    : saveState === "saved"
-                      ? "已自动保存到本机浏览器"
-                      : saveState === "error"
-                        ? "保存失败，请导出 JSON 备份"
-                        : "保存中…"}
+                    : saveState === "conflict"
+                      ? "另一个标签页已修改，本页保存已暂停"
+                      : saveState === "saved"
+                        ? lastSavedAt
+                          ? `已自动保存到本机浏览器 · 最后保存于 ${formatClock(lastSavedAt)}`
+                          : "已自动保存到本机浏览器"
+                        : saveState === "error"
+                          ? "保存失败，请导出 JSON 备份"
+                          : "保存中…"}
                 </p>
               </div>
 
