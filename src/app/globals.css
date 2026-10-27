@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #faf9f7;
+  --color-ink: #18181b;
+  --color-accent: #1d4ed8;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-serif: Georgia, "Songti SC", "SimSun", "Noto Serif SC", serif;
+}
+
+:root {
+  --resume-accent: #1d4ed8;
+  --resume-ink: #1d4ed8;
+  --resume-deep: #0f1e57;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #dbe4ff;
+  color: #111827;
+}
+
+/* 细滚动条，避免编辑器出现厚重的原生滚动条 */
+.resume-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.resume-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.16);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+.resume-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------------- 简历主题色 ---------------- */
+/* 变量由 ResumePaper 的 accentStyle() 注入，未注入时使用 :root 默认值 */
+
+.resume-ink {
+  color: var(--resume-ink);
+}
+
+.resume-accent-bg {
+  background-color: var(--resume-accent);
+}
+
+.resume-soft {
+  background-color: color-mix(in srgb, var(--resume-accent) 10%, white);
+}
+
+.resume-rule {
+  background-color: color-mix(in srgb, var(--resume-accent) 28%, white);
+}
+
+.resume-dot {
+  background-color: var(--resume-ink);
+}
+
+.resume-timeline-line {
+  background-color: color-mix(in srgb, var(--resume-accent) 32%, white);
+}
+
+.resume-side {
+  background-color: var(--resume-deep);
+}
+
+/* 打印时保留主题色与侧栏底色，不依赖浏览器的「背景图形」开关 */
+#resume-print,
+#resume-print * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ---------------- 打印：只输出 A4 简历 ---------------- */
+@media print {
+  @page {
+    size: A4;
+    /* 顶部 8mm 给续页留呼吸感；底部 8mm 放页码 */
+    margin: 8mm 0 8mm;
+
+    @bottom-center {
+      content: "第 " counter(page) " / " counter(pages) " 页";
+      font-family: var(--font-sans);
+      font-size: 8pt;
+      color: #a1a1aa;
+    }
+  }
+
+  /* 首页贴顶，侧栏模板的深色通栏才不会被裁出一条白边 */
+  @page :first {
+    margin-top: 0;
+  }
+
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+    background: #fff !important;
+  }
+
+  .print-hide {
+    display: none !important;
+  }
+
+  .print-root {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  /* 左栏被隐藏后，网格仍保留两列会让预览掉进窄列 */
+  .resume-grid {
+    display: block !important;
+  }
+
+  .resume-zoom {
+    zoom: 1 !important;
+  }
+
+  .resume-scroll {
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    position: static !important;
+  }
+
+  #resume-print {
+    width: 210mm !important;
+    min-height: 289mm !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+  }
+
+  /* 侧栏模板自带全高背景，打印时按内容区高度收住，避免多出一页 */
+  .resume-paper {
+    min-height: 289mm !important;
+  }
+
+  /* 侧栏底色改画在纸张上：跨页时只出现在首页，第二页不会留空白色块 */
+  .resume-paper-sidebar {
+    background-image: linear-gradient(
+      var(--resume-deep),
+      var(--resume-deep)
+    ) !important;
+    background-repeat: no-repeat !important;
+    background-size: 62mm 289mm !important;
+    background-position: 0 0 !important;
+  }
+
+  .resume-side {
+    background-color: transparent !important;
+  }
+
+  /* 网格跨页时分栏可能失效：续页仍保持首页主栏宽度，避免文字忽然变宽 */
+  .resume-aside-grid > .resume-main {
+    max-width: 117.5mm !important;
+  }
+}
