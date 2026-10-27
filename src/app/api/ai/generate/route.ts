@@ -24,6 +24,7 @@ const MAX_BODY_BYTES = 64 * 1024;
 const LIMITS = {
   keywords: 2000,
   current: 4000,
+  jd: 4000,
   role: 80,
   years: 20,
 } as const;
@@ -187,9 +188,6 @@ function parseGenerateRequest(body: unknown): AiGenerateRequest {
   }
 
   const keywords = readString(input.keywords).trim();
-  if (!keywords) {
-    throw new RequestError(400, "invalid_request", "请填写关键词或成果");
-  }
   if (keywords.length > LIMITS.keywords) {
     throw new RequestError(400, "invalid_request", "关键词最多 2000 字");
   }
@@ -197,6 +195,16 @@ function parseGenerateRequest(body: unknown): AiGenerateRequest {
   const current = readString(input.current).trim();
   if (current.length > LIMITS.current) {
     throw new RequestError(400, "invalid_request", "现有内容最多 4000 字");
+  }
+
+  // 优化模式可以只给现有内容；新写模式仍需关键词素材。
+  if (!keywords && !(mode === "polish" && current)) {
+    throw new RequestError(400, "invalid_request", "请填写关键词或成果");
+  }
+
+  const jd = readString(input.jd).trim();
+  if (jd.length > LIMITS.jd) {
+    throw new RequestError(400, "invalid_request", "参考 JD 最多 4000 字");
   }
 
   const role = readString(input.role).trim();
@@ -217,6 +225,7 @@ function parseGenerateRequest(body: unknown): AiGenerateRequest {
     years,
     keywords,
     current: current || undefined,
+    jd: jd || undefined,
   };
 }
 

@@ -110,6 +110,54 @@ async function clickText(page, text, scope = "body") {
   if (!found) throw new Error(`button not found: ${text}`);
 }
 
+/** 按 data-qa 写入输入框 / 文本域，触发 React 的 onChange。 */
+async function setQaValue(page, selector, value) {
+  return page.evaluate(
+    ({ target, nextValue }) => {
+      const element = document.querySelector(target);
+      if (!element) return false;
+      const proto =
+        element instanceof HTMLTextAreaElement
+          ? HTMLTextAreaElement.prototype
+          : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(
+        element,
+        nextValue,
+      );
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+      return true;
+    },
+    { target: selector, nextValue: value },
+  );
+}
+
+/** 按选项文案切换 select，触发 React 的 onChange。 */
+async function selectByOptionText(page, optionText, scope = "body") {
+  const found = await page.evaluate(
+    ({ label, root }) => {
+      const container = document.querySelector(root) ?? document;
+      const select = [...container.querySelectorAll("select")].find((item) =>
+        [...item.options].some((option) =>
+          option.textContent?.includes(label),
+        ),
+      );
+      if (!select) return false;
+      const option = [...select.options].find((item) =>
+        item.textContent?.includes(label),
+      );
+      if (!option) return false;
+      Object.getOwnPropertyDescriptor(
+        HTMLSelectElement.prototype,
+        "value",
+      )?.set?.call(select, option.value);
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;
+    },
+    { label: optionText, root: scope },
+  );
+  if (!found) throw new Error(`select option not found: ${optionText}`);
+}
+
 /** 按板块序号填写自定义条目，触发表单的 React onChange。 */
 async function fillCustomItem(page, sectionIndex, values) {
   return page.evaluate(
@@ -163,10 +211,18 @@ async function interceptAi(page, { configured = true, text = "" } = {}) {
       return;
     }
     if (url.includes("/api/ai/generate")) {
-      const split = Math.max(1, Math.floor(text.length / 2));
+      let payload = {};
+      try {
+        payload = JSON.parse(request.postData() ?? "{}");
+      } catch {
+        // 保持空对象，按默认文本返回。
+      }
+      const resolved =
+        typeof text === "function" ? text(payload) : text;
+      const split = Math.max(1, Math.floor(resolved.length / 2));
       const body = [
-        { event: "delta", data: { text: text.slice(0, split) } },
-        { event: "delta", data: { text: text.slice(split) } },
+        { event: "delta", data: { text: resolved.slice(0, split) } },
+        { event: "delta", data: { text: resolved.slice(split) } },
         {
           event: "done",
           data: {
@@ -434,6 +490,244 @@ expect(
   aiPage.qaErrors.join(" | "),
 );
 await aiPage.close();
+
+// AI 参考 JD + 优化模式：读取 JD 匹配页内容，允许只传现有文本
+const AI_JD =
+  "岗位职责：负责 B 端产品规划与需求分析，推动跨团队协作。\n任职要求：3 年以上产品经验，熟悉 PRD、数据分析与项目管理。";
+const aiJdPage = await open({ width: 1440, height: 1000 });
+const aiJdBodies = [];
+await interceptAi(aiJdPage, { text: "优化后的产品经理简介：3 年 B 端产品经验，主导需求分析与跨团队协作。" });
+aiJdPage.on("request", (request) => {
+  if (!request.url().includes("/api/ai/generate")) return;
+  try {
+    aiJdBodies.push(JSON.parse(request.postData() ?? "{}"));
+  } catch {
+    // ignore
+  }
+});
+await aiJdPage.goto(BASE, { waitUntil: "networkidle0" });
+await aiJdPage.evaluate(({ jd }) => {
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: {
+        name: "林一",
+        headline: "产品经理",
+        summary: "5 年 B 端产品经验，负责客服工单系统。",
+      },
+      intent: { targetRole: "产品经理", experience: "3-5年" },
+      educations: [],
+      experiences: [],
+      projects: [],
+      skills: ["需求分析"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.setItem("resume-workshop:jd", jd);
+}, { jd: AI_JD });
+await aiJdPage.reload({ waitUntil: "networkidle0" });
+await pause(500);
+await aiJdPage.evaluate(() => {
+  [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.includes("开始生成"))
+    ?.click();
+});
+await aiJdPage.waitForSelector('[data-qa="ai-jd"]', { timeout: 15000 });
+const jdPrefill = await aiJdPage.$eval(
+  '[data-qa="ai-jd"]',
+  (element) => element.value,
+);
+expect("AI 自动读取 JD 匹配页内容", jdPrefill === AI_JD, jdPrefill.slice(0, 40));
+
+await selectByOptionText(aiJdPage, "优化现有个人简介", '[role="dialog"]');
+await setQaValue(aiJdPage, '[data-qa="ai-keywords"]', "");
+await pause(200);
+const polishReady = await aiJdPage.evaluate(() => {
+  const dialog = document.querySelector('[role="dialog"]');
+  const generate = [...(dialog?.querySelectorAll("button") ?? [])].find(
+    (button) => button.textContent?.trim() === "生成",
+  );
+  return Boolean(generate && !generate.disabled);
+});
+expect("优化模式不填关键词也可生成", polishReady);
+await clickText(aiJdPage, "生成", '[role="dialog"]');
+await aiJdPage.waitForSelector('[aria-label="生成预览，可直接修改"]', {
+  timeout: 15000,
+});
+await pause(300);
+const aiJdRequest = aiJdBodies.at(-1) ?? {};
+expect(
+  "AI 请求携带 JD 且优化模式可为空关键词",
+  aiJdRequest.mode === "polish" &&
+    aiJdRequest.keywords === "" &&
+    aiJdRequest.jd === AI_JD &&
+    String(aiJdRequest.current ?? "").includes("5 年 B 端产品经验"),
+  JSON.stringify({
+    mode: aiJdRequest.mode,
+    keywords: aiJdRequest.keywords,
+    jd: String(aiJdRequest.jd ?? "").slice(0, 20),
+    current: String(aiJdRequest.current ?? "").slice(0, 20),
+  }),
+);
+expect(
+  "AI 参考 JD 页面无控制台错误",
+  aiJdPage.qaErrors.length === 0,
+  aiJdPage.qaErrors.join(" | "),
+);
+await aiJdPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.removeItem("resume-workshop:jd");
+});
+await aiJdPage.close();
+
+// AI 整份简历：依次生成简介 / 工作 / 项目，一次采用并可整体撤销
+const FULL_AI_TEXTS = {
+  summary: "3 年 B 端产品经验，主导客服工单系统从 0 到 1 落地。",
+  experience: "负责客服工单系统需求分析与产品设计。\n推动跨团队协作，交付周期缩短 30%。",
+  project: "主导工单系统重构，覆盖 12 条业务线。\n建立需求优先级机制，线上问题下降 25%。",
+};
+const aiFullPage = await open({ width: 1440, height: 1100 });
+await interceptAi(aiFullPage, {
+  text: (payload) => FULL_AI_TEXTS[payload.section] ?? "",
+});
+await aiFullPage.goto(BASE, { waitUntil: "networkidle0" });
+await aiFullPage.evaluate(() => {
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: { name: "林一", headline: "产品经理", summary: "旧简介" },
+      intent: { targetRole: "产品经理", experience: "3-5年" },
+      educations: [],
+      experiences: [
+        {
+          id: "qa-old-e",
+          company: "旧公司",
+          role: "产品助理",
+          start: "2019.01",
+          end: "2020.01",
+          description: "旧经历",
+        },
+      ],
+      projects: [
+        {
+          id: "qa-old-p",
+          name: "旧项目",
+          role: "产品助理",
+          start: "2019.01",
+          end: "2020.01",
+          description: "旧项目描述",
+          link: "",
+        },
+      ],
+      skills: ["需求分析"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.removeItem("resume-workshop:jd");
+});
+await aiFullPage.reload({ waitUntil: "networkidle0" });
+await pause(500);
+await aiFullPage.evaluate(() => {
+  [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.includes("开始生成"))
+    ?.click();
+});
+await aiFullPage.waitForSelector('[data-qa="ai-keywords"]', { timeout: 15000 });
+await clickText(aiFullPage, "整份简历", '[role="dialog"]');
+await setQaValue(
+  aiFullPage,
+  '[data-qa="ai-keywords"]',
+  "B 端产品；工单系统；跨团队协作",
+);
+await clickText(aiFullPage, "生成整份简历", '[role="dialog"]');
+await aiFullPage.waitForFunction(
+  () => document.querySelectorAll('[data-qa^="ai-full-"]').length === 3,
+  { timeout: 20000 },
+);
+await pause(300);
+const fullPreview = await aiFullPage.evaluate(() =>
+  [...document.querySelectorAll('[data-qa^="ai-full-"]')].map(
+    (element) => element.value,
+  ),
+);
+const fullDialog = await aiFullPage.$('[role="dialog"]');
+if (fullDialog) {
+  await fullDialog.screenshot({ path: `${OUT}/qa-ai-full.png` });
+}
+expect(
+  "整份生成三段内容",
+  fullPreview.length === 3 &&
+    fullPreview[0] === FULL_AI_TEXTS.summary &&
+    fullPreview[1] === FULL_AI_TEXTS.experience &&
+    fullPreview[2] === FULL_AI_TEXTS.project,
+  JSON.stringify(fullPreview),
+);
+
+await clickText(aiFullPage, "采用整份简历", '[role="dialog"]');
+await pause(300);
+const fullConfirmShown = await aiFullPage.evaluate(() =>
+  [...document.querySelectorAll('[role="dialog"] button')].some(
+    (button) => button.textContent?.trim() === "确认覆盖",
+  ),
+);
+if (fullConfirmShown) {
+  await clickText(aiFullPage, "确认覆盖", '[role="dialog"]');
+}
+await aiFullPage.waitForFunction(
+  () => !document.querySelector('[role="dialog"]'),
+);
+await pause(1300);
+const fullAdopted = await aiFullPage.evaluate(() => {
+  const data = JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}");
+  return {
+    summary: data.basic?.summary,
+    experiences: data.experiences ?? [],
+    projects: data.projects ?? [],
+  };
+});
+expect(
+  "整份采用写入简介并新增工作/项目条目",
+  fullAdopted.summary === FULL_AI_TEXTS.summary &&
+    fullAdopted.experiences.length === 2 &&
+    fullAdopted.experiences[1].description === FULL_AI_TEXTS.experience &&
+    fullAdopted.experiences[1].company === "" &&
+    fullAdopted.projects.length === 2 &&
+    fullAdopted.projects[1].description === FULL_AI_TEXTS.project &&
+    fullAdopted.projects[1].name === "",
+  JSON.stringify({
+    summary: fullAdopted.summary,
+    experiences: fullAdopted.experiences.length,
+    projects: fullAdopted.projects.length,
+  }),
+);
+
+await clickText(aiFullPage, "撤销");
+await pause(1300);
+const fullUndone = await aiFullPage.evaluate(() => {
+  const data = JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}");
+  return {
+    summary: data.basic?.summary,
+    experiences: (data.experiences ?? []).length,
+    projects: (data.projects ?? []).length,
+  };
+});
+expect(
+  "整份采用可整体撤销",
+  fullUndone.summary === "旧简介" &&
+    fullUndone.experiences === 1 &&
+    fullUndone.projects === 1,
+  JSON.stringify(fullUndone),
+);
+expect(
+  "AI 整份简历无控制台错误",
+  aiFullPage.qaErrors.length === 0,
+  aiFullPage.qaErrors.join(" | "),
+);
+await aiFullPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.removeItem("resume-workshop:jd");
+});
+await aiFullPage.close();
 
 // AI 弹窗 390px 无横向溢出
 const aiMobile = await open({ width: 390, height: 844, mobile: true });

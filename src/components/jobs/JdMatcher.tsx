@@ -2,20 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { analyzeJd } from "@/lib/jdMatch";
+import { clearSavedJd, readSavedJd, saveJd } from "@/lib/jdStorage";
 import type { Resume } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { TextArea } from "@/components/ui/Field";
 import { SkillChip } from "./SkillChip";
-
-const JD_STORAGE_KEY = "resume-workshop:jd";
-
-function readSavedJd(): string {
-  try {
-    return window.localStorage.getItem(JD_STORAGE_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
 
 export function JdMatcher({
   resume,
@@ -33,28 +24,14 @@ export function JdMatcher({
   );
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        if (jd.trim()) {
-          window.localStorage.setItem(JD_STORAGE_KEY, jd);
-        } else {
-          window.localStorage.removeItem(JD_STORAGE_KEY);
-        }
-      } catch {
-        // ignore
-      }
-    }, 500);
+    const timer = window.setTimeout(() => saveJd(jd), 500);
     return () => window.clearTimeout(timer);
   }, [jd]);
 
   const clear = () => {
     setJd("");
     setShowResult(false);
-    try {
-      window.localStorage.removeItem(JD_STORAGE_KEY);
-    } catch {
-      // ignore
-    }
+    clearSavedJd();
   };
 
   const scoreColor =

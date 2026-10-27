@@ -12,13 +12,15 @@ import { Button } from "@/components/ui/Button";
 import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { streamGenerate } from "@/lib/ai/client";
 import { cleanAiText } from "@/lib/ai/prompt";
-import type {
-  AiGenerateRequest,
-  AiMode,
-  AiSection,
-  AiStatus,
-  AiTone,
+import {
+  AI_SECTIONS,
+  type AiGenerateRequest,
+  type AiMode,
+  type AiSection,
+  type AiStatus,
+  type AiTone,
 } from "@/lib/ai/types";
+import { JD_MAX_LENGTH, readSavedJd } from "@/lib/jdStorage";
 import { newId, type Resume } from "@/lib/types";
 
 const SECTIONS: { value: AiSection; label: string }[] = [
@@ -45,6 +47,13 @@ const TONES: { value: AiTone; label: string }[] = [
 ];
 
 type AdoptMode = "replace" | "append";
+type AiTab = AiSection | "full";
+
+const EMPTY_FULL_OUTPUT: Record<AiSection, string> = {
+  summary: "",
+  experience: "",
+  project: "",
+};
 
 type UndoState =
   | { kind: "summary"; previous: string }
@@ -59,6 +68,13 @@ type UndoState =
       id: string;
       previousDescription: string;
       created: boolean;
+    }
+  | {
+      kind: "full";
+      previousSummary: string;
+      summaryChanged: boolean;
+      experienceId: string | null;
+      projectId: string | null;
     };
 
 type Props = {
@@ -73,16 +89,22 @@ export function AiWriter({ resume, onChange }: Props) {
   const [statusError, setStatusError] = useState<string | null>(null);
 
   const [section, setSection] = useState<AiSection>("summary");
+  const [fullMode, setFullMode] = useState(false);
   const [targetId, setTargetId] = useState("new");
   const [adoptMode, setAdoptMode] = useState<AdoptMode>("replace");
 
   const [role, setRole] = useState("");
   const [years, setYears] = useState("");
   const [keywords, setKeywords] = useState("");
+  const [jd, setJd] = useState("");
+  const [jdFromSaved, setJdFromSaved] = useState(false);
   const [tone, setTone] = useState<AiTone>("professional");
   const [mode, setMode] = useState<AiMode>("draft");
 
   const [output, setOutput] = useState("");
+  const [fullOutput, setFullOutput] =
+    useState<Record<AiSection, string>>(EMPTY_FULL_OUTPUT);
+  const [fullStage, setFullStage] = useState<AiSection | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
@@ -113,6 +135,14 @@ export function AiWriter({ resume, onChange }: Props) {
           }))
         : [];
 
+  const fullHasOutput = AI_SECTIONS.some(
+    (item) => fullOutput[item].trim().length > 0,
+  );
+  const canGenerate = fullMode
+    ? Boolean(keywords.trim())
+    : Boolean(keywords.trim()) ||
+      (mode === "polish" && Boolean(currentText.trim()));
+
   const checkStatus = useCallback(async () => {
     setStatusLoading(true);
     setStatusError(null);
@@ -131,6 +161,7 @@ export function AiWriter({ resume, onChange }: Props) {
     abortRef.current?.abort();
     abortRef.current = null;
     setStreaming(false);
+    setFullStage(null);
     setConfirmOverwrite(false);
     setOpen(false);
   }, []);
@@ -166,18 +197,37 @@ export function AiWriter({ resume, onChange }: Props) {
       setYears(resume.intent.experience || "");
       prefilledRef.current = true;
     }
+    const savedJd = readSavedJd().trim().slice(0, JD_MAX_LENGTH);
+    setJd(savedJd);
+    setJdFromSaved(Boolean(savedJd));
     setError(null);
     setConfirmOverwrite(false);
     setOpen(true);
     if (!status && !statusLoading && !statusError) void checkStatus();
   };
 
-  const handleSectionChange = (next: AiSection) => {
+  const handleTabChange = (next: AiTab) => {
+    if (next === "full") {
+      setFullMode(true);
+      setTargetId("new");
+      setAdoptMode("replace");
+      setMode("draft");
+      setOutput("");
+      setFullOutput(EMPTY_FULL_OUTPUT);
+      setFullStage(null);
+      setError(null);
+      setConfirmOverwrite(false);
+      return;
+    }
+
+    setFullMode(false);
     setSection(next);
     setTargetId("new");
     setAdoptMode("replace");
     setMode("draft");
     setOutput("");
+    setFullOutput(EMPTY_FULL_OUTPUT);
+    setFullStage(null);
     setError(null);
     setConfirmOverwrite(false);
   };
@@ -202,7 +252,8 @@ export function AiWriter({ resume, onChange }: Props) {
 
   const handleGenerate = async () => {
     const trimmedKeywords = keywords.trim();
-    if (!trimmedKeywords) {
+    const currentForPolish = currentText.trim();
+    if (!trimmedKeywords && !(mode === "polish" && currentForPolish)) {
       setError("请先填写关键词或成果");
       return;
     }
@@ -216,28 +267,83 @@ export function AiWriter({ resume, onChange }: Props) {
     setError(null);
     setConfirmOverwrite(false);
 
-    const input: AiGenerateRequest = {
-      section,
-      mode,
+    await streamGenerate(
+      {
+        section,
+        mode,
+        tone,
+        role: role.trim(),
+        years: years.trim(),
+        keywords: trimmedKeywords,
+        // 新写不发送现有文本，减少数据暴露。
+        current: mode === "polish" ? currentForPolish || undefined : undefined,
+        jd: jd.trim() || undefined,
+      },
+      controller.signal,
+      {
+        onDelta: (text) => setOutput((previous) => previous + text),
+        onDone: () => setStreaming(false),
+        onError: (_code, message) => {
+          setError(message);
+          setStreaming(false);
+        },
+      },
+    );
+
+    if (abortRef.current === controller) abortRef.current = null;
+    setStreaming(false);
+  };
+
+  const handleGenerateFull = async () => {
+    const trimmedKeywords = keywords.trim();
+    if (!trimmedKeywords) {
+      setError("整份生成需要先填写关键词或成果");
+      return;
+    }
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setStreaming(true);
+    setFullOutput(EMPTY_FULL_OUTPUT);
+    setError(null);
+    setConfirmOverwrite(false);
+
+    const base: Omit<AiGenerateRequest, "section"> = {
+      mode: "draft",
       tone,
       role: role.trim(),
       years: years.trim(),
       keywords: trimmedKeywords,
-      // 新写不发送现有文本，减少数据暴露。
-      current:
-        mode === "polish" ? currentText.trim() || undefined : undefined,
+      jd: jd.trim() || undefined,
     };
 
-    await streamGenerate(input, controller.signal, {
-      onDelta: (text) => setOutput((previous) => previous + text),
-      onDone: () => setStreaming(false),
-      onError: (_code, message) => {
-        setError(message);
-        setStreaming(false);
-      },
-    });
+    let failed = false;
+    for (const nextSection of AI_SECTIONS) {
+      if (controller.signal.aborted) break;
+      setFullStage(nextSection);
+      await streamGenerate(
+        { ...base, section: nextSection },
+        controller.signal,
+        {
+          onDelta: (text) =>
+            setFullOutput((previous) => ({
+              ...previous,
+              [nextSection]: previous[nextSection] + text,
+            })),
+          onDone: () => {},
+          onError: (_code, message) => {
+            failed = true;
+            setError(`生成${SECTION_LABELS[nextSection]}失败：${message}`);
+          },
+        },
+      );
+      if (failed || controller.signal.aborted) break;
+    }
 
     if (abortRef.current === controller) abortRef.current = null;
+    setFullStage(null);
     setStreaming(false);
   };
 
@@ -245,6 +351,7 @@ export function AiWriter({ resume, onChange }: Props) {
     abortRef.current?.abort();
     abortRef.current = null;
     setStreaming(false);
+    setFullStage(null);
   };
 
   const applyAdopt = () => {
@@ -361,8 +468,91 @@ export function AiWriter({ resume, onChange }: Props) {
     setOpen(false);
   };
 
+  const applyFullAdopt = () => {
+    const cleaned = {
+      summary: cleanAiText(fullOutput.summary, "summary"),
+      experience: cleanAiText(fullOutput.experience, "experience"),
+      project: cleanAiText(fullOutput.project, "project"),
+    };
+    if (!cleaned.summary && !cleaned.experience && !cleaned.project) {
+      setError("还没有生成内容，请先生成整份简历");
+      return;
+    }
+
+    const previousSummary = resume.basic.summary;
+    const summaryChanged = Boolean(cleaned.summary);
+    const experienceId = cleaned.experience ? newId() : null;
+    const projectId = cleaned.project ? newId() : null;
+
+    onChange((prev) => ({
+      ...prev,
+      basic: summaryChanged
+        ? { ...prev.basic, summary: cleaned.summary }
+        : prev.basic,
+      experiences: experienceId
+        ? [
+            ...prev.experiences,
+            {
+              id: experienceId,
+              company: "",
+              role: "",
+              start: "",
+              end: "",
+              description: cleaned.experience,
+            },
+          ]
+        : prev.experiences,
+      projects: projectId
+        ? [
+            ...prev.projects,
+            {
+              id: projectId,
+              name: "",
+              role: "",
+              start: "",
+              end: "",
+              description: cleaned.project,
+              link: "",
+            },
+          ]
+        : prev.projects,
+    }));
+
+    setUndo({
+      kind: "full",
+      previousSummary,
+      summaryChanged,
+      experienceId,
+      projectId,
+    });
+    setFullOutput(EMPTY_FULL_OUTPUT);
+    setError(null);
+    setConfirmOverwrite(false);
+    setOpen(false);
+  };
+
   const handleAdopt = () => {
-    if (streaming || !output.trim()) return;
+    if (streaming) return;
+
+    if (fullMode) {
+      const hasOutput = AI_SECTIONS.some(
+        (item) => cleanAiText(fullOutput[item], item).length > 0,
+      );
+      if (!hasOutput) return;
+
+      const destructive = Boolean(
+        resume.basic.summary.trim() &&
+          cleanAiText(fullOutput.summary, "summary"),
+      );
+      if (destructive && !confirmOverwrite) {
+        setConfirmOverwrite(true);
+        return;
+      }
+      applyFullAdopt();
+      return;
+    }
+
+    if (!output.trim()) return;
 
     const destructive =
       section === "summary"
@@ -398,6 +588,20 @@ export function AiWriter({ resume, onChange }: Props) {
                 ? { ...entry, description: previousDescription }
                 : entry,
             ),
+      }));
+    } else if (undo.kind === "full") {
+      const { previousSummary, summaryChanged, experienceId, projectId } = undo;
+      onChange((prev) => ({
+        ...prev,
+        basic: summaryChanged
+          ? { ...prev.basic, summary: previousSummary }
+          : prev.basic,
+        experiences: experienceId
+          ? prev.experiences.filter((entry) => entry.id !== experienceId)
+          : prev.experiences,
+        projects: projectId
+          ? prev.projects.filter((entry) => entry.id !== projectId)
+          : prev.projects,
       }));
     } else {
       const { id, previousDescription, created } = undo;
@@ -473,7 +677,7 @@ export function AiWriter({ resume, onChange }: Props) {
                   AI 帮我写
                 </h2>
                 <p className="mt-0.5 text-[11.5px] text-zinc-500">
-                  {SECTION_LABELS[section]} · 内容会发送到 DeepSeek
+                  {fullMode ? "整份简历" : SECTION_LABELS[section]} · 内容会发送到 DeepSeek
                 </p>
               </div>
               <button
@@ -537,21 +741,36 @@ export function AiWriter({ resume, onChange }: Props) {
               ) : (
                 <div className="space-y-3">
                   <div className="flex rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
-                    {SECTIONS.map((item) => (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => handleSectionChange(item.value)}
-                        aria-pressed={section === item.value}
-                        className={`flex-1 rounded-md px-2 py-1.5 text-[12px] font-medium transition ${
-                          section === item.value
-                            ? "bg-white text-zinc-900 shadow-sm"
-                            : "text-zinc-500 hover:text-zinc-900"
-                        }`}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
+                    {SECTIONS.map((item) => {
+                      const active = !fullMode && section === item.value;
+                      return (
+                        <button
+                          key={item.value}
+                          type="button"
+                          onClick={() => handleTabChange(item.value)}
+                          aria-pressed={active}
+                          className={`flex-1 rounded-md px-1.5 py-1.5 text-[11.5px] font-medium transition sm:text-[12px] ${
+                            active
+                              ? "bg-white text-zinc-900 shadow-sm"
+                              : "text-zinc-500 hover:text-zinc-900"
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => handleTabChange("full")}
+                      aria-pressed={fullMode}
+                      className={`flex-1 rounded-md px-1.5 py-1.5 text-[11.5px] font-medium transition sm:text-[12px] ${
+                        fullMode
+                          ? "bg-white text-zinc-900 shadow-sm"
+                          : "text-zinc-500 hover:text-zinc-900"
+                      }`}
+                    >
+                      整份简历
+                    </button>
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -573,7 +792,7 @@ export function AiWriter({ resume, onChange }: Props) {
                     </Field>
                   </div>
 
-                  {section !== "summary" ? (
+                  {!fullMode && section !== "summary" ? (
                     <>
                       <Field label="写入到">
                         <Select
@@ -598,9 +817,17 @@ export function AiWriter({ resume, onChange }: Props) {
                     </>
                   ) : null}
 
-                  <Field label="关键词 / 成果" hint={`${keywords.length}/2000`}>
+                  <Field
+                    label="关键词 / 成果"
+                    hint={`${keywords.length}/2000${
+                      !fullMode && mode === "polish"
+                        ? " · 优化模式可只传现有内容"
+                        : ""
+                    }`}
+                  >
                     <TextArea
                       autoFocus
+                      data-qa="ai-keywords"
                       value={keywords}
                       onChange={(event) => setKeywords(event.target.value)}
                       maxLength={2000}
@@ -609,7 +836,30 @@ export function AiWriter({ resume, onChange }: Props) {
                     />
                   </Field>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <Field
+                    label="参考 JD"
+                    hint={`${jd.length}/${JD_MAX_LENGTH}${
+                      jdFromSaved ? " · 已读取 JD 匹配页" : " · 选填"
+                    }`}
+                  >
+                    <TextArea
+                      data-qa="ai-jd"
+                      value={jd}
+                      onChange={(event) => {
+                        setJd(event.target.value);
+                        setJdFromSaved(false);
+                      }}
+                      maxLength={JD_MAX_LENGTH}
+                      className="min-h-[72px]"
+                      placeholder="选填：粘贴目标岗位 JD，AI 会按 JD 调整表述重点，但不会编造你没写过的经历"
+                    />
+                  </Field>
+
+                  <div
+                    className={
+                      fullMode ? "" : "grid gap-3 sm:grid-cols-2"
+                    }
+                  >
                     <Field label="风格">
                       <Select
                         value={tone}
@@ -624,23 +874,25 @@ export function AiWriter({ resume, onChange }: Props) {
                         ))}
                       </Select>
                     </Field>
-                    <Field label="模式">
-                      <Select
-                        value={mode}
-                        onChange={(event) =>
-                          setMode(event.target.value as AiMode)
-                        }
-                      >
-                        <option value="draft">新写</option>
-                        <option value="polish" disabled={!currentText.trim()}>
-                          优化现有{SECTION_LABELS[section]}
-                          {currentText.trim() ? "" : "（暂无内容）"}
-                        </option>
-                      </Select>
-                    </Field>
+                    {fullMode ? null : (
+                      <Field label="模式">
+                        <Select
+                          value={mode}
+                          onChange={(event) =>
+                            setMode(event.target.value as AiMode)
+                          }
+                        >
+                          <option value="draft">新写</option>
+                          <option value="polish" disabled={!currentText.trim()}>
+                            优化现有{SECTION_LABELS[section]}
+                            {currentText.trim() ? "" : "（暂无内容）"}
+                          </option>
+                        </Select>
+                      </Field>
+                    )}
                   </div>
 
-                  {section !== "summary" && targetId !== "new" ? (
+                  {!fullMode && section !== "summary" && targetId !== "new" ? (
                     <Field label="采用方式" hint="追加不会删除原文">
                       <Select
                         value={adoptMode}
@@ -654,14 +906,22 @@ export function AiWriter({ resume, onChange }: Props) {
                     </Field>
                   ) : null}
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => void handleGenerate()}
-                      disabled={streaming || !keywords.trim()}
+                      onClick={() =>
+                        void (fullMode ? handleGenerateFull() : handleGenerate())
+                      }
+                      disabled={streaming || !canGenerate}
                     >
-                      {output ? "重新生成" : "生成"}
+                      {fullMode
+                        ? fullHasOutput
+                          ? "重新生成整份"
+                          : "生成整份简历"
+                        : output
+                          ? "重新生成"
+                          : "生成"}
                     </Button>
                     {streaming ? (
                       <Button variant="ghost" size="sm" onClick={handleStop}>
@@ -670,38 +930,91 @@ export function AiWriter({ resume, onChange }: Props) {
                     ) : null}
                     {status?.model ? (
                       <span className="ml-auto text-[11px] text-zinc-400">
-                        {status.model}
+                        {fullMode ? "依次调用 3 次 AI" : status.model}
                       </span>
                     ) : null}
                   </div>
 
-                  <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3">
-                    <div className="mb-1.5 flex items-center justify-between text-[11px] text-zinc-400">
-                      <span>
-                        生成预览
-                        {output && !streaming ? "（可直接修改）" : ""}
-                      </span>
-                      {output ? <span>{output.length} 字</span> : null}
+                  {fullMode ? (
+                    <div className="space-y-2">
+                      {AI_SECTIONS.map((item) => {
+                        const active = fullStage === item;
+                        return (
+                          <div
+                            key={item}
+                            className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3"
+                          >
+                            <div className="mb-1.5 flex items-center justify-between text-[11px] text-zinc-400">
+                              <span>
+                                {SECTION_LABELS[item]}
+                                {active
+                                  ? " · 生成中…"
+                                  : fullOutput[item]
+                                    ? " · 可直接修改"
+                                    : " · 等待生成"}
+                              </span>
+                              {fullOutput[item] ? (
+                                <span>{fullOutput[item].length} 字</span>
+                              ) : null}
+                            </div>
+                            {fullOutput[item] && !active ? (
+                              <textarea
+                                data-qa={`ai-full-${item}`}
+                                value={fullOutput[item]}
+                                onChange={(event) =>
+                                  setFullOutput((previous) => ({
+                                    ...previous,
+                                    [item]: event.target.value,
+                                  }))
+                                }
+                                aria-label={`${SECTION_LABELS[item]}生成预览，可直接修改`}
+                                className="min-h-[84px] w-full resize-y bg-transparent text-[13px] leading-6 text-zinc-800 outline-none"
+                              />
+                            ) : (
+                              <div className="min-h-[84px] whitespace-pre-wrap text-[13px] leading-6 text-zinc-800">
+                                {fullOutput[item] ||
+                                  (active ? "AI 正在写…" : "等待生成")}
+                                {active ? (
+                                  <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-zinc-900 align-middle" />
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      <p className="text-[10.5px] leading-4 text-zinc-400">
+                        采用后会覆盖个人简介，并各新增一条工作经历和项目经历；公司、职位、项目名和时间仍需你补充。
+                      </p>
                     </div>
-                    {output && !streaming ? (
-                      <textarea
-                        value={output}
-                        onChange={(event) => setOutput(event.target.value)}
-                        aria-label="生成预览，可直接修改"
-                        className="min-h-[120px] w-full resize-y bg-transparent text-[13px] leading-6 text-zinc-800 outline-none"
-                      />
-                    ) : (
-                      <div className="min-h-[120px] whitespace-pre-wrap text-[13px] leading-6 text-zinc-800">
-                        {output ||
-                          (streaming
-                            ? "AI 正在构思…"
-                            : "填写关键词后点击生成")}
-                        {streaming ? (
-                          <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-zinc-900 align-middle" />
-                        ) : null}
+                  ) : (
+                    <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3">
+                      <div className="mb-1.5 flex items-center justify-between text-[11px] text-zinc-400">
+                        <span>
+                          生成预览
+                          {output && !streaming ? "（可直接修改）" : ""}
+                        </span>
+                        {output ? <span>{output.length} 字</span> : null}
                       </div>
-                    )}
-                  </div>
+                      {output && !streaming ? (
+                        <textarea
+                          value={output}
+                          onChange={(event) => setOutput(event.target.value)}
+                          aria-label="生成预览，可直接修改"
+                          className="min-h-[120px] w-full resize-y bg-transparent text-[13px] leading-6 text-zinc-800 outline-none"
+                        />
+                      ) : (
+                        <div className="min-h-[120px] whitespace-pre-wrap text-[13px] leading-6 text-zinc-800">
+                          {output ||
+                            (streaming
+                              ? "AI 正在构思…"
+                              : "填写关键词后点击生成")}
+                          {streaming ? (
+                            <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-zinc-900 align-middle" />
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {error ? (
                     <p role="alert" className="text-[12px] text-red-600">
@@ -712,15 +1025,19 @@ export function AiWriter({ resume, onChange }: Props) {
                   {confirmOverwrite ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
                       <p>
-                        {section === "summary"
-                          ? "个人简介已有内容，采用后会覆盖原文。"
-                          : `该条${SECTION_LABELS[section]}已有描述，采用后会覆盖原文。`}
+                        {fullMode
+                          ? "整份生成会覆盖个人简介，并新增工作/项目条目；现有经历与项目不会被修改。"
+                          : section === "summary"
+                            ? "个人简介已有内容，采用后会覆盖原文。"
+                            : `该条${SECTION_LABELS[section]}已有描述，采用后会覆盖原文。`}
                       </p>
                       <div className="mt-2 flex gap-2">
                         <Button
                           variant="primary"
                           size="sm"
-                          onClick={applyAdopt}
+                          onClick={
+                            fullMode ? applyFullAdopt : applyAdopt
+                          }
                         >
                           确认覆盖
                         </Button>
@@ -740,7 +1057,9 @@ export function AiWriter({ resume, onChange }: Props) {
 
             <footer className="border-t border-zinc-100 px-5 py-3">
               <p className="text-[11px] leading-4 text-zinc-400">
-                只发送本面板内容与当前板块文本，不发送姓名、电话、邮箱或整份简历。
+                只发送本面板内容、当前板块文本
+                {jd.trim() ? "与参考 JD" : ""}
+                ，不发送姓名、电话、邮箱或整份简历。
               </p>
               <div className="mt-2 flex items-center justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={closeDialog}>
@@ -751,9 +1070,11 @@ export function AiWriter({ resume, onChange }: Props) {
                     variant="primary"
                     size="sm"
                     onClick={handleAdopt}
-                    disabled={streaming || !output.trim()}
+                    disabled={
+                      streaming || (fullMode ? !fullHasOutput : !output.trim())
+                    }
                   >
-                    采用到简历
+                    {fullMode ? "采用整份简历" : "采用到简历"}
                   </Button>
                 ) : null}
               </div>

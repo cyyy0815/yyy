@@ -14,6 +14,8 @@ export type AiGenerateRequest = {
   years: string;
   keywords: string;
   current?: string;
+  /** 可选的目标 JD，只用于调整表述重点，不写入简历。 */
+  jd?: string;
   tone: AiTone;
 };
 
