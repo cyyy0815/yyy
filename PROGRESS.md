@@ -26,7 +26,7 @@
 | 8 | 编辑体验（追加） | ✅ 完成 |
 | 9 | 主题色与新模板（追加） | ✅ 完成 |
 | 10 | 分页控制与 PDF 页码（追加） | ✅ 完成 |
-| 11 | AI 写简历（DeepSeek，追加） | 🟡 进行中（M0–M1 完成） |
+| 11 | AI 写简历（DeepSeek，追加） | 🟡 进行中（M0–M2 完成） |
 
 ## 阶段明细
 
@@ -125,8 +125,10 @@
 - [x] 真实 Key 联调：流式 delta、done + usage、简介单段、经历逐行要点
 - [x] 发现并修复：`deepseek-flash` 默认 high effort 会耗尽 `max_tokens`，改用 `reasoning_effort: "low"`
 - [x] 校验分支：400（参数/JSON）、413（64KB）、429（限流）返回正确
-- [ ] M2：AI 弹窗 + 个人简介生成 + 采用
-- [ ] M3：工作/项目目标选择 + 优化模式 + 停止/重试/撤销
+- [x] M2：AI 写简介弹窗、流式预览、停止/重新生成、覆盖确认、8 秒撤销
+- [x] 隐私：服务端过滤邮箱/手机/链接；新写模式不发送现有简介
+- [x] 无头 Chrome 验证：采用后 localStorage 同步、撤销可还原、390px 无横向溢出
+- [ ] M3：工作/项目板块 + 目标条目选择（优化模式、停止、撤销已在 M2 完成）
 - [ ] M4：QA、README/PROGRESS、真实 Key 联调、build
 
 > 方案细节、接口契约、Prompt、测试与验收全部在 `PLAN.md`。
@@ -134,11 +136,12 @@
 ## 当前进度
 
 - 最近更新：2026-10-27
-- 状态：**阶段 0–10 已完成；阶段 11「AI 写简历」进行中，M0–M1 完成**
+- 状态：**阶段 0–10 已完成；阶段 11「AI 写简历」进行中，M0–M2 完成**
 - 代码状态：
   - M0：git 仓库、`.env.example`、`scripts/mock-deepseek.mjs` 完成
   - M1：`/api/ai/status`、`/api/ai/generate`、SSE 转换完成
-  - M2–M4 未开始：页面尚未接入 AI 入口，用户还看不到功能
+  - M2：编辑页顶部「AI 帮我写」入口 + 简介弹窗 + 流式预览 + 采用/撤销完成
+  - M3–M4 未开始：工作 / 项目板块尚未接入，QA 与文档待补
 - 本地地址：http://localhost:3000 （推荐页 http://localhost:3000/#jobs）
 - 一键自检：先 `npm run dev`，再 `npm run qa`（截图输出到 `.screenshots/`）
 - 单一方案文档：**`PLAN.md`**
@@ -152,19 +155,23 @@
 - 关键修复：`deepseek-flash` 默认 high effort 把 450 token 全消耗在 reasoning 上，
   正文为空；改为 `reasoning_effort: "low"`，预算调为简介 700 / 经历与项目 1500
 - 提示词按板块拆分格式规则：简介单段，经历/项目逐行要点且不编号
+- M2：编辑页顶部 AI 入口 + 弹窗；配置检查、流式预览、停止/重新生成
+- M2：覆盖非空简介需二次确认；采用后 8 秒撤销；未配置 Key 显示步骤
+- M2：服务端过滤邮箱/手机/链接；新写模式不发送现有简介
+- 无头 Chrome 验证：采用后 localStorage 同步、撤销还原、390px 无横向溢出、无控制台错误
 - 验证：400 / 413 分支、`tsc`、`npm run lint` 均通过
 
 ### 下次继续
 
 1. 先读 `PLAN.md` 的 1.2–1.7 与「路线图」，再读本文件阶段 11
-2. 实施 M2：`AiWriter.tsx` 弹窗 + 简介生成 + 采用 + 未配置 Key 状态
-3. M3：工作/项目目标选择、优化模式、停止/重试、撤销
-4. M4：QA 脚本、README/PROGRESS、真实 Key 联调、`npm run build`
-5. 注意：覆盖非空内容必须在 M2/M3 内做确认 + 撤销，不能拖到 P1
+2. 实施 M3：工作/项目板块、现有条目选择、新建条目、写入与撤销
+3. M4：QA 脚本接入 AI 弹窗与 mock 生成、README、`npm run build`
+4. 注意：AI 写入的覆盖确认与撤销不能留到 P1；M3 要覆盖新建条目的撤销
+5. M3 完成后补一次移动端与多页简历的回归（AI 只改文本，不影响排版）
 
 ## 可选后续
 
-- [x] AI 写简历（DeepSeek）— M0–M1 完成，M2 进行中；详见 `PLAN.md`
+- [x] AI 写简历（DeepSeek）— M0–M2 完成，M3 进行中；详见 `PLAN.md`
 - [ ] AI 润色 / JD 匹配改写 / 多语言翻译（AI 首版跑通后再考虑）
 - [ ] 接入职位聚合 API（JSearch / Adzuna），用 Next.js Route Handler 隐藏 key
 - [ ] 更多字体搭配 / 模板变体（配色已支持）
@@ -215,12 +222,13 @@ PLAN.md                单一优化方案（AI 为 P0；数据安全、内容能
 ```
 src/app/api/ai/status/route.ts     ✅ Key / 模型状态（运行时读取）
 src/app/api/ai/generate/route.ts   ✅ 校验、限流、SSE 转换
-src/lib/ai/types.ts                ✅ 请求 / 事件类型
+src/lib/ai/types.ts                ✅ 请求 / 事件 / 状态类型
 src/lib/ai/config.ts               ✅ 环境变量读取
-src/lib/ai/prompt.ts               ✅ 提示词、payload、输出清洗
+src/lib/ai/client.ts               ✅ 浏览器端 SSE 客户端
+src/lib/ai/prompt.ts               ✅ 提示词、payload、输出清洗、联系方式过滤
 src/lib/ai/deepseek.ts             ✅ 上游请求、重试、SSE 解析
 scripts/mock-deepseek.mjs          ✅ 本地 mock 上游
 .env.example                       ✅ 环境变量示例
-src/components/resume/AiWriter.tsx ⬜ 待实现（M2）
+src/components/resume/AiWriter.tsx ✅ 弹窗、流式预览、采用/撤销（简介）
 src/app/api/ai/models/route.ts     ⬜ 可选，暂不实现
 ```

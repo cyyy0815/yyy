@@ -22,6 +22,11 @@ export type AiUsage = {
   completion_tokens: number;
 };
 
+export type AiStatus = {
+  configured: boolean;
+  model: string;
+};
+
 export type AiErrorCode =
   | "invalid_request"
   | "payload_too_large"

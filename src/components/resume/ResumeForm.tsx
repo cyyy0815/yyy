@@ -11,6 +11,7 @@ import {
   type Project,
   type Resume,
 } from "@/lib/types";
+import { AiWriter } from "@/components/resume/AiWriter";
 import { Button } from "@/components/ui/Button";
 import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -686,6 +687,8 @@ export function ResumeForm({ resume, onChange }: Props) {
 
   return (
     <div className="space-y-4">
+      <AiWriter resume={resume} onChange={onChange} />
+
       <SectionCard title="基本信息" description="让 HR 第一眼知道你是谁">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="姓名">

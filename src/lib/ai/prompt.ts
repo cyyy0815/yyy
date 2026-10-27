@@ -41,6 +41,20 @@ export function buildSystemPrompt(section: AiSection): string {
   ].join("\n");
 }
 
+/**
+ * 隐私兜底：姓名来自独立字段，本模块从不读取 `basic.name`；
+ * 若用户把邮箱、手机、链接写进了简介或关键词，也在发送前过滤掉。
+ */
+function stripContactInfo(text: string): string {
+  return text
+    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "")
+    .replace(/(?:\+?86[\s-]?)?1[3-9]\d{9}/g, "")
+    .replace(/(?:https?:\/\/|www\.)\S+/gi, "")
+    .replace(/\bgithub\.com\/\S+/gi, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 export function buildUserPrompt(input: AiGenerateRequest): string {
   return [
     `目标岗位：${input.role || "未填写"}`,
@@ -48,9 +62,9 @@ export function buildUserPrompt(input: AiGenerateRequest): string {
     `风格：${TONE_LABELS[input.tone]}`,
     `模式：${MODE_LABELS[input.mode]}`,
     "现有内容：",
-    `<current>${input.current ?? ""}</current>`,
+    `<current>${stripContactInfo(input.current ?? "")}</current>`,
     "关键词/成果：",
-    `<keywords>${input.keywords}</keywords>`,
+    `<keywords>${stripContactInfo(input.keywords)}</keywords>`,
   ].join("\n");
 }
 
