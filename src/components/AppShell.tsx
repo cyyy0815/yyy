@@ -32,6 +32,15 @@ const TEMPLATES: { id: TemplateId; label: string }[] = [
 ];
 
 const TEMPLATE_KEY = "resume-workshop:template";
+const PAGE_NUMBERS_KEY = "resume-workshop:page-numbers";
+
+function readShowPageNumbers(): boolean {
+  try {
+    return window.localStorage.getItem(PAGE_NUMBERS_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
 
 type Tab = "edit" | "jobs";
 type MobilePane = "form" | "preview";
@@ -117,6 +126,8 @@ function ResumeWorkspace() {
   );
   const [template, setTemplate] = useState<TemplateId>(readTemplate);
   const [mobilePane, setMobilePane] = useState<MobilePane>("form");
+  const [showPageNumbers, setShowPageNumbers] =
+    useState(readShowPageNumbers);
   const [notice, setNotice] = useState<Notice>(null);
   const [resumeVersion, setResumeVersion] = useState(0);
   const backupDue = useSyncExternalStore(
@@ -140,6 +151,20 @@ function ResumeWorkspace() {
       // ignore
     }
   }, [template]);
+
+  useEffect(() => {
+    document.documentElement.dataset.pageNumbers = showPageNumbers
+      ? "on"
+      : "off";
+    try {
+      window.localStorage.setItem(
+        PAGE_NUMBERS_KEY,
+        showPageNumbers ? "on" : "off",
+      );
+    } catch {
+      // ignore
+    }
+  }, [showPageNumbers]);
 
   useEffect(() => {
     const nextHash = tab === "jobs" ? "#jobs" : "";
@@ -472,6 +497,7 @@ function ResumeWorkspace() {
               <button
                 type="button"
                 onClick={() => setMobilePane("form")}
+                aria-pressed={mobilePane === "form"}
                 className={`flex-1 rounded-lg py-2 text-[12.5px] font-medium transition ${
                   mobilePane === "form"
                     ? "bg-zinc-900 text-white"
@@ -483,6 +509,7 @@ function ResumeWorkspace() {
               <button
                 type="button"
                 onClick={() => setMobilePane("preview")}
+                aria-pressed={mobilePane === "preview"}
                 className={`flex-1 rounded-lg py-2 text-[12.5px] font-medium transition ${
                   mobilePane === "preview"
                     ? "bg-zinc-900 text-white"
@@ -645,6 +672,23 @@ function ResumeWorkspace() {
                       accent={resume.theme.accent}
                       onChange={handleAccent}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPageNumbers((value) => !value)}
+                      aria-pressed={showPageNumbers}
+                      title={
+                        showPageNumbers
+                          ? "打印时显示页码，点击关闭"
+                          : "打印时不显示页码，点击开启"
+                      }
+                      className={`rounded-lg border px-2.5 py-1.5 text-[11.5px] font-medium transition ${
+                        showPageNumbers
+                          ? "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400"
+                          : "border-zinc-200 bg-transparent text-zinc-400 hover:text-zinc-600"
+                      }`}
+                    >
+                      页码 {showPageNumbers ? "开" : "关"}
+                    </button>
                   </div>
                   <div className="flex items-center gap-1">
                     <Button

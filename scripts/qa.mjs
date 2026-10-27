@@ -2303,6 +2303,17 @@ await printPage.goto(BASE, { waitUntil: "networkidle0" });
 await new Promise((resolve) => setTimeout(resolve, 900));
 await printPage.emulateMediaType("print");
 await new Promise((resolve) => setTimeout(resolve, 300));
+const printContrast = await printPage.evaluate(() => {
+  const node = document.querySelector(
+    '#resume-print [class*="text-zinc-400"]',
+  );
+  return node ? getComputedStyle(node).color : "none";
+});
+expect(
+  "打印浅灰文字对比度提高",
+  printContrast === "rgb(82, 82, 91)",
+  printContrast,
+);
 await printPage.screenshot({ path: `${OUT}/qa-print.png`, fullPage: true });
 await printPage.pdf({
   path: `${OUT}/qa-resume.pdf`,
@@ -2348,6 +2359,86 @@ console.log(`qa-theme-ink: ${themeInk}`);
 await themePage.screenshot({ path: `${OUT}/qa-theme-timeline.png` });
 await themePage.evaluate(() => localStorage.removeItem("resume-workshop:v1"));
 await themePage.close();
+
+// P3 页码开关与可访问性：命名页关闭页码、主题色圆点加大、移动端 aria-pressed
+const printSettingsPage = await open({ width: 1440, height: 1000 });
+await printSettingsPage.goto(BASE, { waitUntil: "networkidle0" });
+await printSettingsPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.removeItem("resume-workshop:page-numbers");
+});
+await printSettingsPage.reload({ waitUntil: "networkidle0" });
+await pause(600);
+
+const swatchSize = await printSettingsPage.evaluate(() => {
+  const swatch = document.querySelector('button[aria-label="靛蓝"]');
+  return swatch?.getBoundingClientRect().width ?? 0;
+});
+expect("主题色圆点不小于 24px", swatchSize >= 23.5, String(swatchSize));
+
+await printSettingsPage.evaluate(() => {
+  [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.trim().startsWith("页码"))
+    ?.click();
+});
+await printSettingsPage.waitForFunction(
+  () =>
+    localStorage.getItem("resume-workshop:page-numbers") === "off" &&
+    document.documentElement.dataset.pageNumbers === "off",
+  { timeout: 5000 },
+);
+expect("页码开关可关闭", true);
+
+await printSettingsPage.reload({ waitUntil: "networkidle0" });
+await pause(600);
+const pagesOffKept = await printSettingsPage.evaluate(
+  () => document.documentElement.dataset.pageNumbers === "off",
+);
+expect("页码开关刷新后保留", pagesOffKept);
+
+await printSettingsPage.emulateMediaType("print");
+await pause(300);
+const namedPage = await printSettingsPage.evaluate(() => ({
+  body: getComputedStyle(document.body).getPropertyValue("page"),
+  html: getComputedStyle(document.documentElement).getPropertyValue("page"),
+}));
+console.log(`qa-page-numbers: ${JSON.stringify(namedPage)}`);
+expect(
+  "关闭页码时使用无页码命名页",
+  namedPage.body === "no-page-numbers" || namedPage.html === "no-page-numbers",
+  JSON.stringify(namedPage),
+);
+await printSettingsPage.emulateMediaType("screen");
+
+await printSettingsPage.setViewport({
+  width: 390,
+  height: 844,
+  deviceScaleFactor: 1,
+  isMobile: true,
+  hasTouch: true,
+});
+await pause(300);
+const paneAria = await printSettingsPage.evaluate(() =>
+  [...document.querySelectorAll("button[aria-pressed]")]
+    .filter((button) => ["编辑", "预览"].includes(button.textContent?.trim() ?? ""))
+    .map((button) => ({
+      text: button.textContent?.trim(),
+      pressed: button.getAttribute("aria-pressed"),
+    })),
+);
+expect(
+  "手机端编辑/预览切换有 aria-pressed",
+  paneAria.length === 2 &&
+    paneAria.find((item) => item.text === "编辑")?.pressed === "true" &&
+    paneAria.find((item) => item.text === "预览")?.pressed === "false",
+  JSON.stringify(paneAria),
+);
+
+await printSettingsPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.removeItem("resume-workshop:page-numbers");
+});
+await printSettingsPage.close();
 
 // 分页：长简历 + 手动分页，检查页数提示、引导线和标题页码按钮
 const pagePage = await open({ width: 1440, height: 1100 });

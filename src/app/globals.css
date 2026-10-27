@@ -105,6 +105,24 @@ body {
     margin-top: 0;
   }
 
+  /*
+   * 页码开关：关闭时整份文档切换到不带 @bottom-center 的命名页，
+   * 其余边距与首页贴顶规则保持一致。
+   */
+  @page no-page-numbers {
+    size: A4;
+    margin: 8mm 0 8mm;
+  }
+
+  @page no-page-numbers:first {
+    margin-top: 0;
+  }
+
+  html[data-page-numbers="off"],
+  html[data-page-numbers="off"] body {
+    page: no-page-numbers;
+  }
+
   html,
   body {
     height: auto !important;
@@ -192,5 +210,14 @@ body {
   /* 网格跨页时分栏可能失效：续页仍保持首页主栏宽度，避免文字忽然变宽 */
   .resume-aside-grid > .resume-main {
     max-width: 117.5mm !important;
+  }
+
+  /* 打印对比度：浅灰日期 / 链接在纸面上偏淡，统一压深一档 */
+  #resume-print [class*="text-zinc-400"] {
+    color: #52525b !important;
+  }
+
+  #resume-print [class*="text-white/55"] {
+    color: rgba(255, 255, 255, 0.8) !important;
   }
 }

@@ -26,7 +26,7 @@ export function ThemePicker({
               title={preset.name}
               aria-label={preset.name}
               aria-pressed={selected}
-              className={`h-[18px] w-[18px] rounded-full transition ${
+              className={`h-6 w-6 rounded-full transition ${
                 selected
                   ? "ring-2 ring-zinc-900 ring-offset-2"
                   : "ring-1 ring-black/10 hover:ring-black/30"
@@ -37,7 +37,7 @@ export function ThemePicker({
         })}
         <label
           title="自定义颜色"
-          className={`relative flex h-[18px] w-[18px] cursor-pointer items-center justify-center rounded-full border border-dashed transition ${
+          className={`relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border border-dashed transition ${
             isPreset
               ? "border-zinc-300 text-zinc-400 hover:border-zinc-400"
               : "border-transparent ring-2 ring-zinc-900 ring-offset-2"
