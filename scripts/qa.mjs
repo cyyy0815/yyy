@@ -1371,6 +1371,416 @@ await customPage.evaluate(() => {
 });
 await customPage.close();
 
+// P2 多份简历：重命名、复制、切换、模板隔离、刷新保留、删除、新建
+const multiPage = await open({ width: 1440, height: 1000 });
+await multiPage.goto(BASE, { waitUntil: "networkidle0" });
+await multiPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:library:v1");
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: {
+        name: "多简历测试",
+        headline: "前端工程师",
+        email: "",
+        phone: "",
+        city: "上海",
+        website: "",
+        github: "",
+        summary: "用于验证多份简历。",
+        photo: "",
+      },
+      intent: { targetRole: "前端工程师" },
+      educations: [],
+      experiences: [],
+      projects: [],
+      customSections: [],
+      skills: ["React"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.setItem("resume-workshop:template", "classic");
+});
+await multiPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+
+const initialDocuments = await multiPage.evaluate(() => {
+  const select = document.querySelector('select[aria-label="切换简历"]');
+  return {
+    count: select?.options.length,
+    title: select?.selectedOptions[0]?.textContent,
+    value: select?.value,
+    deleteDisabled: [...document.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "删除",
+    )?.disabled,
+  };
+});
+expect(
+  "单份简历显示文档栏",
+  initialDocuments.count === 1 &&
+    initialDocuments.title === "多简历测试" &&
+    initialDocuments.deleteDisabled === true,
+  JSON.stringify(initialDocuments),
+);
+
+let renamePrompt = "";
+multiPage.once("dialog", async (dialog) => {
+  renamePrompt = dialog.message();
+  await dialog.accept("主简历");
+});
+await clickText(multiPage, "重命名", '[data-resume-documents="true"]');
+await multiPage.waitForFunction(
+  () => {
+    const select = document.querySelector('select[aria-label="切换简历"]');
+    try {
+      const library = JSON.parse(
+        localStorage.getItem("resume-workshop:library:v1") ?? "null",
+      );
+      return (
+        select?.selectedOptions[0]?.textContent === "主简历" &&
+        library?.activeTitle === "主简历"
+      );
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 5000 },
+);
+expect("简历可重命名", renamePrompt.includes("重命名"), renamePrompt);
+
+await clickText(multiPage, "复制", '[data-resume-documents="true"]');
+await multiPage.waitForFunction(
+  () => {
+    const select = document.querySelector('select[aria-label="切换简历"]');
+    return (
+      select?.options.length === 2 &&
+      select.selectedOptions[0]?.textContent === "主简历 副本"
+    );
+  },
+  { timeout: 5000 },
+);
+const copiedState = await multiPage.evaluate(() => {
+  const select = document.querySelector('select[aria-label="切换简历"]');
+  const library = JSON.parse(
+    localStorage.getItem("resume-workshop:library:v1") ?? "null",
+  );
+  return {
+    count: select?.options.length,
+    activeTitle: select?.selectedOptions[0]?.textContent,
+    others: (library?.others ?? []).map((document) => ({
+      title: document.title,
+      name: document.resume?.basic?.name,
+      template: document.template,
+    })),
+    template: localStorage.getItem("resume-workshop:template"),
+  };
+});
+expect(
+  "可复制当前简历并保留原文档",
+  copiedState.count === 2 &&
+    copiedState.activeTitle === "主简历 副本" &&
+    copiedState.others.length === 1 &&
+    copiedState.others[0].title === "主简历" &&
+    copiedState.others[0].name === "多简历测试" &&
+    copiedState.others[0].template === "classic",
+  JSON.stringify(copiedState),
+);
+
+await multiPage.evaluate(() => {
+  const label = [...document.querySelectorAll("label")].find((node) =>
+    node.textContent?.includes("姓名"),
+  );
+  const input = label?.querySelector("input");
+  if (!input) return;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+    input,
+    "副本简历",
+  );
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await multiPage.waitForFunction(
+  () => {
+    try {
+      const data = JSON.parse(
+        localStorage.getItem("resume-workshop:v1") ?? "{}",
+      );
+      return data.basic?.name === "副本简历";
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 5000 },
+);
+await clickText(multiPage, "紧凑");
+await multiPage.waitForFunction(
+  () => {
+    const compact = [...document.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "紧凑",
+    );
+    return (
+      compact?.getAttribute("aria-pressed") === "true" &&
+      localStorage.getItem("resume-workshop:template") === "compact"
+    );
+  },
+  { timeout: 5000 },
+);
+
+const originalId = await multiPage.evaluate(() => {
+  const select = document.querySelector('select[aria-label="切换简历"]');
+  return [...(select?.options ?? [])].find(
+    (option) => option.textContent === "主简历",
+  )?.value;
+});
+expect("复制后可切换到原简历", Boolean(originalId), String(originalId));
+await multiPage.select('select[aria-label="切换简历"]', originalId);
+await multiPage.waitForFunction(
+  () => {
+    const select = document.querySelector('select[aria-label="切换简历"]');
+    const nameLabel = [...document.querySelectorAll("label")].find((node) =>
+      node.textContent?.includes("姓名"),
+    );
+    const classic = [...document.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "经典",
+    );
+    return (
+      select?.selectedOptions[0]?.textContent === "主简历" &&
+      nameLabel?.querySelector("input")?.value === "多简历测试" &&
+      classic?.getAttribute("aria-pressed") === "true"
+    );
+  },
+  { timeout: 5000 },
+);
+const originalState = await multiPage.evaluate(() => {
+  const library = JSON.parse(
+    localStorage.getItem("resume-workshop:library:v1") ?? "null",
+  );
+  return {
+    activeTitle: library?.activeTitle,
+    others: (library?.others ?? []).map((document) => ({
+      title: document.title,
+      name: document.resume?.basic?.name,
+      template: document.template,
+    })),
+    template: localStorage.getItem("resume-workshop:template"),
+  };
+});
+expect(
+  "切换简历恢复各自内容与模板",
+  originalState.activeTitle === "主简历" &&
+    originalState.template === "classic" &&
+    originalState.others.some(
+      (document) =>
+        document.title === "主简历 副本" &&
+        document.name === "副本简历" &&
+        document.template === "compact",
+    ),
+  JSON.stringify(originalState),
+);
+
+const duplicateId = await multiPage.evaluate(() => {
+  const select = document.querySelector('select[aria-label="切换简历"]');
+  return [...(select?.options ?? [])].find(
+    (option) => option.textContent === "主简历 副本",
+  )?.value;
+});
+await multiPage.select('select[aria-label="切换简历"]', duplicateId);
+await multiPage.waitForFunction(
+  () => {
+    const nameLabel = [...document.querySelectorAll("label")].find((node) =>
+      node.textContent?.includes("姓名"),
+    );
+    const compact = [...document.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "紧凑",
+    );
+    return (
+      nameLabel?.querySelector("input")?.value === "副本简历" &&
+      compact?.getAttribute("aria-pressed") === "true"
+    );
+  },
+  { timeout: 5000 },
+);
+
+const documentsBar = await multiPage.$('[data-resume-documents="true"]');
+await documentsBar?.screenshot({ path: `${OUT}/qa-documents.png` });
+
+await multiPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+const reloadedDocuments = await multiPage.evaluate(() => {
+  const select = document.querySelector('select[aria-label="切换简历"]');
+  const nameLabel = [...document.querySelectorAll("label")].find((node) =>
+    node.textContent?.includes("姓名"),
+  );
+  const compact = [...document.querySelectorAll("button")].find(
+    (button) => button.textContent?.trim() === "紧凑",
+  );
+  return {
+    count: select?.options.length,
+    activeTitle: select?.selectedOptions[0]?.textContent,
+    name: nameLabel?.querySelector("input")?.value,
+    compact: compact?.getAttribute("aria-pressed") === "true",
+    titles: [...(select?.options ?? [])].map((option) => option.textContent),
+  };
+});
+expect(
+  "刷新后保留多份简历与当前文档",
+  reloadedDocuments.count === 2 &&
+    reloadedDocuments.activeTitle === "主简历 副本" &&
+    reloadedDocuments.name === "副本简历" &&
+    reloadedDocuments.compact &&
+    reloadedDocuments.titles.includes("主简历"),
+  JSON.stringify(reloadedDocuments),
+);
+
+let deleteConfirm = "";
+multiPage.once("dialog", async (dialog) => {
+  deleteConfirm = dialog.message();
+  await dialog.accept();
+});
+await clickText(multiPage, "删除", '[data-resume-documents="true"]');
+await multiPage.waitForFunction(
+  () => {
+    const select = document.querySelector('select[aria-label="切换简历"]');
+    const nameLabel = [...document.querySelectorAll("label")].find((node) =>
+      node.textContent?.includes("姓名"),
+    );
+    const deleteButton = [...document.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "删除",
+    );
+    const classic = [...document.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "经典",
+    );
+    return (
+      select?.options.length === 1 &&
+      select.selectedOptions[0]?.textContent === "主简历" &&
+      nameLabel?.querySelector("input")?.value === "多简历测试" &&
+      classic?.getAttribute("aria-pressed") === "true" &&
+      deleteButton?.disabled === true
+    );
+  },
+  { timeout: 5000 },
+);
+expect(
+  "可删除当前简历并切回上一份",
+  deleteConfirm.includes("删除当前简历"),
+  deleteConfirm,
+);
+
+await clickText(multiPage, "新建", '[data-resume-documents="true"]');
+await multiPage.waitForFunction(
+  () => {
+    const select = document.querySelector('select[aria-label="切换简历"]');
+    const nameLabel = [...document.querySelectorAll("label")].find((node) =>
+      node.textContent?.includes("姓名"),
+    );
+    const modern = [...document.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "现代",
+    );
+    return (
+      select?.options.length === 2 &&
+      select.selectedOptions[0]?.textContent === "新简历" &&
+      nameLabel?.querySelector("input")?.value === "" &&
+      modern?.getAttribute("aria-pressed") === "true"
+    );
+  },
+  { timeout: 5000 },
+);
+const blankState = await multiPage.evaluate(() => {
+  const library = JSON.parse(
+    localStorage.getItem("resume-workshop:library:v1") ?? "null",
+  );
+  return {
+    activeTitle: library?.activeTitle,
+    others: (library?.others ?? []).map((document) => ({
+      title: document.title,
+      name: document.resume?.basic?.name,
+      template: document.template,
+    })),
+  };
+});
+expect(
+  "可新建空白简历并保留原文档",
+  blankState.activeTitle === "新简历" &&
+    blankState.others.some(
+      (document) =>
+        document.title === "主简历" &&
+        document.name === "多简历测试" &&
+        document.template === "classic",
+    ),
+  JSON.stringify(blankState),
+);
+
+const restoredOriginalId = await multiPage.evaluate(() => {
+  const select = document.querySelector('select[aria-label="切换简历"]');
+  return [...(select?.options ?? [])].find(
+    (option) => option.textContent === "主简历",
+  )?.value;
+});
+await multiPage.select('select[aria-label="切换简历"]', restoredOriginalId);
+await multiPage.waitForFunction(
+  () => {
+    const nameLabel = [...document.querySelectorAll("label")].find((node) =>
+      node.textContent?.includes("姓名"),
+    );
+    return nameLabel?.querySelector("input")?.value === "多简历测试";
+  },
+  { timeout: 5000 },
+);
+const blankRetained = await multiPage.evaluate(() => {
+  const library = JSON.parse(
+    localStorage.getItem("resume-workshop:library:v1") ?? "null",
+  );
+  return (library?.others ?? []).some(
+    (document) =>
+      document.title === "新简历" &&
+      document.resume?.basic?.name === "" &&
+      document.template === "modern",
+  );
+});
+expect("新建的空白简历可再次切回", blankRetained);
+
+await multiPage.setViewport({
+  width: 390,
+  height: 844,
+  deviceScaleFactor: 1,
+  isMobile: true,
+  hasTouch: true,
+});
+await pause(400);
+const documentsMobile = await multiPage.evaluate(() => {
+  const bar = document.querySelector('[data-resume-documents="true"]');
+  const select = document.querySelector('select[aria-label="切换简历"]');
+  return {
+    viewport: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    count: select?.options.length,
+    actions: [...(bar?.querySelectorAll("button") ?? [])].map((button) =>
+      button.textContent?.trim(),
+    ),
+    bar: Boolean(bar),
+  };
+});
+expect(
+  "手机端多简历栏无横向溢出",
+  documentsMobile.bar &&
+    documentsMobile.count === 2 &&
+    documentsMobile.actions.join(",") === "新建,复制,重命名,删除" &&
+    documentsMobile.scrollWidth <= documentsMobile.viewport,
+  JSON.stringify(documentsMobile),
+);
+const mobileDocumentsBar = await multiPage.$(
+  '[data-resume-documents="true"]',
+);
+await mobileDocumentsBar?.screenshot({
+  path: `${OUT}/qa-documents-mobile.png`,
+});
+
+await multiPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.removeItem("resume-workshop:library:v1");
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await multiPage.close();
+
 // 打印前用「姓名-头衔」作 document.title，Chrome 存 PDF 时用作文件名
 const pdfNamePage = await open({ width: 1440, height: 1000 });
 await pdfNamePage.goto(BASE, { waitUntil: "networkidle0" });

@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { JobsPanel } from "@/components/jobs/JobsPanel";
+import { ResumeDocumentsBar } from "@/components/resume/ResumeDocumentsBar";
 import { ResumeForm } from "@/components/resume/ResumeForm";
 import { ResumePreview } from "@/components/resume/ResumePreview";
 import { ThemePicker } from "@/components/resume/ThemePicker";
 import { Button } from "@/components/ui/Button";
 import { useResume } from "@/hooks/useResume";
+import { useResumeDocuments } from "@/hooks/useResumeDocuments";
 import { downloadResumeJSON, parseResumeJSON } from "@/lib/storage";
 import { isTemplateId, type Resume, type TemplateId } from "@/lib/types";
 
@@ -92,6 +94,13 @@ function ResumeWorkspace() {
   const [notice, setNotice] = useState<Notice>(null);
   const [resumeVersion, setResumeVersion] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const documents = useResumeDocuments({
+    resume,
+    template,
+    isSample,
+    replaceResume,
+    setTemplate,
+  });
 
   useEffect(() => {
     try {
@@ -150,6 +159,78 @@ function ResumeWorkspace() {
 
   const handleAccent = (accent: string) => {
     updateResume((prev) => ({ ...prev, theme: { accent } }));
+  };
+
+  const handleSwitchDocument = (id: string) => {
+    if (documents.switchTo(id)) {
+      setResumeVersion((value) => value + 1);
+      return;
+    }
+    setNotice({
+      type: "error",
+      message: "切换失败：浏览器存储不可用或空间已满",
+    });
+  };
+
+  const handleCreateDocument = () => {
+    if (documents.createBlank()) {
+      setResumeVersion((value) => value + 1);
+      setNotice({ type: "ok", message: "已新建空白简历" });
+      return;
+    }
+    setNotice({
+      type: "error",
+      message: "新建失败：浏览器存储不可用或空间已满",
+    });
+  };
+
+  const handleDuplicateDocument = () => {
+    if (documents.duplicateCurrent()) {
+      setResumeVersion((value) => value + 1);
+      setNotice({ type: "ok", message: "已复制当前简历" });
+      return;
+    }
+    setNotice({
+      type: "error",
+      message: "复制失败：浏览器存储不可用或空间已满",
+    });
+  };
+
+  const handleRenameDocument = () => {
+    const title = window.prompt("重命名简历", documents.currentTitle);
+    if (title === null) return;
+    if (!title.trim()) {
+      setNotice({ type: "error", message: "简历名称不能为空" });
+      return;
+    }
+    if (documents.renameActive(title)) {
+      setNotice({ type: "ok", message: "简历已重命名" });
+      return;
+    }
+    setNotice({
+      type: "error",
+      message: "重命名失败：浏览器存储不可用或空间已满",
+    });
+  };
+
+  const handleDeleteDocument = () => {
+    if (!documents.canDelete) return;
+    if (
+      !window.confirm(
+        `确定删除当前简历「${documents.currentTitle}」吗？此操作不可撤销，建议先导出 JSON 备份。`,
+      )
+    ) {
+      return;
+    }
+    if (documents.deleteActive()) {
+      setResumeVersion((value) => value + 1);
+      setNotice({ type: "ok", message: "已删除当前简历" });
+      return;
+    }
+    setNotice({
+      type: "error",
+      message: "删除失败：浏览器存储不可用或空间已满",
+    });
   };
 
   const handlePrint = () => {
@@ -328,6 +409,17 @@ function ResumeWorkspace() {
                 预览
               </button>
             </div>
+
+            <ResumeDocumentsBar
+              documents={documents.documents}
+              activeId={documents.activeId}
+              canDelete={documents.canDelete}
+              onSwitch={handleSwitchDocument}
+              onCreate={handleCreateDocument}
+              onDuplicate={handleDuplicateDocument}
+              onRename={handleRenameDocument}
+              onDelete={handleDeleteDocument}
+            />
 
             {isSample ? (
               <div className="print-hide mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200/70 bg-amber-50/70 px-4 py-3">
