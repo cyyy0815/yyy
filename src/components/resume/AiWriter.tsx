@@ -15,18 +15,51 @@ import { cleanAiText } from "@/lib/ai/prompt";
 import type {
   AiGenerateRequest,
   AiMode,
+  AiSection,
   AiStatus,
   AiTone,
 } from "@/lib/ai/types";
-import type { Resume } from "@/lib/types";
+import { newId, type Resume } from "@/lib/types";
 
-const SECTION = "summary" as const;
+const SECTIONS: { value: AiSection; label: string }[] = [
+  { value: "summary", label: "个人简介" },
+  { value: "experience", label: "工作经历" },
+  { value: "project", label: "项目经历" },
+];
+
+const SECTION_LABELS: Record<AiSection, string> = {
+  summary: "个人简介",
+  experience: "工作经历",
+  project: "项目经历",
+};
+
+const NEW_ENTRY_HINTS: Record<"experience" | "project", string> = {
+  experience: "将新建一条空经历，公司、职位、时间由你补充。",
+  project: "将新建一条空项目，项目名、角色、链接由你补充。",
+};
 
 const TONES: { value: AiTone; label: string }[] = [
   { value: "professional", label: "专业稳重" },
   { value: "concise", label: "精炼简洁" },
   { value: "result", label: "结果导向" },
 ];
+
+type AdoptMode = "replace" | "append";
+
+type UndoState =
+  | { kind: "summary"; previous: string }
+  | {
+      kind: "experience";
+      id: string;
+      previousDescription: string;
+      created: boolean;
+    }
+  | {
+      kind: "project";
+      id: string;
+      previousDescription: string;
+      created: boolean;
+    };
 
 type Props = {
   resume: Resume;
@@ -39,6 +72,10 @@ export function AiWriter({ resume, onChange }: Props) {
   const [statusLoading, setStatusLoading] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
 
+  const [section, setSection] = useState<AiSection>("summary");
+  const [targetId, setTargetId] = useState("new");
+  const [adoptMode, setAdoptMode] = useState<AdoptMode>("replace");
+
   const [role, setRole] = useState("");
   const [years, setYears] = useState("");
   const [keywords, setKeywords] = useState("");
@@ -49,10 +86,32 @@ export function AiWriter({ resume, onChange }: Props) {
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
-  const [undo, setUndo] = useState<{ previous: string } | null>(null);
+  const [undo, setUndo] = useState<UndoState | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const prefilledRef = useRef(false);
+
+  const currentText =
+    section === "summary"
+      ? resume.basic.summary
+      : section === "experience"
+        ? (resume.experiences.find((item) => item.id === targetId)?.description ??
+          "")
+        : (resume.projects.find((item) => item.id === targetId)?.description ??
+          "");
+
+  const targets =
+    section === "experience"
+      ? resume.experiences.map((item) => ({
+          id: item.id,
+          label: `${item.company || "未命名公司"} · ${item.role || "未填写职位"}`,
+        }))
+      : section === "project"
+        ? resume.projects.map((item) => ({
+            id: item.id,
+            label: item.name || "未命名项目",
+          }))
+        : [];
 
   const checkStatus = useCallback(async () => {
     setStatusLoading(true);
@@ -113,6 +172,34 @@ export function AiWriter({ resume, onChange }: Props) {
     if (!status && !statusLoading && !statusError) void checkStatus();
   };
 
+  const handleSectionChange = (next: AiSection) => {
+    setSection(next);
+    setTargetId("new");
+    setAdoptMode("replace");
+    setMode("draft");
+    setOutput("");
+    setError(null);
+    setConfirmOverwrite(false);
+  };
+
+  const handleTargetChange = (next: string) => {
+    setTargetId(next);
+    setAdoptMode("replace");
+    setOutput("");
+    setError(null);
+    setConfirmOverwrite(false);
+
+    const nextText =
+      next === "new"
+        ? ""
+        : section === "experience"
+          ? (resume.experiences.find((item) => item.id === next)?.description ??
+            "")
+          : (resume.projects.find((item) => item.id === next)?.description ?? "");
+
+    if (mode === "polish" && !nextText.trim()) setMode("draft");
+  };
+
   const handleGenerate = async () => {
     const trimmedKeywords = keywords.trim();
     if (!trimmedKeywords) {
@@ -130,17 +217,15 @@ export function AiWriter({ resume, onChange }: Props) {
     setConfirmOverwrite(false);
 
     const input: AiGenerateRequest = {
-      section: SECTION,
+      section,
       mode,
       tone,
       role: role.trim(),
       years: years.trim(),
       keywords: trimmedKeywords,
-      // 新写不发送现有简介，减少数据暴露。
+      // 新写不发送现有文本，减少数据暴露。
       current:
-        mode === "polish"
-          ? resume.basic.summary.trim() || undefined
-          : undefined,
+        mode === "polish" ? currentText.trim() || undefined : undefined,
     };
 
     await streamGenerate(input, controller.signal, {
@@ -163,25 +248,122 @@ export function AiWriter({ resume, onChange }: Props) {
   };
 
   const applyAdopt = () => {
-    const text = cleanAiText(output, SECTION);
+    const text = cleanAiText(output, section);
     if (!text) {
       setError("生成内容为空，请重新生成");
       return;
     }
 
-    const previous = resume.basic.summary;
-    onChange((prev) => ({
-      ...prev,
-      basic: { ...prev.basic, summary: text },
-    }));
-    setUndo({ previous });
+    if (section === "summary") {
+      const previous = resume.basic.summary;
+      onChange((prev) => ({
+        ...prev,
+        basic: { ...prev.basic, summary: text },
+      }));
+      setUndo({ kind: "summary", previous });
+    } else if (section === "experience") {
+      if (targetId === "new") {
+        const id = newId();
+        onChange((prev) => ({
+          ...prev,
+          experiences: [
+            ...prev.experiences,
+            { id, company: "", role: "", start: "", end: "", description: text },
+          ],
+        }));
+        setUndo({
+          kind: "experience",
+          id,
+          previousDescription: "",
+          created: true,
+        });
+      } else {
+        const item = resume.experiences.find((entry) => entry.id === targetId);
+        if (!item) {
+          setError("目标经历不存在，请重新选择");
+          return;
+        }
+        const previous = item.description;
+        const nextDescription =
+          adoptMode === "append" && previous.trim()
+            ? `${previous.trim()}\n${text}`
+            : text;
+        onChange((prev) => ({
+          ...prev,
+          experiences: prev.experiences.map((entry) =>
+            entry.id === targetId
+              ? { ...entry, description: nextDescription }
+              : entry,
+          ),
+        }));
+        setUndo({
+          kind: "experience",
+          id: targetId,
+          previousDescription: previous,
+          created: false,
+        });
+      }
+    } else {
+      if (targetId === "new") {
+        const id = newId();
+        onChange((prev) => ({
+          ...prev,
+          projects: [
+            ...prev.projects,
+            { id, name: "", role: "", description: text, link: "" },
+          ],
+        }));
+        setUndo({
+          kind: "project",
+          id,
+          previousDescription: "",
+          created: true,
+        });
+      } else {
+        const item = resume.projects.find((entry) => entry.id === targetId);
+        if (!item) {
+          setError("目标项目不存在，请重新选择");
+          return;
+        }
+        const previous = item.description;
+        const nextDescription =
+          adoptMode === "append" && previous.trim()
+            ? `${previous.trim()}\n${text}`
+            : text;
+        onChange((prev) => ({
+          ...prev,
+          projects: prev.projects.map((entry) =>
+            entry.id === targetId
+              ? { ...entry, description: nextDescription }
+              : entry,
+          ),
+        }));
+        setUndo({
+          kind: "project",
+          id: targetId,
+          previousDescription: previous,
+          created: false,
+        });
+      }
+    }
+
+    setOutput("");
+    setError(null);
     setConfirmOverwrite(false);
     setOpen(false);
   };
 
   const handleAdopt = () => {
     if (streaming || !output.trim()) return;
-    if (resume.basic.summary.trim() && !confirmOverwrite) {
+
+    const destructive =
+      section === "summary"
+        ? Boolean(resume.basic.summary.trim())
+        : targetId !== "new" &&
+          adoptMode === "replace" &&
+          Boolean(currentText.trim());
+
+    if (destructive && !confirmOverwrite) {
       setConfirmOverwrite(true);
       return;
     }
@@ -190,11 +372,39 @@ export function AiWriter({ resume, onChange }: Props) {
 
   const handleUndo = () => {
     if (!undo) return;
-    const previous = undo.previous;
-    onChange((prev) => ({
-      ...prev,
-      basic: { ...prev.basic, summary: previous },
-    }));
+
+    if (undo.kind === "summary") {
+      const previous = undo.previous;
+      onChange((prev) => ({
+        ...prev,
+        basic: { ...prev.basic, summary: previous },
+      }));
+    } else if (undo.kind === "experience") {
+      const { id, previousDescription, created } = undo;
+      onChange((prev) => ({
+        ...prev,
+        experiences: created
+          ? prev.experiences.filter((entry) => entry.id !== id)
+          : prev.experiences.map((entry) =>
+              entry.id === id
+                ? { ...entry, description: previousDescription }
+                : entry,
+            ),
+      }));
+    } else {
+      const { id, previousDescription, created } = undo;
+      onChange((prev) => ({
+        ...prev,
+        projects: created
+          ? prev.projects.filter((entry) => entry.id !== id)
+          : prev.projects.map((entry) =>
+              entry.id === id
+                ? { ...entry, description: previousDescription }
+                : entry,
+            ),
+      }));
+    }
+
     setUndo(null);
   };
 
@@ -204,7 +414,7 @@ export function AiWriter({ resume, onChange }: Props) {
         <div>
           <p className="text-[13px] font-semibold text-zinc-900">AI 帮我写</p>
           <p className="mt-0.5 text-[11.5px] text-zinc-500">
-            填写岗位与关键词，生成个人简介草稿，确认后写入简历。
+            生成个人简介、工作经历或项目描述草稿，确认后写入简历。
           </p>
         </div>
         <Button
@@ -213,7 +423,7 @@ export function AiWriter({ resume, onChange }: Props) {
           onClick={openDialog}
           className="border-blue-200 bg-white text-blue-700 hover:bg-blue-50"
         >
-          帮我写简介
+          开始生成
         </Button>
       </div>
 
@@ -255,7 +465,7 @@ export function AiWriter({ resume, onChange }: Props) {
                   AI 帮我写
                 </h2>
                 <p className="mt-0.5 text-[11.5px] text-zinc-500">
-                  个人简介 · 内容会发送到 DeepSeek
+                  {SECTION_LABELS[section]} · 内容会发送到 DeepSeek
                 </p>
               </div>
               <button
@@ -318,6 +528,24 @@ export function AiWriter({ resume, onChange }: Props) {
                 </div>
               ) : (
                 <div className="space-y-3">
+                  <div className="flex rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
+                    {SECTIONS.map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => handleSectionChange(item.value)}
+                        aria-pressed={section === item.value}
+                        className={`flex-1 rounded-md px-2 py-1.5 text-[12px] font-medium transition ${
+                          section === item.value
+                            ? "bg-white text-zinc-900 shadow-sm"
+                            : "text-zinc-500 hover:text-zinc-900"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Field label="目标岗位" hint="选填">
                       <TextInput
@@ -336,6 +564,31 @@ export function AiWriter({ resume, onChange }: Props) {
                       />
                     </Field>
                   </div>
+
+                  {section !== "summary" ? (
+                    <>
+                      <Field label="写入到">
+                        <Select
+                          value={targetId}
+                          onChange={(event) =>
+                            handleTargetChange(event.target.value)
+                          }
+                        >
+                          <option value="new">新建一条</option>
+                          {targets.map((target) => (
+                            <option key={target.id} value={target.id}>
+                              {target.label}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                      {targetId === "new" ? (
+                        <p className="-mt-1 text-[11px] leading-4 text-zinc-400">
+                          {NEW_ENTRY_HINTS[section]}
+                        </p>
+                      ) : null}
+                    </>
+                  ) : null}
 
                   <Field label="关键词 / 成果" hint={`${keywords.length}/2000`}>
                     <TextArea
@@ -371,16 +624,27 @@ export function AiWriter({ resume, onChange }: Props) {
                         }
                       >
                         <option value="draft">新写</option>
-                        <option
-                          value="polish"
-                          disabled={!resume.basic.summary.trim()}
-                        >
-                          优化现有简介
-                          {resume.basic.summary.trim() ? "" : "（简介为空）"}
+                        <option value="polish" disabled={!currentText.trim()}>
+                          优化现有{SECTION_LABELS[section]}
+                          {currentText.trim() ? "" : "（暂无内容）"}
                         </option>
                       </Select>
                     </Field>
                   </div>
+
+                  {section !== "summary" && targetId !== "new" ? (
+                    <Field label="采用方式" hint="追加不会删除原文">
+                      <Select
+                        value={adoptMode}
+                        onChange={(event) =>
+                          setAdoptMode(event.target.value as AdoptMode)
+                        }
+                      >
+                        <option value="replace">替换现有描述</option>
+                        <option value="append">追加到现有描述</option>
+                      </Select>
+                    </Field>
+                  ) : null}
 
                   <div className="flex items-center gap-2">
                     <Button
@@ -405,16 +669,30 @@ export function AiWriter({ resume, onChange }: Props) {
 
                   <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3">
                     <div className="mb-1.5 flex items-center justify-between text-[11px] text-zinc-400">
-                      <span>生成预览</span>
+                      <span>
+                        生成预览
+                        {output && !streaming ? "（可直接修改）" : ""}
+                      </span>
                       {output ? <span>{output.length} 字</span> : null}
                     </div>
-                    <div className="min-h-[120px] whitespace-pre-wrap text-[13px] leading-6 text-zinc-800">
-                      {output ||
-                        (streaming ? "AI 正在构思…" : "填写关键词后点击生成")}
-                      {streaming ? (
-                        <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-zinc-900 align-middle" />
-                      ) : null}
-                    </div>
+                    {output && !streaming ? (
+                      <textarea
+                        value={output}
+                        onChange={(event) => setOutput(event.target.value)}
+                        aria-label="生成预览，可直接修改"
+                        className="min-h-[120px] w-full resize-y bg-transparent text-[13px] leading-6 text-zinc-800 outline-none"
+                      />
+                    ) : (
+                      <div className="min-h-[120px] whitespace-pre-wrap text-[13px] leading-6 text-zinc-800">
+                        {output ||
+                          (streaming
+                            ? "AI 正在构思…"
+                            : "填写关键词后点击生成")}
+                        {streaming ? (
+                          <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-zinc-900 align-middle" />
+                        ) : null}
+                      </div>
+                    )}
                   </div>
 
                   {error ? (
@@ -425,7 +703,11 @@ export function AiWriter({ resume, onChange }: Props) {
 
                   {confirmOverwrite ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
-                      <p>个人简介已有内容，采用后会覆盖原文。</p>
+                      <p>
+                        {section === "summary"
+                          ? "个人简介已有内容，采用后会覆盖原文。"
+                          : `该条${SECTION_LABELS[section]}已有描述，采用后会覆盖原文。`}
+                      </p>
                       <div className="mt-2 flex gap-2">
                         <Button
                           variant="primary"
@@ -450,7 +732,7 @@ export function AiWriter({ resume, onChange }: Props) {
 
             <footer className="border-t border-zinc-100 px-5 py-3">
               <p className="text-[11px] leading-4 text-zinc-400">
-                只发送本面板内容与当前简介，不发送姓名、电话、邮箱或整份简历。
+                只发送本面板内容与当前板块文本，不发送姓名、电话、邮箱或整份简历。
               </p>
               <div className="mt-2 flex items-center justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={closeDialog}>
