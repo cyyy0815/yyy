@@ -3074,6 +3074,123 @@ expect(
   `${iconResponse.status} ${ogResponse.status}`,
 );
 
+// P2：简历链接可点击，并过滤危险协议
+const linksPage = await open({ width: 1200, height: 900 });
+await linksPage.goto(`${BASE}/`, { waitUntil: "networkidle0" });
+await linksPage.evaluate((resume) => {
+  localStorage.setItem("resume-workshop:v1", JSON.stringify(resume));
+  localStorage.setItem("resume-workshop:template", "modern");
+  localStorage.removeItem("resume-workshop:last-saved-at");
+}, {
+  basic: {
+    name: "林一",
+    headline: "前端工程师",
+    email: "lin@example.com",
+    phone: "13800000000",
+    city: "上海",
+    website: "github.com/linyi",
+    github: "",
+    summary: "",
+    photo: "",
+  },
+  intent: {
+    targetRole: "前端工程师",
+    targetCity: "上海",
+    salaryMin: "",
+    salaryMax: "",
+    jobType: "全职",
+    experience: "3-5年",
+  },
+  educations: [],
+  experiences: [],
+  projects: [
+    {
+      id: "qa-link-project",
+      name: "作品集",
+      role: "前端",
+      start: "",
+      end: "",
+      description: "",
+      link: "example.com/work",
+    },
+  ],
+  customSections: [
+    {
+      id: "qa-link-section",
+      title: "作品集",
+      visible: true,
+      items: [
+        {
+          id: "qa-link-safe",
+          title: "个人网站",
+          subtitle: "",
+          date: "",
+          description: "",
+          link: "portfolio.example.com",
+        },
+        {
+          id: "qa-link-unsafe",
+          title: "危险链接",
+          subtitle: "",
+          date: "",
+          description: "",
+          link: "javascript:alert(1)",
+        },
+      ],
+    },
+  ],
+  skills: ["React"],
+  theme: { accent: "#1d4ed8" },
+});
+await linksPage.reload({ waitUntil: "networkidle0" });
+await pause(600);
+const linkResult = await linksPage.evaluate(() => {
+  const anchors = [...document.querySelectorAll("#resume-print a[href]")].map(
+    (anchor) => ({
+      href: anchor.getAttribute("href"),
+      text: anchor.textContent?.trim() ?? "",
+    }),
+  );
+  const text = document.querySelector("#resume-print")?.textContent ?? "";
+  return {
+    anchors,
+    hasUnsafeAnchor: anchors.some((anchor) =>
+      anchor.href?.startsWith("javascript:"),
+    ),
+    showsUnsafeText: text.includes("javascript:alert(1)"),
+  };
+});
+expect(
+  "简历网站/项目/自定义链接可点击",
+  linkResult.anchors.some(
+    (anchor) =>
+      anchor.href === "https://github.com/linyi" &&
+      anchor.text === "github.com/linyi",
+  ) &&
+    linkResult.anchors.some(
+      (anchor) =>
+        anchor.href === "https://example.com/work" &&
+        anchor.text === "example.com/work",
+    ) &&
+    linkResult.anchors.some(
+      (anchor) =>
+        anchor.href === "https://portfolio.example.com/" &&
+        anchor.text === "portfolio.example.com",
+    ),
+  JSON.stringify(linkResult.anchors),
+);
+expect(
+  "危险协议不渲染为链接",
+  !linkResult.hasUnsafeAnchor && linkResult.showsUnsafeText,
+  JSON.stringify(linkResult),
+);
+expect(
+  "链接页面无控制台错误",
+  linksPage.qaErrors.length === 0,
+  linksPage.qaErrors.join("; "),
+);
+await linksPage.close();
+
 await browser.close();
 if (failures.length > 0) {
   console.error(`QA failures: ${failures.length}`);

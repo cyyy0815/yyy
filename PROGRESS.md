@@ -32,6 +32,7 @@
 | 14 | P3 体验与健壮性（追加） | ✅ 完成（4.1–4.8） |
 | 15 | AI 功能完善（追加） | ✅ 完成（JD 定制 + 整份生成） |
 | 16 | P4 工程化与分发（追加） | ✅ 完成（单测 / CI / SEO / manifest / 清理） |
+| 17 | P2 收尾：可点击链接（追加） | ✅ 完成（安全 href + 五套模板） |
 
 ## 阶段明细
 
@@ -248,10 +249,20 @@
 - [x] 验证：`tsc`、`npm run lint`、`npm test`（45 passed）、`npm run qa`、`npm run build` 通过
 - [x] 有意不做：Service Worker 离线缓存（只提供可安装清单）
 
+### 阶段 17 — P2 收尾：可点击链接（追加）✅
+
+- [x] 新增 `src/lib/links.ts`：`toSafeHref` 只放行 http/https，自动补协议；`displayUrl` 生成短链接
+- [x] 过滤 `javascript:`、`data:`、`file:` 等危险协议，以及无域名、含空格的值
+- [x] 五套模板：网站 / GitHub / 项目链接 / 自定义板块链接改为 `<a>`，新标签打开，PDF 中可点击
+- [x] 联系人列表统一走 `contactItems`，非法链接只显示文本，不生成锚点
+- [x] 单测新增 4 个（共 49 个）：协议补全、危险协议、短链接展示
+- [x] QA 新增：网站 / 项目 / 自定义安全链接可点击、`javascript:` 不渲染为链接、页面无控制台错误
+- [x] 验证：`tsc`、`npm run lint`、`npm test`（49 passed）、`npm run qa`、`npm run build` 通过
+
 ## 当前进度
 
 - 最近更新：2026-10-27
-- 状态：**阶段 0–16 全部完成；P1–P4 与 AI 功能完善全部完成**
+- 状态：**阶段 0–17 全部完成；P1–P4、AI 功能完善与可点击链接全部完成**
 - 代码状态：
   - M0：git 仓库、`.env.example`、`scripts/mock-deepseek.mjs` 完成
   - M1：`/api/ai/status`、`/api/ai/generate`、SSE 转换完成
@@ -262,7 +273,8 @@
 - P3 进度：4.1 多标签页防覆盖、4.2 输入校验、4.3 保存时间与备份提醒、4.4 导入校验、4.5 错误边界、4.6 页码开关/打印对比度/可访问性、4.7 推荐门槛与 JD 缺口一键补、4.8 岗位库与城市覆盖全部完成
 - AI 增强：参考 JD 定制、优化模式空关键词、整份简历串行生成与整体撤销全部完成
 - P4 进度：Vitest 单元测试、GitHub Actions CI、SEO/OG、manifest 与图标、静态资源清理全部完成；离线缓存未实现
-- 工程命令：`npm test` 运行单元测试；CI 覆盖 lint + 类型检查 + 单测 + 构建
+- P2 收尾：网站 / GitHub / 项目 / 自定义板块链接在五套模板与 PDF 中可点击，危险协议降级为纯文本
+- 工程命令：`npm test` 运行单元测试（49 个）；CI 覆盖 lint + 类型检查 + 单测 + 构建
 - 本地地址：http://localhost:3000 （推荐页 http://localhost:3000/#jobs）
 - 一键自检：先 `npm run dev`，再 `npm run qa`（截图输出到 `.screenshots/`）
 - 单一方案文档：**`PLAN.md`**
@@ -359,12 +371,16 @@
 - P4：新增 `manifest.ts`、192/512 PNG 图标、`icon.svg`、`apple-icon.png`，替换默认 favicon
 - P4：删除 `public/` 下未使用的 5 个默认 SVG；QA 增加元数据、manifest 与图标检查
 - P4 验证：`tsc`、`lint`、`npm test`（45 passed）、`npm run qa`、`npm run build` 全部通过，构建无 metadataBase 警告
+- P2 收尾：新增 `src/lib/links.ts`，`toSafeHref` 只放行 http/https 并自动补协议，`displayUrl` 生成短链接
+- P2 收尾：联系人、项目与自定义板块链接改为 `<a>`；`javascript:` 等危险协议只显示文本
+- P2 收尾：单测增至 49 个；QA 验证安全链接可点击、危险链接不生成锚点
+- P2 收尾验证：`tsc`、`lint`、`npm test`（49 passed）、`npm run qa`、`npm run build` 通过
 
 ### 下次继续
 
 1. 先读 `PLAN.md` 与 `PROGRESS.md`「当前进度」
-2. 阶段 0–16 全部完成；P1–P4 与 AI 增强均已完成
-3. 可选后续：P2 剩余缺口（全局撤销、技能分组、可点击链接、双语）、AI 求职信 / 英文输出、离线缓存
+2. 阶段 0–17 全部完成；P1–P4、AI 增强与可点击链接均已完成
+3. 可选后续：P2 剩余缺口（全局撤销、技能分组、双语）、AI 求职信 / 英文输出、离线缓存
 4. 每完成一项跑 `npm run lint`、`npm test`、`npm run build`、`npm run qa` 并更新本文件
 
 ## 可选后续
@@ -376,6 +392,7 @@
 - [ ] 拖拽排序替换上下按钮（注：阶段 8 已实现拖拽手柄，此处仅剩纯鼠标拖拽体验优化）
 - [x] P1 数据安全与打印交付（侧栏跨页、保存失败、覆盖保护、PDF 文件名等；详见 `PLAN.md`）
 - [x] P4 工程化与分发（Vitest、CI、SEO/OG、manifest、图标清理；离线缓存未做）
+- [x] 简历链接可点击（网站 / GitHub / 项目 / 自定义板块；危险协议过滤）
 
 ## 如何继续
 
@@ -416,6 +433,7 @@ src/
     matching.ts         技能匹配、评分、建议
     jdMatch.ts          JD 关键词识别、覆盖率、年限/学历核验
     jdStorage.ts        JD 本地保存与 AI 参考 JD 读取
+    links.ts            安全链接判断与展示用短链接
     jobBoards.ts        招聘站 URL 与城市编码
     theme.ts            主题色校验、可读性压暗与 CSS 变量
     __tests__/          Vitest：storage / matching / jdMatch / validate / SSE

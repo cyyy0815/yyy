@@ -390,7 +390,7 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 | 多份简历 | 只有一份 | 复制/重命名/按 JD 定制，配合已有 JD 匹配 |
 | 撤销/重做 | 无历史栈 | 全局 undo/redo 或至少操作级撤销 |
 | 技能组织 | 只能加/删 | 拖拽排序、分组、熟练度 |
-| 链接不可点击 | 模板里网站/GitHub/项目链接是纯文本 | 输出 `<a>`，PDF 中可点击，自动补 `https://` |
+| 链接不可点击 ✅ | 模板里网站/GitHub/项目链接是纯文本 | 已输出 `<a>`，PDF 中可点击；自动补 `https://`，过滤 `javascript:` / `data:` 等危险协议 |
 | 中英双语 | 仅中文 | 面向外企/海外时再做 |
 
 **实施顺序建议**：照片 → 自定义板块（含显隐/排序）→ 项目起止时间 → 教育增强 → 多份简历。
@@ -418,7 +418,7 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 ## 5. P4：工程化与分发（已完成）
 
 - **git**：P0 前置已完成；后续每个阶段独立提交。
-- **单元测试**：已接入 Vitest，45 个用例覆盖 `normalizeResume`、`parseResumeJSON`、技能匹配与评分、JD 关键词/年限/学历、输入校验、SSE 分片与中止。命令：`npm test` / `npm run test:watch`。
+- **单元测试**：已接入 Vitest，49 个用例覆盖 `normalizeResume`、`parseResumeJSON`、技能匹配与评分、JD 关键词/年限/学历、输入校验、安全链接、SSE 分片与中止。命令：`npm test` / `npm run test:watch`。
 - **CI**：`.github/workflows/ci.yml` 在 push / PR 时执行 lint、`tsc --noEmit`、单元测试与生产构建；QA 截图需要本机 Chrome，未放入 CI。
 - **SEO/分享**：`layout.tsx` 已补 Open Graph、Twitter Card、keywords、theme-color 与 `formatDetection`；`opengraph-image.tsx` 生成 1200×630 分享图；`manifest.ts` 提供安装清单；自定义 `icon.svg` / `apple-icon.png` / `favicon.ico`。分享图文案用英文，避免 `ImageResponse` 默认字体缺中文字形。
 - **部署地址**：支持 `NEXT_PUBLIC_SITE_URL`；Vercel 自动使用 `VERCEL_PROJECT_PRODUCTION_URL`，本地回退 `http://localhost:3000`。

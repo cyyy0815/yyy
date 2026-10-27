@@ -1,3 +1,4 @@
+import { displayUrl, toSafeHref } from "@/lib/links";
 import { accentStyle } from "@/lib/theme";
 import type {
   CustomItem,
@@ -11,8 +12,61 @@ function range(start: string, end: string): string {
   return [start, end].filter(Boolean).join(" – ");
 }
 
-function displayUrl(value: string): string {
-  return value.replace(/^https?:\/\//, "").replace(/\/$/, "");
+type ContactItem = { key: string; label: string; href: string | null };
+
+function contactItems(resume: Resume): ContactItem[] {
+  return [
+    { key: "phone", label: resume.basic.phone.trim(), href: null },
+    { key: "email", label: resume.basic.email.trim(), href: null },
+    { key: "city", label: resume.basic.city.trim(), href: null },
+    {
+      key: "website",
+      label: displayUrl(resume.basic.website),
+      href: toSafeHref(resume.basic.website),
+    },
+    {
+      key: "github",
+      label: displayUrl(resume.basic.github),
+      href: toSafeHref(resume.basic.github),
+    },
+  ].filter((item) => item.label.length > 0);
+}
+
+/** 网站 / GitHub / 项目 / 自定义板块链接：安全地址渲染 <a>，非法地址只显示文本。 */
+function ResumeLink({
+  value,
+  className = "",
+}: {
+  value: string;
+  className?: string;
+}) {
+  const href = toSafeHref(value);
+  const label = displayUrl(value);
+  if (!href) return <span className={className}>{label}</span>;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+      className={`${className} underline decoration-current/40 underline-offset-2 hover:opacity-75`}
+    >
+      {label}
+    </a>
+  );
+}
+
+function ContactLink({ item }: { item: ContactItem }) {
+  if (!item.href) return <>{item.label}</>;
+  return (
+    <a
+      href={item.href}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="underline decoration-current/40 underline-offset-2 hover:opacity-75"
+    >
+      {item.label}
+    </a>
+  );
 }
 
 /** GPA / 排名 / 主修课程 / 荣誉，只有填写时才输出。 */
@@ -117,7 +171,9 @@ function CustomItems({
               )
             ) : null}
             {item.link ? (
-              <p className={linkClassName}>{displayUrl(item.link)}</p>
+              <p className={linkClassName}>
+                <ResumeLink value={item.link} />
+              </p>
             ) : null}
           </div>
         );
@@ -192,18 +248,12 @@ function ContactList({
   resume: Resume;
   className?: string;
 }) {
-  const items = [
-    resume.basic.phone,
-    resume.basic.email,
-    resume.basic.city,
-    displayUrl(resume.basic.website),
-    displayUrl(resume.basic.github),
-  ].filter(Boolean);
-
   return (
     <div className={className}>
-      {items.map((item) => (
-        <div key={item}>{item}</div>
+      {contactItems(resume).map((item) => (
+        <div key={item.key}>
+          <ContactLink item={item} />
+        </div>
       ))}
     </div>
   );
@@ -359,7 +409,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
                           ) : null}
                           {item.link ? (
                             <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
-                              {displayUrl(item.link)}
+                              <ResumeLink value={item.link} />
                             </span>
                           ) : null}
                         </div>
@@ -489,13 +539,7 @@ function ClassicSectionTitle({ children }: { children: React.ReactNode }) {
 
 function ClassicTemplate({ resume }: { resume: Resume }) {
   const customSections = visibleCustomSections(resume);
-  const contact = [
-    resume.basic.phone,
-    resume.basic.email,
-    resume.basic.city,
-    displayUrl(resume.basic.website),
-    displayUrl(resume.basic.github),
-  ].filter(Boolean);
+  const contact = contactItems(resume);
 
   return (
     <article
@@ -520,7 +564,12 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
             </p>
             {contact.length > 0 ? (
               <p className="mt-2.5 text-[9.5px] leading-relaxed tracking-wide text-zinc-500">
-                {contact.join("   ｜   ")}
+                {contact.map((item, index) => (
+                  <span key={item.key}>
+                    {index > 0 ? "   ｜   " : ""}
+                    <ContactLink item={item} />
+                  </span>
+                ))}
               </p>
             ) : null}
           </div>
@@ -605,7 +654,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
                       ) : null}
                       {item.link ? (
                         <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
-                          {displayUrl(item.link)}
+                          <ResumeLink value={item.link} />
                         </span>
                       ) : null}
                     </div>
@@ -695,13 +744,7 @@ function CompactSectionTitle({ children }: { children: React.ReactNode }) {
 
 function CompactTemplate({ resume }: { resume: Resume }) {
   const customSections = visibleCustomSections(resume);
-  const contact = [
-    resume.basic.phone,
-    resume.basic.email,
-    resume.basic.city,
-    displayUrl(resume.basic.website),
-    displayUrl(resume.basic.github),
-  ].filter(Boolean);
+  const contact = contactItems(resume);
 
   return (
     <article
@@ -724,7 +767,12 @@ function CompactTemplate({ resume }: { resume: Resume }) {
         </div>
         <div className="flex shrink-0 items-start gap-3">
           <div className="max-w-[82mm] text-right text-[9px] leading-[1.6] text-zinc-500">
-            {contact.join("  ·  ")}
+            {contact.map((item, index) => (
+              <span key={item.key}>
+                {index > 0 ? "  ·  " : ""}
+                <ContactLink item={item} />
+              </span>
+            ))}
           </div>
           <ResumePhoto
             src={resume.basic.photo}
@@ -807,7 +855,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
                       ) : null}
                       {item.link ? (
                         <span className="max-w-[45mm] break-all text-[8.5px] text-zinc-400">
-                          {displayUrl(item.link)}
+                          <ResumeLink value={item.link} />
                         </span>
                       ) : null}
                     </div>
@@ -892,13 +940,7 @@ function SidebarHeading({ children }: { children: React.ReactNode }) {
 
 function SidebarTemplate({ resume }: { resume: Resume }) {
   const customSections = visibleCustomSections(resume);
-  const contact = [
-    resume.basic.phone,
-    resume.basic.email,
-    resume.basic.city,
-    displayUrl(resume.basic.website),
-    displayUrl(resume.basic.github),
-  ].filter(Boolean);
+  const contact = contactItems(resume);
 
   return (
     <article
@@ -927,8 +969,8 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
             <SidebarHeading>联系方式</SidebarHeading>
             <div className="space-y-1 text-[9.5px] leading-[1.6] text-white/75">
               {contact.map((item) => (
-                <p key={item} className="break-all">
-                  {item}
+                <p key={item.key} className="break-all">
+                  <ContactLink item={item} />
                 </p>
               ))}
             </div>
@@ -1080,7 +1122,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
                         ) : null}
                         {item.link ? (
                           <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
-                            {displayUrl(item.link)}
+                            <ResumeLink value={item.link} />
                           </span>
                         ) : null}
                       </div>
@@ -1130,13 +1172,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
 
 function TimelineTemplate({ resume }: { resume: Resume }) {
   const customSections = visibleCustomSections(resume);
-  const contact = [
-    resume.basic.phone,
-    resume.basic.email,
-    resume.basic.city,
-    displayUrl(resume.basic.website),
-    displayUrl(resume.basic.github),
-  ].filter(Boolean);
+  const contact = contactItems(resume);
 
   return (
     <article
@@ -1158,8 +1194,8 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
         <div className="flex shrink-0 items-center gap-5">
           <div className="space-y-0.5 text-right text-[9.5px] leading-[1.6] text-zinc-500">
             {contact.map((item) => (
-              <div key={item} className="break-all">
-                {item}
+              <div key={item.key} className="break-all">
+                <ContactLink item={item} />
               </div>
             ))}
           </div>
@@ -1252,7 +1288,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
                       ) : null}
                       {item.link ? (
                         <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
-                          {displayUrl(item.link)}
+                          <ResumeLink value={item.link} />
                         </span>
                       ) : null}
                     </div>
