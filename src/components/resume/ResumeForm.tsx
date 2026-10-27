@@ -575,6 +575,44 @@ function EducationSection({ resume, onChange, onDelete }: SectionProps) {
                   />
                 </Field>
               </div>
+              <Field label="GPA" hint="选填">
+                <TextInput
+                  value={item.gpa}
+                  onChange={(event) => update(item.id, { gpa: event.target.value })}
+                  placeholder="3.8/4.0"
+                />
+              </Field>
+              <Field label="排名" hint="选填">
+                <TextInput
+                  value={item.ranking}
+                  onChange={(event) =>
+                    update(item.id, { ranking: event.target.value })
+                  }
+                  placeholder="前 10%"
+                />
+              </Field>
+              <Field
+                label="主修课程"
+                hint="选填，用顿号或逗号分隔"
+                className="sm:col-span-2"
+              >
+                <TextInput
+                  value={item.courses}
+                  onChange={(event) =>
+                    update(item.id, { courses: event.target.value })
+                  }
+                  placeholder="数据结构、操作系统、计算机网络"
+                />
+              </Field>
+              <Field label="荣誉" hint="选填" className="sm:col-span-2">
+                <TextInput
+                  value={item.honors}
+                  onChange={(event) =>
+                    update(item.id, { honors: event.target.value })
+                  }
+                  placeholder="校级一等奖学金、优秀毕业生"
+                />
+              </Field>
             </div>
           </div>
         ))}
@@ -595,6 +633,10 @@ function EducationSection({ resume, onChange, onDelete }: SectionProps) {
                   degree: "",
                   start: "",
                   end: "",
+                  gpa: "",
+                  ranking: "",
+                  courses: "",
+                  honors: "",
                 },
               ],
             }))

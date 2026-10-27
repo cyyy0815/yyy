@@ -2,6 +2,7 @@ import { accentStyle } from "@/lib/theme";
 import type {
   CustomItem,
   CustomSection,
+  Education,
   Resume,
   TemplateId,
 } from "@/lib/types";
@@ -12,6 +13,30 @@ function range(start: string, end: string): string {
 
 function displayUrl(value: string): string {
   return value.replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
+
+/** GPA / 排名 / 主修课程 / 荣誉，只有填写时才输出。 */
+function EducationDetails({
+  item,
+  className = "",
+}: {
+  item: Education;
+  className?: string;
+}) {
+  const meta = [
+    item.gpa ? `GPA ${item.gpa}` : "",
+    item.ranking ? `排名 ${item.ranking}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  if (!meta && !item.courses && !item.honors) return null;
+  return (
+    <div className={`space-y-0.5 ${className}`}>
+      {meta ? <p>{meta}</p> : null}
+      {item.courses ? <p>主修课程：{item.courses}</p> : null}
+      {item.honors ? <p>荣誉：{item.honors}</p> : null}
+    </div>
+  );
 }
 
 function hasCustomItemContent(item: CustomItem): boolean {
@@ -431,6 +456,10 @@ function ModernTemplate({ resume }: { resume: Resume }) {
                       <p className="text-[9.5px] tabular-nums text-zinc-400">
                         {range(item.start, item.end)}
                       </p>
+                      <EducationDetails
+                        item={item}
+                        className="pt-0.5 text-[9px] leading-[1.55] text-zinc-500"
+                      />
                     </div>
                   ))}
                 </div>
@@ -613,23 +642,26 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
           <ClassicSectionTitle>教育经历</ClassicSectionTitle>
           <div className="space-y-2">
             {resume.educations.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-baseline justify-between gap-4"
-              >
-                <p className="text-[11px] text-zinc-700">
-                  <span className="font-semibold text-zinc-900">
-                    {item.school || "学校名称"}
+              <div key={item.id} className="break-inside-avoid">
+                <div className="flex items-baseline justify-between gap-4">
+                  <p className="text-[11px] text-zinc-700">
+                    <span className="font-semibold text-zinc-900">
+                      {item.school || "学校名称"}
+                    </span>
+                    <span className="text-zinc-500">
+                      {[item.major, item.degree].filter(Boolean).length > 0
+                        ? ` ｜ ${[item.major, item.degree].filter(Boolean).join(" · ")}`
+                        : ""}
+                    </span>
+                  </p>
+                  <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-400">
+                    {range(item.start, item.end)}
                   </span>
-                  <span className="text-zinc-500">
-                    {[item.major, item.degree].filter(Boolean).length > 0
-                      ? ` ｜ ${[item.major, item.degree].filter(Boolean).join(" · ")}`
-                      : ""}
-                  </span>
-                </p>
-                <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-400">
-                  {range(item.start, item.end)}
-                </span>
+                </div>
+                <EducationDetails
+                  item={item}
+                  className="mt-0.5 text-[9.5px] leading-[1.65] text-zinc-500"
+                />
               </div>
             ))}
           </div>
@@ -823,6 +855,10 @@ function CompactTemplate({ resume }: { resume: Resume }) {
                   <p className="text-[9px] text-zinc-500">
                     {[item.major, item.degree].filter(Boolean).join(" · ")}
                   </p>
+                  <EducationDetails
+                    item={item}
+                    className="text-[8.5px] leading-[1.5] text-zinc-500"
+                  />
                 </div>
               ))}
             </div>
@@ -958,6 +994,10 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
                   <p className="text-[8.5px] tabular-nums text-white/50">
                     {range(item.start, item.end)}
                   </p>
+                  <EducationDetails
+                    item={item}
+                    className="text-[8.5px] leading-[1.6] text-white/55"
+                  />
                 </div>
               ))}
             </div>
@@ -1265,6 +1305,10 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
                     <p className="text-[9px] tabular-nums text-zinc-400">
                       {range(item.start, item.end)}
                     </p>
+                    <EducationDetails
+                      item={item}
+                      className="mt-0.5 text-[9px] leading-[1.6] text-zinc-500"
+                    />
                   </div>
                 ))}
               </div>

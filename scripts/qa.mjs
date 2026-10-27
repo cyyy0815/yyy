@@ -641,7 +641,16 @@ await writeFile(
   JSON.stringify({
     basic: { name: "导入测试", summary: "导入的简介" },
     intent: {},
-    educations: [],
+    educations: [
+      {
+        id: "legacy-e1",
+        school: "旧版学校",
+        major: "",
+        degree: "",
+        start: "",
+        end: "",
+      },
+    ],
     experiences: [],
     projects: [
       {
@@ -711,7 +720,8 @@ await safetyPage.waitForFunction(
       );
       return (
         data.basic?.name === "导入测试" &&
-        data.projects?.[0]?.name === "旧版项目"
+        data.projects?.[0]?.name === "旧版项目" &&
+        data.educations?.[0]?.school === "旧版学校"
       );
     } catch {
       return false;
@@ -727,13 +737,23 @@ const oldJsonCompat = await safetyPage.evaluate(() => {
     emptyState: document.body.innerText.includes("还没有自定义板块"),
     projectDates:
       data.projects?.[0]?.start === "" && data.projects?.[0]?.end === "",
+    educationExtras:
+      data.educations?.[0]?.gpa === "" &&
+      data.educations?.[0]?.ranking === "" &&
+      data.educations?.[0]?.courses === "" &&
+      data.educations?.[0]?.honors === "",
+    educationDetailsHidden: !["GPA", "主修课程", "荣誉"].some((marker) =>
+      document.querySelector(".resume-paper")?.innerText.includes(marker),
+    ),
   };
 });
 expect(
-  "旧 JSON 兼容自定义板块与项目时间",
+  "旧 JSON 兼容自定义板块、项目时间与教育增强",
   oldJsonCompat.customSections &&
     oldJsonCompat.emptyState &&
-    oldJsonCompat.projectDates,
+    oldJsonCompat.projectDates &&
+    oldJsonCompat.educationExtras &&
+    oldJsonCompat.educationDetailsHidden,
   JSON.stringify(oldJsonCompat),
 );
 await safetyPage.evaluate(() => {
@@ -945,7 +965,20 @@ await customPage.evaluate(() => {
         photo: "",
       },
       intent: { targetRole: "产品经理" },
-      educations: [],
+      educations: [
+        {
+          id: "ce1",
+          school: "教育测试大学",
+          major: "计算机科学",
+          degree: "本科",
+          start: "2017.09",
+          end: "2021.06",
+          gpa: "3.8/4.0",
+          ranking: "前 10%",
+          courses: "数据结构、操作系统",
+          honors: "一等奖学金",
+        },
+      ],
       experiences: [],
       projects: [
         {
@@ -1001,6 +1034,47 @@ await customPage.waitForFunction(
         data.projects?.[0]?.end === "至今" &&
         document.querySelector(".resume-paper")?.innerText.includes(
           "2023.05 – 至今",
+        )
+      );
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 5000 },
+);
+
+const educationPreview = await customPage.evaluate(() => {
+  const text = document.querySelector(".resume-paper")?.innerText ?? "";
+  return (
+    text.includes("GPA 3.8/4.0") &&
+    text.includes("排名 前 10%") &&
+    text.includes("主修课程：数据结构、操作系统") &&
+    text.includes("荣誉：一等奖学金")
+  );
+});
+expect("教育增强字段渲染到简历", educationPreview);
+
+const educationEdited = await customPage.evaluate(() => {
+  const input = document.querySelector('input[placeholder="3.8/4.0"]');
+  if (!input) return false;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+    input,
+    "3.9/4.0",
+  );
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  return true;
+});
+expect("教育 GPA 可编辑", educationEdited);
+await customPage.waitForFunction(
+  () => {
+    try {
+      const data = JSON.parse(
+        localStorage.getItem("resume-workshop:v1") ?? "{}",
+      );
+      return (
+        data.educations?.[0]?.gpa === "3.9/4.0" &&
+        document.querySelector(".resume-paper")?.innerText.includes(
+          "GPA 3.9/4.0",
         )
       );
     } catch {
@@ -1183,15 +1257,21 @@ for (const { label, id } of customTemplates) {
       certificate: text.includes("PMP") && text.includes("证书"),
       language: text.includes("CET-6") && text.includes("语言"),
       projectDates: text.includes("2023.05 – 至今"),
+      education:
+        text.includes("GPA 3.9/4.0") &&
+        text.includes("排名 前 10%") &&
+        text.includes("主修课程：数据结构、操作系统") &&
+        text.includes("荣誉：一等奖学金"),
     };
   });
   const paper = await customPage.$(".resume-paper");
   await paper?.screenshot({ path: `${OUT}/qa-custom-${id}.png` });
 }
 expect(
-  "五套模板渲染自定义板块与项目时间",
+  "五套模板渲染自定义板块、项目时间与教育增强",
   Object.values(customTemplateResult).every(
-    (item) => item.certificate && item.language && item.projectDates,
+    (item) =>
+      item.certificate && item.language && item.projectDates && item.education,
   ),
   JSON.stringify(customTemplateResult),
 );
@@ -1262,17 +1342,27 @@ const customExport = await customPage.evaluate(async () => {
       start: payload.projects?.[0]?.start,
       end: payload.projects?.[0]?.end,
     },
+    education: {
+      gpa: payload.educations?.[0]?.gpa,
+      ranking: payload.educations?.[0]?.ranking,
+      courses: payload.educations?.[0]?.courses,
+      honors: payload.educations?.[0]?.honors,
+    },
   };
 });
 expect(
-  "JSON 备份包含自定义板块与项目时间",
+  "JSON 备份包含自定义板块、项目时间与教育增强",
   customExport.count === 2 &&
     customExport.titles.join(",") === "语言,证书" &&
     customExport.visible.every(Boolean) &&
     customExport.items.flat().includes("PMP") &&
     customExport.items.flat().includes("英语") &&
     customExport.projectDates.start === "2023.05" &&
-    customExport.projectDates.end === "至今",
+    customExport.projectDates.end === "至今" &&
+    customExport.education.gpa === "3.9/4.0" &&
+    customExport.education.ranking === "前 10%" &&
+    customExport.education.courses === "数据结构、操作系统" &&
+    customExport.education.honors === "一等奖学金",
   JSON.stringify(customExport),
 );
 await customPage.evaluate(() => {

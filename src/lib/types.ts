@@ -26,6 +26,11 @@ export type Education = {
   degree: string;
   start: string;
   end: string;
+  /** 选填：GPA、排名、主修课程、荣誉 */
+  gpa: string;
+  ranking: string;
+  courses: string;
+  honors: string;
 };
 
 export type Experience = {

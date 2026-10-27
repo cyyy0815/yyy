@@ -55,6 +55,10 @@ export function normalizeResume(input: unknown): Resume {
       degree: asString(item.degree),
       start: asString(item.start),
       end: asString(item.end),
+      gpa: asString(item.gpa),
+      ranking: asString(item.ranking),
+      courses: asString(item.courses),
+      honors: asString(item.honors),
     })),
     experiences: asArray<Record<string, unknown>>(raw.experiences).map((item) => ({
       id: asString(item.id) || newId(),
