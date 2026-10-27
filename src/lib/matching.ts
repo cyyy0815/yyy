@@ -182,6 +182,9 @@ export function analyzeResume(resume: Resume): MatchResult {
       new Set(
         [
           resume.intent.targetRole,
+          resume.basic.headline,
+          resume.experiences[0]?.role ?? "",
+          resume.projects[0]?.role ?? "",
           ...resume.skills.slice(0, 5),
         ].filter(Boolean),
       ),
@@ -189,7 +192,12 @@ export function analyzeResume(resume: Resume): MatchResult {
 
     return {
       profile: null,
-      inferredRole: resume.intent.targetRole || "通用岗位",
+      inferredRole:
+        resume.intent.targetRole ||
+        resume.basic.headline ||
+        resume.experiences[0]?.role ||
+        resume.projects[0]?.role ||
+        "通用岗位",
       score: Math.round(completeness * 0.8),
       label: "岗位画像未收录",
       matchedCore: [],
@@ -223,7 +231,7 @@ export function analyzeResume(resume: Resume): MatchResult {
   const keywords = Array.from(
     new Set(
       [
-        resume.intent.targetRole.trim() || best.title,
+        resume.intent.targetRole.trim() || resume.basic.headline.trim() || best.title,
         ...best.searchKeywords,
         ...matchedCore.slice(0, 3),
       ].filter(Boolean),
@@ -232,7 +240,10 @@ export function analyzeResume(resume: Resume): MatchResult {
 
   return {
     profile: best,
-    inferredRole: resume.intent.targetRole.trim() || best.title,
+    inferredRole:
+      resume.intent.targetRole.trim() ||
+      resume.basic.headline.trim() ||
+      best.title,
     score,
     label,
     matchedCore,

@@ -17,7 +17,13 @@ function readSavedJd(): string {
   }
 }
 
-export function JdMatcher({ resume }: { resume: Resume }) {
+export function JdMatcher({
+  resume,
+  onAddSkill,
+}: {
+  resume: Resume;
+  onAddSkill: (skill: string) => void;
+}) {
   const [jd, setJd] = useState(readSavedJd);
   const [showResult, setShowResult] = useState(false);
 
@@ -156,11 +162,26 @@ export function JdMatcher({ resume }: { resume: Resume }) {
                   )}
                 </div>
                 <div>
-                  <p className="mb-2 text-[11px] text-zinc-400">简历未体现</p>
+                  <p className="mb-2 text-[11px] text-zinc-400">
+                    简历未体现
+                    {result.missing.length > 0 ? (
+                      <span className="ml-1 text-zinc-300">
+                        · 若你掌握，点击加入简历
+                      </span>
+                    ) : null}
+                  </p>
                   {result.missing.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div
+                      data-qa="jd-missing"
+                      className="flex flex-wrap gap-1.5"
+                    >
                       {result.missing.map((skill) => (
-                        <SkillChip key={skill} tone="missing">
+                        <SkillChip
+                          key={skill}
+                          tone="missing"
+                          onClick={() => onAddSkill(skill)}
+                          title="若你掌握该技能，点击加入简历"
+                        >
                           {skill}
                         </SkillChip>
                       ))}

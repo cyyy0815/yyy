@@ -104,18 +104,36 @@ function JobBoardCard({
   );
 }
 
+function hasJobInputs(resume: Resume): boolean {
+  return Boolean(
+    resume.intent.targetRole.trim() ||
+      resume.basic.headline.trim() ||
+      resume.basic.summary.trim() ||
+      resume.skills.length ||
+      resume.experiences.some(
+        (item) => item.company.trim() || item.role.trim() || item.description.trim(),
+      ) ||
+      resume.projects.some(
+        (item) => item.name.trim() || item.role.trim() || item.description.trim(),
+      ) ||
+      resume.educations.some(
+        (item) => item.school.trim() || item.major.trim() || item.courses.trim(),
+      ),
+  );
+}
+
 export function JobsPanel({
   resume,
   onGoEdit,
+  onAddSkill,
 }: {
   resume: Resume;
   onGoEdit: () => void;
+  onAddSkill: (skill: string) => void;
 }) {
   const analysis = analyzeResume(resume);
-  const hasData =
-    resume.intent.targetRole.trim().length > 0 || resume.skills.length > 0;
 
-  if (!hasData) {
+  if (!hasJobInputs(resume)) {
     return (
       <div className="mx-auto max-w-2xl">
         <div className="rounded-3xl border border-zinc-200/80 bg-white px-6 py-16 text-center shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
@@ -126,7 +144,7 @@ export function JobsPanel({
             先填写简历，才能推荐文章
           </h2>
           <p className="mx-auto mt-2 max-w-sm text-[13px] leading-6 text-zinc-500">
-            至少填写「期望岗位」或几个技能标签，我们会据此分析岗位匹配度，并生成招聘网站的搜索入口。
+            填写期望岗位、个人简介、技能或任意一段经历，我们会据此分析岗位匹配度，并生成招聘网站的搜索入口。
           </p>
           <Button variant="primary" className="mt-6" onClick={onGoEdit}>
             去填写
@@ -141,6 +159,9 @@ export function JobsPanel({
     resume.intent.targetRole.trim() ||
     analysis.profile?.title ||
     analysis.keywords[0] ||
+    resume.basic.headline.trim() ||
+    resume.experiences[0]?.role.trim() ||
+    resume.projects[0]?.role.trim() ||
     "";
   const alternates = analysis.keywords.filter(
     (keyword) => keyword !== primaryKeyword,
@@ -238,11 +259,21 @@ export function JobsPanel({
               <div>
                 <p className="mb-2 text-[11px] text-zinc-400">
                   缺失核心技能（{analysis.missingCore.length}）
+                  {analysis.missingCore.length > 0 ? (
+                    <span className="ml-1 text-zinc-300">
+                      · 若你掌握，点击补进简历
+                    </span>
+                  ) : null}
                 </p>
                 {analysis.missingCore.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
                     {analysis.missingCore.map((skill) => (
-                      <SkillChip key={skill} tone="missing">
+                      <SkillChip
+                        key={skill}
+                        tone="missing"
+                        onClick={() => onAddSkill(skill)}
+                        title="点击添加到简历技能"
+                      >
                         {skill}
                       </SkillChip>
                     ))}
@@ -296,7 +327,7 @@ export function JobsPanel({
         </section>
       </div>
 
-      <JdMatcher resume={resume} />
+      <JdMatcher resume={resume} onAddSkill={onAddSkill} />
 
       <section className="rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
         <div className="flex flex-wrap items-center justify-between gap-3">

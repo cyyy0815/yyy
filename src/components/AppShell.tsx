@@ -193,6 +193,23 @@ function ResumeWorkspace() {
   const showBackupReminder =
     backupDue && !isSample && hasResumeContent(resume);
 
+  const handleAddSkill = (skill: string) => {
+    const value = skill.trim();
+    if (!value) return;
+    const exists = resume.skills.some(
+      (item) => item.trim().toLowerCase() === value.toLowerCase(),
+    );
+    if (exists) {
+      setNotice({ type: "ok", message: `技能「${value}」已在简历中` });
+      return;
+    }
+    updateResume((prev) => ({
+      ...prev,
+      skills: [...prev.skills, value],
+    }));
+    setNotice({ type: "ok", message: `已添加技能「${value}」` });
+  };
+
   const handleExport = () => {
     downloadResumeJSON(resume, template);
     recordExport();
@@ -711,7 +728,11 @@ function ResumeWorkspace() {
             </div>
           </>
         ) : (
-          <JobsPanel resume={resume} onGoEdit={() => setTab("edit")} />
+          <JobsPanel
+            resume={resume}
+            onGoEdit={() => setTab("edit")}
+            onAddSkill={handleAddSkill}
+          />
         )}
       </main>
 

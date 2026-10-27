@@ -2593,6 +2593,140 @@ console.log(
 );
 expect("侧栏多页 PDF 页数", sidebarPages === 2, String(sidebarPages));
 
+// P3 推荐页：只有简介也能进入；JD 缺口可一键补进简历
+const jobsP3Page = await open({ width: 1440, height: 1000 });
+await jobsP3Page.goto(`${BASE}/#jobs`, { waitUntil: "networkidle0" });
+await jobsP3Page.evaluate(() => {
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: {
+        name: "林一",
+        headline: "",
+        summary: "3 年 B 端产品经验，负责过客服工单系统从 0 到 1 的设计。",
+      },
+      intent: {},
+      educations: [],
+      experiences: [],
+      projects: [],
+      skills: [],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.removeItem("resume-workshop:jd");
+});
+await jobsP3Page.reload({ waitUntil: "networkidle0" });
+await pause(800);
+const relaxedJobs = await jobsP3Page.evaluate(() => {
+  const text = document.body.innerText;
+  return {
+    hasEmptyState: text.includes("先填写简历，才能推荐文章"),
+    hasPanel: text.includes("根据简历，找到该搜的岗位"),
+  };
+});
+expect(
+  "仅填写简介也能进入推荐页",
+  !relaxedJobs.hasEmptyState && relaxedJobs.hasPanel,
+  JSON.stringify(relaxedJobs),
+);
+
+await jobsP3Page.evaluate(() => {
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: { name: "林一", headline: "前端工程师" },
+      intent: {},
+      educations: [],
+      experiences: [],
+      projects: [],
+      skills: ["React"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.removeItem("resume-workshop:jd");
+});
+await jobsP3Page.reload({ waitUntil: "networkidle0" });
+await pause(800);
+await jobsP3Page.type(
+  "textarea",
+  "任职要求：熟悉 Vue、Webpack、Vite，了解 Node.js 与前端工程化。",
+);
+await clickText(jobsP3Page, "分析匹配度");
+await pause(600);
+const missingSkill = await jobsP3Page.evaluate(() => {
+  const button = document.querySelector('[data-qa="jd-missing"] button');
+  return button?.textContent?.trim() ?? "";
+});
+expect("JD 缺口技能可点击", Boolean(missingSkill), missingSkill);
+if (missingSkill) {
+  await jobsP3Page.evaluate(() => {
+    document.querySelector('[data-qa="jd-missing"] button')?.click();
+  });
+  await pause(1000);
+  const addSkillResult = await jobsP3Page.evaluate((skill) => {
+    const raw = localStorage.getItem("resume-workshop:v1") ?? "{}";
+    const data = JSON.parse(raw);
+    return {
+      skills: data.skills ?? [],
+      stillMissing: [...document.querySelectorAll('[data-qa="jd-missing"] button')]
+        .some((button) => button.textContent?.trim() === skill),
+      notice: document.body.innerText.includes(`已添加技能「${skill}」`),
+    };
+  }, missingSkill);
+  expect(
+    "点击 JD 缺口后写入简历并更新匹配结果",
+    addSkillResult.skills.includes(missingSkill) &&
+      !addSkillResult.stillMissing &&
+      addSkillResult.notice,
+    JSON.stringify(addSkillResult),
+  );
+}
+await jobsP3Page.evaluate(() => {
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: { name: "林一", headline: "销售经理" },
+      intent: { targetRole: "销售经理", targetCity: "宁波" },
+      educations: [],
+      experiences: [],
+      projects: [],
+      skills: ["客户开发", "商务谈判", "销售管理"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.removeItem("resume-workshop:jd");
+});
+await jobsP3Page.reload({ waitUntil: "networkidle0" });
+await pause(800);
+const expandedJobs = await jobsP3Page.evaluate(() => {
+  const bossLink = [...document.querySelectorAll("a")].find((link) =>
+    link.href.includes("zhipin.com/web/geek/job"),
+  );
+  const url = bossLink ? new URL(bossLink.href) : null;
+  const text = document.body.innerText;
+  return {
+    city: url?.searchParams.get("city") ?? "",
+    keyword: url?.searchParams.get("query") ?? "",
+    hasProfile: text.includes("命中核心技能"),
+    unknownProfile: text.includes("岗位画像未收录"),
+  };
+});
+expect(
+  "非技术岗位画像与新增城市编码可用",
+  expandedJobs.hasProfile &&
+    !expandedJobs.unknownProfile &&
+    expandedJobs.city === "101210400" &&
+    expandedJobs.keyword === "销售经理",
+  JSON.stringify(expandedJobs),
+);
+
+await jobsP3Page.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.removeItem("resume-workshop:jd");
+  localStorage.removeItem("resume-workshop:last-saved-at");
+});
+await jobsP3Page.close();
+
 // P3 错误边界：未知路径显示自定义 404
 const notFoundPage = await open({ width: 1000, height: 800 });
 const notFoundResponse = await notFoundPage.goto(`${BASE}/qa-not-found`, {
