@@ -9,6 +9,7 @@ import {
   type SetStateAction,
 } from "react";
 import { analyzeResume } from "@/lib/matching";
+import { fileToPhoto } from "@/lib/photo";
 import {
   newId,
   type BasicInfo,
@@ -687,6 +688,9 @@ const UNDO_WINDOW_MS = 8000;
 export function ResumeForm({ resume, onChange }: Props) {
   const [deleted, setDeleted] = useState<DeleteTarget | null>(null);
   const undoTimer = useRef<number | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState("");
 
   const clearUndo = useCallback(() => {
     if (undoTimer.current !== null) {
@@ -784,6 +788,20 @@ export function ResumeForm({ resume, onChange }: Props) {
   const updateBasic = (patch: Partial<BasicInfo>) =>
     onChange((prev) => ({ ...prev, basic: { ...prev.basic, ...patch } }));
 
+  const handlePhoto = async (file: File) => {
+    setPhotoError("");
+    setPhotoBusy(true);
+    try {
+      updateBasic({ photo: await fileToPhoto(file) });
+    } catch (error) {
+      setPhotoError(
+        error instanceof Error ? error.message : "图片处理失败，请换一张试试",
+      );
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
   const updateIntent = (patch: Partial<JobIntent>) =>
     onChange((prev) => ({ ...prev, intent: { ...prev.intent, ...patch } }));
 
@@ -792,6 +810,68 @@ export function ResumeForm({ resume, onChange }: Props) {
       <AiWriter resume={resume} onChange={onChange} />
 
       <SectionCard title="基本信息" description="让 HR 第一眼知道你是谁">
+        <div className="mb-4 flex items-center gap-4 rounded-xl border border-zinc-100 bg-zinc-50/70 p-3">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white text-[10px] tracking-wide text-zinc-300">
+            {resume.basic.photo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={resume.basic.photo}
+                alt="证件照预览"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              "照片"
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={photoBusy}
+                onClick={() => photoInputRef.current?.click()}
+              >
+                {photoBusy
+                  ? "处理中…"
+                  : resume.basic.photo
+                    ? "更换照片"
+                    : "上传照片"}
+              </Button>
+              {resume.basic.photo ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setPhotoError("");
+                    updateBasic({ photo: "" });
+                  }}
+                >
+                  移除
+                </Button>
+              ) : null}
+            </div>
+            <p className="mt-1 text-[11px] leading-5 text-zinc-400">
+              选填。自动居中裁成正方形并压缩，只保存在本机。
+            </p>
+            {photoError ? (
+              <p role="alert" className="mt-1 text-[11px] text-red-600">
+                {photoError}
+              </p>
+            ) : null}
+          </div>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            aria-label="选择证件照文件"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) void handlePhoto(file);
+            }}
+          />
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="姓名">
             <TextInput

@@ -9,6 +9,27 @@ function displayUrl(value: string): string {
   return value.replace(/^https?:\/\//, "").replace(/\/$/, "");
 }
 
+/** 证件照统一走 object-cover，避免不同尺寸的原图撑破版式。 */
+function ResumePhoto({
+  src,
+  className = "",
+}: {
+  src: string;
+  className?: string;
+}) {
+  if (!src) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      draggable={false}
+      data-resume-photo="true"
+      className={`shrink-0 object-cover ${className}`}
+    />
+  );
+}
+
 function Bullets({
   text,
   className = "",
@@ -128,10 +149,16 @@ function ModernTemplate({ resume }: { resume: Resume }) {
             {resume.basic.headline || "求职头衔"}
           </p>
         </div>
-        <ContactList
-          resume={resume}
-          className="shrink-0 space-y-0.5 text-right text-[10.5px] leading-[1.6] text-zinc-500"
-        />
+        <div className="flex shrink-0 items-start gap-4">
+          <ContactList
+            resume={resume}
+            className="space-y-0.5 text-right text-[10.5px] leading-[1.6] text-zinc-500"
+          />
+          <ResumePhoto
+            src={resume.basic.photo}
+            className="h-[24mm] w-[24mm] rounded-xl ring-1 ring-zinc-200"
+          />
+        </div>
       </header>
 
       <div
@@ -330,18 +357,29 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
         ...accentStyle(resume.theme.accent),
       }}
     >
-      <header className="border-b border-zinc-300 pb-4 text-center">
-        <h1 className="text-[28px] font-semibold tracking-[0.12em] text-zinc-900">
-          {resume.basic.name || "你的姓名"}
-        </h1>
-        <p className="mt-1 text-[12px] tracking-[0.16em] text-zinc-600">
-          {resume.basic.headline || "求职头衔"}
-        </p>
-        {contact.length > 0 ? (
-          <p className="mt-2.5 text-[9.5px] leading-relaxed tracking-wide text-zinc-500">
-            {contact.join("   ｜   ")}
-          </p>
-        ) : null}
+      <header className="border-b border-zinc-300 pb-4">
+        <div className="flex items-center gap-5">
+          {resume.basic.photo ? (
+            <span aria-hidden="true" className="w-[24mm] shrink-0" />
+          ) : null}
+          <div className="min-w-0 flex-1 text-center">
+            <h1 className="text-[28px] font-semibold tracking-[0.12em] text-zinc-900">
+              {resume.basic.name || "你的姓名"}
+            </h1>
+            <p className="mt-1 text-[12px] tracking-[0.16em] text-zinc-600">
+              {resume.basic.headline || "求职头衔"}
+            </p>
+            {contact.length > 0 ? (
+              <p className="mt-2.5 text-[9.5px] leading-relaxed tracking-wide text-zinc-500">
+                {contact.join("   ｜   ")}
+              </p>
+            ) : null}
+          </div>
+          <ResumePhoto
+            src={resume.basic.photo}
+            className="h-[24mm] w-[24mm] rounded-sm ring-1 ring-zinc-200"
+          />
+        </div>
       </header>
 
       {resume.basic.summary ? (
@@ -505,8 +543,14 @@ function CompactTemplate({ resume }: { resume: Resume }) {
             {resume.basic.headline || "求职头衔"}
           </p>
         </div>
-        <div className="max-w-[95mm] text-right text-[9px] leading-[1.6] text-zinc-500">
-          {contact.join("  ·  ")}
+        <div className="flex shrink-0 items-start gap-3">
+          <div className="max-w-[82mm] text-right text-[9px] leading-[1.6] text-zinc-500">
+            {contact.join("  ·  ")}
+          </div>
+          <ResumePhoto
+            src={resume.basic.photo}
+            className="h-[18mm] w-[18mm] rounded-md ring-1 ring-zinc-200"
+          />
         </div>
       </header>
 
@@ -656,6 +700,10 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
     >
       <aside className="resume-side w-[62mm] shrink-0 px-[8mm] py-[12mm]">
         <header>
+          <ResumePhoto
+            src={resume.basic.photo}
+            className="mb-4 h-[30mm] w-[30mm] rounded-full ring-4 ring-white/10"
+          />
           <h1 className="text-[26px] font-semibold leading-[1.15] tracking-tight text-white">
             {resume.basic.name || "你的姓名"}
           </h1>
@@ -866,12 +914,18 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
             {resume.basic.headline || "求职头衔"}
           </p>
         </div>
-        <div className="shrink-0 space-y-0.5 text-right text-[9.5px] leading-[1.6] text-zinc-500">
-          {contact.map((item) => (
-            <div key={item} className="break-all">
-              {item}
-            </div>
-          ))}
+        <div className="flex shrink-0 items-center gap-5">
+          <div className="space-y-0.5 text-right text-[9.5px] leading-[1.6] text-zinc-500">
+            {contact.map((item) => (
+              <div key={item} className="break-all">
+                {item}
+              </div>
+            ))}
+          </div>
+          <ResumePhoto
+            src={resume.basic.photo}
+            className="h-[22mm] w-[22mm] rounded-full ring-2 ring-zinc-100"
+          />
         </div>
       </header>
 

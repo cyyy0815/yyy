@@ -39,6 +39,8 @@ export type BasicInfo = {
   website: string;
   github: string;
   summary: string;
+  /** 压缩后的证件照 Data URL；空字符串表示不显示照片 */
+  photo: string;
 };
 
 export type JobIntent = {
@@ -99,6 +101,7 @@ export function createEmptyResume(): Resume {
       website: "",
       github: "",
       summary: "",
+      photo: "",
     },
     intent: {
       targetRole: "",

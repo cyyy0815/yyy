@@ -1,3 +1,4 @@
+import { isPhotoDataUrl } from "./photo";
 import { normalizeAccent } from "./theme";
 import {
   createEmptyResume,
@@ -37,6 +38,7 @@ export function normalizeResume(input: unknown): Resume {
       website: asString(basic.website),
       github: asString(basic.github),
       summary: asString(basic.summary),
+      photo: isPhotoDataUrl(basic.photo) ? basic.photo : "",
     },
     intent: {
       targetRole: asString(intent.targetRole),

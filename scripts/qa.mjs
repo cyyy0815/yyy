@@ -609,7 +609,9 @@ await writeFile(
     template: "classic",
   }),
 );
-const fileInput = await safetyPage.$('input[type="file"]');
+const fileInput = await safetyPage.$(
+  'input[type="file"][accept*="json"]',
+);
 if (!fileInput) throw new Error("file input not found");
 
 let importDialog = "";
@@ -658,6 +660,191 @@ await safetyPage.evaluate(() => {
   localStorage.removeItem("resume-workshop:v1");
 });
 await safetyPage.close();
+
+// P2 证件照：上传后压缩保存、五套模板展示、JSON 备份包含、可移除
+const photoFixture = path.join(OUT, "qa-photo-fixture.svg");
+await writeFile(
+  photoFixture,
+  `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800">
+    <rect width="600" height="800" fill="#dbeafe"/>
+    <circle cx="300" cy="270" r="130" fill="#1d4ed8"/>
+    <path d="M70 800c20-190 120-310 230-310s210 120 230 310" fill="#1e40af"/>
+  </svg>`,
+);
+const photoPage = await open({ width: 1440, height: 1000 });
+await photoPage.goto(BASE, { waitUntil: "networkidle0" });
+await photoPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await photoPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+const photoInput = await photoPage.$('input[type="file"][accept="image/*"]');
+if (!photoInput) throw new Error("photo input not found");
+await photoInput.uploadFile(photoFixture);
+await photoPage.waitForFunction(
+  () => {
+    try {
+      const data = JSON.parse(
+        localStorage.getItem("resume-workshop:v1") ?? "{}",
+      );
+      return (
+        typeof data.basic?.photo === "string" &&
+        data.basic.photo.startsWith("data:image/jpeg;base64,")
+      );
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 10000 },
+);
+await photoPage.waitForFunction(
+  () => {
+    const image = document.querySelector('img[alt="证件照预览"]');
+    return Boolean(image?.complete && image.naturalWidth);
+  },
+  { timeout: 5000 },
+);
+const photoState = await photoPage.evaluate(() => {
+  const data = JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}");
+  const image = document.querySelector('img[alt="证件照预览"]');
+  return {
+    prefix: data.basic?.photo?.slice(0, 23) ?? "",
+    length: data.basic?.photo?.length ?? 0,
+    width: image?.naturalWidth ?? 0,
+    height: image?.naturalHeight ?? 0,
+  };
+});
+expect(
+  "照片压缩并保存",
+  photoState.prefix === "data:image/jpeg;base64," &&
+    photoState.length > 0 &&
+    photoState.length <= 600000 &&
+    photoState.width === 400 &&
+    photoState.height === 400,
+  JSON.stringify(photoState),
+);
+
+const photoTemplates = [
+  { label: "现代", id: "modern" },
+  { label: "经典", id: "classic" },
+  { label: "紧凑", id: "compact" },
+  { label: "侧栏", id: "sidebar" },
+  { label: "时间轴", id: "timeline" },
+];
+const photoLayout = {};
+for (const { label, id } of photoTemplates) {
+  await clickText(photoPage, label);
+  await photoPage.waitForFunction(
+    (templateLabel) =>
+      [...document.querySelectorAll("button")].some(
+        (button) =>
+          button.textContent?.trim() === templateLabel &&
+          button.getAttribute("aria-pressed") === "true",
+      ),
+    {},
+    label,
+  );
+  photoLayout[id] = await photoPage.evaluate(() => {
+    const image = document.querySelector('[data-resume-photo="true"]');
+    const rect = image?.getBoundingClientRect();
+    return {
+      count: document.querySelectorAll('[data-resume-photo="true"]').length,
+      width: Math.round(rect?.width ?? 0),
+    };
+  });
+  const paper = await photoPage.$(".resume-paper");
+  await paper?.screenshot({ path: `${OUT}/qa-photo-${id}.png` });
+}
+expect(
+  "五套模板展示证件照",
+  Object.values(photoLayout).every(
+    (item) => item.count === 1 && item.width > 10,
+  ),
+  JSON.stringify(photoLayout),
+);
+
+await clickText(photoPage, "现代");
+await photoPage.evaluate(() => {
+  window.__photoExport = null;
+  const originalCreate = URL.createObjectURL.bind(URL);
+  URL.createObjectURL = (blob) => {
+    window.__photoExport = blob;
+    return originalCreate(blob);
+  };
+  HTMLAnchorElement.prototype.click = function () {};
+});
+await clickText(photoPage, "导出");
+await photoPage.waitForFunction(() => Boolean(window.__photoExport), {
+  timeout: 5000,
+});
+const photoExport = await photoPage.evaluate(async () => {
+  const payload = JSON.parse(await window.__photoExport.text());
+  return {
+    prefix: payload.basic?.photo?.slice(0, 23) ?? "",
+    length: payload.basic?.photo?.length ?? 0,
+    template: payload.template,
+  };
+});
+expect(
+  "JSON 备份包含照片",
+  photoExport.prefix === "data:image/jpeg;base64," &&
+    photoExport.length > 0 &&
+    photoExport.template === "modern",
+  JSON.stringify(photoExport),
+);
+
+await photoPage.setViewport({
+  width: 390,
+  height: 844,
+  deviceScaleFactor: 1,
+  isMobile: true,
+  hasTouch: true,
+});
+await pause(400);
+const photoMobile = await photoPage.evaluate(() => ({
+  viewport: window.innerWidth,
+  scrollWidth: document.documentElement.scrollWidth,
+  uploader: Boolean(
+    [...document.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "更换照片",
+    ),
+  ),
+}));
+expect(
+  "手机端照片入口无横向溢出",
+  photoMobile.uploader && photoMobile.scrollWidth <= photoMobile.viewport,
+  JSON.stringify(photoMobile),
+);
+await photoPage.screenshot({
+  path: `${OUT}/qa-photo-mobile.png`,
+  fullPage: true,
+});
+
+await clickText(photoPage, "移除");
+await photoPage.waitForFunction(
+  () => {
+    try {
+      const data = JSON.parse(
+        localStorage.getItem("resume-workshop:v1") ?? "{}",
+      );
+      return data.basic?.photo === "";
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 5000 },
+);
+const photosAfterRemove = await photoPage.$$eval(
+  '[data-resume-photo="true"]',
+  (nodes) => nodes.length,
+);
+expect("照片可移除", photosAfterRemove === 0, String(photosAfterRemove));
+await photoPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await photoPage.close();
 
 // 打印前用「姓名-头衔」作 document.title，Chrome 存 PDF 时用作文件名
 const pdfNamePage = await open({ width: 1440, height: 1000 });

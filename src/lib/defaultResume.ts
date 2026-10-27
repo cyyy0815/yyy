@@ -14,6 +14,7 @@ export function createSampleResume(): Resume {
       github: "github.com/linyi",
       summary:
         "4 年前端开发经验，专注 React 技术栈与性能优化。主导过日活 20 万的中后台产品重构，首屏加载时间降低 42%。熟悉 TypeScript、工程化与数据可视化，乐于推动团队规范落地。",
+      photo: "",
     },
     intent: {
       targetRole: "前端工程师",
