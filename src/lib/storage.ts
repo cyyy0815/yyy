@@ -73,6 +73,21 @@ export function normalizeResume(input: unknown): Resume {
       link: asString(item.link),
       ...(item.pageBreakBefore === true ? { pageBreakBefore: true } : {}),
     })),
+    customSections: asArray<Record<string, unknown>>(raw.customSections).map(
+      (section) => ({
+        id: asString(section.id) || newId(),
+        title: asString(section.title),
+        visible: section.visible !== false,
+        items: asArray<Record<string, unknown>>(section.items).map((item) => ({
+          id: asString(item.id) || newId(),
+          title: asString(item.title),
+          subtitle: asString(item.subtitle),
+          date: asString(item.date),
+          description: asString(item.description),
+          link: asString(item.link),
+        })),
+      }),
+    ),
     skills: asArray<unknown>(raw.skills)
       .filter((skill): skill is string => typeof skill === "string")
       .map((skill) => skill.trim())

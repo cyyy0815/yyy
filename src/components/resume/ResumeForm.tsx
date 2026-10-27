@@ -20,6 +20,11 @@ import {
   type Resume,
 } from "@/lib/types";
 import { AiWriter } from "@/components/resume/AiWriter";
+import { CustomSectionsEditor } from "@/components/resume/CustomSectionsEditor";
+import {
+  deleteTargetLabel,
+  type DeleteTarget,
+} from "@/components/resume/deleteTarget";
 import { Button } from "@/components/ui/Button";
 import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -28,11 +33,6 @@ type Props = {
   resume: Resume;
   onChange: Dispatch<SetStateAction<Resume>>;
 };
-
-type DeleteTarget =
-  | { kind: "experience"; item: Experience; index: number }
-  | { kind: "project"; item: Project; index: number }
-  | { kind: "education"; item: Education; index: number };
 
 type SectionProps = Props & {
   onDelete: (target: DeleteTarget) => void;
@@ -731,6 +731,27 @@ export function ResumeForm({ resume, onChange }: Props) {
                 (item) => item.id !== target.item.id,
               ),
             };
+          case "customSection":
+            return {
+              ...prev,
+              customSections: prev.customSections.filter(
+                (section) => section.id !== target.section.id,
+              ),
+            };
+          case "customItem":
+            return {
+              ...prev,
+              customSections: prev.customSections.map((section) =>
+                section.id === target.sectionId
+                  ? {
+                      ...section,
+                      items: section.items.filter(
+                        (item) => item.id !== target.item.id,
+                      ),
+                    }
+                  : section,
+              ),
+            };
         }
       });
       setDeleted(target);
@@ -771,19 +792,48 @@ export function ResumeForm({ resume, onChange }: Props) {
           list.splice(Math.min(deleted.index, list.length), 0, deleted.item);
           return { ...prev, educations: list };
         }
+        case "customSection": {
+          if (
+            prev.customSections.some(
+              (section) => section.id === deleted.section.id,
+            )
+          ) {
+            return prev;
+          }
+          const list = [...prev.customSections];
+          list.splice(
+            Math.min(deleted.index, list.length),
+            0,
+            deleted.section,
+          );
+          return { ...prev, customSections: list };
+        }
+        case "customItem": {
+          return {
+            ...prev,
+            customSections: prev.customSections.map((section) => {
+              if (section.id !== deleted.sectionId) return section;
+              if (
+                section.items.some((item) => item.id === deleted.item.id)
+              ) {
+                return section;
+              }
+              const list = [...section.items];
+              list.splice(
+                Math.min(deleted.index, list.length),
+                0,
+                deleted.item,
+              );
+              return { ...section, items: list };
+            }),
+          };
+        }
       }
     });
     clearUndo();
   }, [deleted, onChange, clearUndo]);
 
-  const deletedLabel =
-    deleted?.kind === "experience"
-      ? "工作经历"
-      : deleted?.kind === "project"
-        ? "项目"
-        : deleted?.kind === "education"
-          ? "教育经历"
-          : "";
+  const deletedLabel = deleteTargetLabel(deleted);
 
   const updateBasic = (patch: Partial<BasicInfo>) =>
     onChange((prev) => ({ ...prev, basic: { ...prev.basic, ...patch } }));
@@ -1014,6 +1064,11 @@ export function ResumeForm({ resume, onChange }: Props) {
       />
       <EducationSection
         resume={resume}
+        onChange={onChange}
+        onDelete={handleDelete}
+      />
+      <CustomSectionsEditor
+        sections={resume.customSections}
         onChange={onChange}
         onDelete={handleDelete}
       />

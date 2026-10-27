@@ -72,6 +72,7 @@ export function createSampleResume(): Resume {
         end: "2021.06",
       },
     ],
+    customSections: [],
     skills: [
       "React",
       "TypeScript",

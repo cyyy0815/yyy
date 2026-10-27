@@ -1,5 +1,24 @@
 import { DEFAULT_ACCENT } from "./theme";
 
+export type CustomItem = {
+  id: string;
+  /** 证书名、奖项、语言、作品名等 */
+  title: string;
+  /** 颁发机构、担任角色等补充信息 */
+  subtitle: string;
+  date: string;
+  description: string;
+  link: string;
+};
+
+export type CustomSection = {
+  id: string;
+  title: string;
+  /** 关闭后仍保留数据，只是不出现在简历上 */
+  visible: boolean;
+  items: CustomItem[];
+};
+
 export type Education = {
   id: string;
   school: string;
@@ -62,6 +81,7 @@ export type Resume = {
   educations: Education[];
   experiences: Experience[];
   projects: Project[];
+  customSections: CustomSection[];
   skills: string[];
   theme: ResumeTheme;
 };
@@ -114,6 +134,7 @@ export function createEmptyResume(): Resume {
     educations: [],
     experiences: [],
     projects: [],
+    customSections: [],
     skills: [],
     theme: { accent: DEFAULT_ACCENT },
   };

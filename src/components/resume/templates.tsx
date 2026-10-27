@@ -1,5 +1,10 @@
 import { accentStyle } from "@/lib/theme";
-import type { Resume, TemplateId } from "@/lib/types";
+import type {
+  CustomItem,
+  CustomSection,
+  Resume,
+  TemplateId,
+} from "@/lib/types";
 
 function range(start: string, end: string): string {
   return [start, end].filter(Boolean).join(" – ");
@@ -7,6 +12,93 @@ function range(start: string, end: string): string {
 
 function displayUrl(value: string): string {
   return value.replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
+
+function hasCustomItemContent(item: CustomItem): boolean {
+  return Boolean(
+    item.title.trim() ||
+      item.subtitle.trim() ||
+      item.date.trim() ||
+      item.description.trim() ||
+      item.link.trim(),
+  );
+}
+
+/** 只渲染显示中且有内容的板块，空条目留给表单继续编辑。 */
+function visibleCustomSections(resume: Resume): CustomSection[] {
+  return resume.customSections.filter(
+    (section) => section.visible && section.items.some(hasCustomItemContent),
+  );
+}
+
+function customSectionTitle(section: CustomSection): string {
+  return section.title.trim() || "其他信息";
+}
+
+function CustomItems({
+  section,
+  titleClassName,
+  subtitleClassName,
+  dateClassName,
+  bodyClassName,
+  linkClassName,
+  gapClassName = "space-y-3",
+}: {
+  section: CustomSection;
+  titleClassName: string;
+  subtitleClassName: string;
+  dateClassName: string;
+  bodyClassName: string;
+  linkClassName: string;
+  gapClassName?: string;
+}) {
+  const items = section.items.filter(hasCustomItemContent);
+  if (items.length === 0) return null;
+
+  return (
+    <div className={gapClassName}>
+      {items.map((item) => {
+        const description = item.description.trim();
+        const multiline = /\r?\n/.test(description);
+        return (
+          <div key={item.id} className="break-inside-avoid">
+            {item.title || item.subtitle || item.date ? (
+              <div className="flex items-baseline justify-between gap-3">
+                <p className={titleClassName}>
+                  {item.title ? (
+                    <span className="font-semibold text-zinc-900">
+                      {item.title}
+                    </span>
+                  ) : null}
+                  {item.subtitle ? (
+                    <span className={subtitleClassName}>
+                      {item.title ? " · " : ""}
+                      {item.subtitle}
+                    </span>
+                  ) : null}
+                </p>
+                {item.date ? (
+                  <span className={`shrink-0 tabular-nums ${dateClassName}`}>
+                    {item.date}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+            {description ? (
+              multiline ? (
+                <Bullets text={description} className={bodyClassName} />
+              ) : (
+                <p className={bodyClassName}>{description}</p>
+              )
+            ) : null}
+            {item.link ? (
+              <p className={linkClassName}>{displayUrl(item.link)}</p>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 /** 证件照统一走 object-cover，避免不同尺寸的原图撑破版式。 */
@@ -125,6 +217,7 @@ function AccentSectionTitle({
 }
 
 function ModernTemplate({ resume }: { resume: Resume }) {
+  const customSections = visibleCustomSections(resume);
   const hasAside =
     resume.skills.length > 0 ||
     resume.educations.length > 0 ||
@@ -247,9 +340,26 @@ function ModernTemplate({ resume }: { resume: Resume }) {
             </section>
           ) : null}
 
+          {customSections.map((section) => (
+            <section key={section.id} className="mb-5">
+              <AccentSectionTitle>
+                {customSectionTitle(section)}
+              </AccentSectionTitle>
+              <CustomItems
+                section={section}
+                titleClassName="text-[12px] leading-snug"
+                subtitleClassName="text-zinc-500"
+                dateClassName="text-[9.5px] text-zinc-400"
+                bodyClassName="mt-1 text-[11px] leading-[1.7] text-zinc-600"
+                linkClassName="mt-0.5 text-[9px] text-zinc-400"
+              />
+            </section>
+          ))}
+
           {!resume.basic.summary &&
           resume.experiences.length === 0 &&
-          resume.projects.length === 0 ? (
+          resume.projects.length === 0 &&
+          customSections.length === 0 ? (
             <p className="py-10 text-center text-[12px] text-zinc-300">
               在左侧填写内容，这里会实时预览
             </p>
@@ -340,6 +450,7 @@ function ClassicSectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 function ClassicTemplate({ resume }: { resume: Resume }) {
+  const customSections = visibleCustomSections(resume);
   const contact = [
     resume.basic.phone,
     resume.basic.email,
@@ -462,6 +573,23 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
         </section>
       ) : null}
 
+      {customSections.map((section) => (
+        <section key={section.id} className="mt-5">
+          <ClassicSectionTitle>
+            {customSectionTitle(section)}
+          </ClassicSectionTitle>
+          <CustomItems
+            section={section}
+            titleClassName="text-[11.5px] leading-snug"
+            subtitleClassName="text-zinc-600"
+            dateClassName="text-[9.5px] text-zinc-400"
+            bodyClassName="mt-1 text-[10.5px] leading-[1.8] text-zinc-600"
+            linkClassName="mt-0.5 text-[9px] text-zinc-400"
+            gapClassName="space-y-3"
+          />
+        </section>
+      ))}
+
       {resume.educations.length > 0 ? (
         <section className="mt-5">
           <ClassicSectionTitle>教育经历</ClassicSectionTitle>
@@ -516,6 +644,7 @@ function CompactSectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 function CompactTemplate({ resume }: { resume: Resume }) {
+  const customSections = visibleCustomSections(resume);
   const contact = [
     resume.basic.phone,
     resume.basic.email,
@@ -634,6 +763,23 @@ function CompactTemplate({ resume }: { resume: Resume }) {
         </section>
       ) : null}
 
+      {customSections.map((section) => (
+        <section key={section.id} className="mt-3">
+          <CompactSectionTitle>
+            {customSectionTitle(section)}
+          </CompactSectionTitle>
+          <CustomItems
+            section={section}
+            titleClassName="text-[10.5px] leading-snug"
+            subtitleClassName="text-zinc-500"
+            dateClassName="text-[8.5px] text-zinc-400"
+            bodyClassName="mt-0.5 text-[9.5px] leading-[1.65] text-zinc-600"
+            linkClassName="mt-0.5 text-[8.5px] text-zinc-400"
+            gapClassName="space-y-2"
+          />
+        </section>
+      ))}
+
       <div className="mt-3 grid grid-cols-[1fr_1fr] gap-x-6">
         {resume.educations.length > 0 ? (
           <section>
@@ -682,6 +828,7 @@ function SidebarHeading({ children }: { children: React.ReactNode }) {
 }
 
 function SidebarTemplate({ resume }: { resume: Resume }) {
+  const customSections = visibleCustomSections(resume);
   const contact = [
     resume.basic.phone,
     resume.basic.email,
@@ -872,9 +1019,26 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
           </section>
         ) : null}
 
+        {customSections.map((section) => (
+          <section key={section.id} className="mb-5">
+            <AccentSectionTitle>
+              {customSectionTitle(section)}
+            </AccentSectionTitle>
+            <CustomItems
+              section={section}
+              titleClassName="text-[12px] leading-snug"
+              subtitleClassName="text-zinc-500"
+              dateClassName="text-[9.5px] text-zinc-400"
+              bodyClassName="mt-1 text-[11px] leading-[1.7] text-zinc-600"
+              linkClassName="mt-0.5 text-[9px] text-zinc-400"
+            />
+          </section>
+        ))}
+
         {!resume.basic.summary &&
         resume.experiences.length === 0 &&
-        resume.projects.length === 0 ? (
+        resume.projects.length === 0 &&
+        customSections.length === 0 ? (
           <p className="py-10 text-center text-[12px] text-zinc-300">
             在左侧填写内容，这里会实时预览
           </p>
@@ -889,6 +1053,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
 /* ------------------------------------------------------------------ */
 
 function TimelineTemplate({ resume }: { resume: Resume }) {
+  const customSections = visibleCustomSections(resume);
   const contact = [
     resume.basic.phone,
     resume.basic.email,
@@ -1016,6 +1181,22 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
           </div>
         </section>
       ) : null}
+
+      {customSections.map((section) => (
+        <section key={section.id} className="mt-5">
+          <AccentSectionTitle className="mb-2.5">
+            {customSectionTitle(section)}
+          </AccentSectionTitle>
+          <CustomItems
+            section={section}
+            titleClassName="text-[12px] leading-snug"
+            subtitleClassName="text-zinc-500"
+            dateClassName="text-[9.5px] text-zinc-400"
+            bodyClassName="mt-1 text-[11px] leading-[1.7] text-zinc-600"
+            linkClassName="mt-0.5 text-[9px] text-zinc-400"
+          />
+        </section>
+      ))}
 
       {resume.educations.length > 0 || resume.skills.length > 0 ? (
         <div className="mt-5 grid grid-cols-[1.35fr_1fr] gap-x-8">

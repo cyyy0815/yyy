@@ -49,6 +49,7 @@ function hasResumeContent(resume: Resume): boolean {
       resume.experiences.length ||
       resume.projects.length ||
       resume.educations.length ||
+      resume.customSections.length ||
       resume.skills.length,
   );
 }

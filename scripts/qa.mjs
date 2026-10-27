@@ -69,6 +69,45 @@ async function clickText(page, text, scope = "body") {
   if (!found) throw new Error(`button not found: ${text}`);
 }
 
+/** 按板块序号填写自定义条目，触发表单的 React onChange。 */
+async function fillCustomItem(page, sectionIndex, values) {
+  return page.evaluate(
+    ({ index, fields }) => {
+      const section = document.querySelectorAll(
+        '[data-custom-section="true"]',
+      )[index];
+      const item = section?.querySelector('[data-custom-item="true"]');
+      if (!section || !item) return false;
+      const labels = [...item.querySelectorAll("label")];
+      const set = (labelText, value) => {
+        const label = labels.find((node) =>
+          node.querySelector("span")?.textContent?.includes(labelText),
+        );
+        const input = label?.querySelector("input, textarea");
+        if (!input) return false;
+        const proto =
+          input instanceof HTMLTextAreaElement
+            ? HTMLTextAreaElement.prototype
+            : HTMLInputElement.prototype;
+        Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(
+          input,
+          value,
+        );
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        return true;
+      };
+      return (
+        set("名称", fields.name) &&
+        set("机构 / 角色", fields.subtitle) &&
+        set("时间", fields.date) &&
+        set("链接", fields.link) &&
+        set("补充说明", fields.description)
+      );
+    },
+    { index: sectionIndex, fields: values },
+  );
+}
+
 /** 拦截 AI 接口，用固定 SSE 验证前端闭环，不消耗真实额度。 */
 async function interceptAi(page, { configured = true, text = "" } = {}) {
   await page.setRequestInterception(true);
@@ -656,6 +695,15 @@ expect(
   importedTemplate.pressed && importedTemplate.stored === "classic",
   JSON.stringify(importedTemplate),
 );
+const oldJsonCompat = await safetyPage.evaluate(() => {
+  const data = JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}");
+  return (
+    Array.isArray(data.customSections) &&
+    data.customSections.length === 0 &&
+    document.body.innerText.includes("还没有自定义板块")
+  );
+});
+expect("旧 JSON 兼容自定义板块", oldJsonCompat);
 await safetyPage.evaluate(() => {
   localStorage.removeItem("resume-workshop:v1");
 });
@@ -845,6 +893,310 @@ await photoPage.evaluate(() => {
   localStorage.setItem("resume-workshop:template", "modern");
 });
 await photoPage.close();
+
+// P2 自定义板块：添加、编辑、排序、显隐、删除撤销、五套模板、JSON 备份
+const customPage = await open({ width: 1440, height: 1000 });
+await customPage.goto(BASE, { waitUntil: "networkidle0" });
+await customPage.evaluate(() => {
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: {
+        name: "自定义测试",
+        headline: "产品经理",
+        email: "",
+        phone: "",
+        city: "上海",
+        website: "",
+        github: "",
+        summary: "负责增长与效率工具，关注可量化的业务结果。",
+        photo: "",
+      },
+      intent: { targetRole: "产品经理" },
+      educations: [],
+      experiences: [],
+      projects: [
+        {
+          id: "cp1",
+          name: "增长项目",
+          role: "负责人",
+          description: "把新用户次留提升 8 个百分点。",
+          link: "",
+        },
+      ],
+      customSections: [],
+      skills: ["需求分析"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await customPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+
+await clickText(customPage, "+ 证书");
+await customPage.waitForSelector('[data-custom-section="true"]', {
+  timeout: 5000,
+});
+const filledCertificate = await fillCustomItem(customPage, 0, {
+  name: "PMP",
+  subtitle: "PMI",
+  date: "2023.06",
+  link: "example.com/pmp",
+  description: "项目管理专业人士认证",
+});
+expect("自定义板块可添加条目", filledCertificate);
+await customPage.waitForFunction(
+  () => document.querySelector(".resume-paper")?.innerText.includes("PMP"),
+  { timeout: 5000 },
+);
+const certificatePreview = await customPage.evaluate(() =>
+  document.querySelector(".resume-paper")?.innerText.includes("证书"),
+);
+expect("证书板块渲染到简历", certificatePreview);
+
+await clickText(customPage, "+ 语言");
+await customPage.waitForFunction(
+  () =>
+    document.querySelectorAll('[data-custom-section="true"]').length === 2,
+  { timeout: 5000 },
+);
+const filledLanguage = await fillCustomItem(customPage, 1, {
+  name: "英语",
+  subtitle: "CET-6",
+  date: "",
+  link: "",
+  description: "读写流利，可英文会议沟通",
+});
+expect("可添加第二个自定义板块", filledLanguage);
+await customPage.waitForFunction(
+  () => document.querySelector(".resume-paper")?.innerText.includes("CET-6"),
+  { timeout: 5000 },
+);
+const orderBefore = await customPage.evaluate(() => {
+  const text = document.querySelector(".resume-paper")?.innerText ?? "";
+  return text.indexOf("PMP") < text.indexOf("CET-6");
+});
+await customPage.click('[aria-label="上移板块 语言"]');
+await customPage.waitForFunction(() => {
+  const text = document.querySelector(".resume-paper")?.innerText ?? "";
+  return text.indexOf("CET-6") < text.indexOf("PMP");
+}, { timeout: 5000 });
+const sectionOrder = await customPage.$$eval(
+  '[data-custom-section="true"] input[aria-label^="板块名称"]',
+  (inputs) => inputs.map((input) => input.value),
+);
+expect(
+  "自定义板块可排序",
+  orderBefore && sectionOrder.join(",") === "语言,证书",
+  JSON.stringify({ orderBefore, sectionOrder }),
+);
+
+await customPage.evaluate(() => {
+  document.querySelector('[aria-label="隐藏板块 语言"]')?.click();
+});
+await customPage.waitForFunction(
+  () => {
+    try {
+      const data = JSON.parse(
+        localStorage.getItem("resume-workshop:v1") ?? "{}",
+      );
+      const language = data.customSections?.find(
+        (section) => section.title === "语言",
+      );
+      return (
+        language?.visible === false &&
+        !document.querySelector(".resume-paper")?.innerText.includes("CET-6")
+      );
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 5000 },
+);
+const hiddenState = await customPage.evaluate(() => {
+  const data = JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}");
+  const language = data.customSections?.find(
+    (section) => section.title === "语言",
+  );
+  return {
+    visible: language?.visible,
+    paper: document.querySelector(".resume-paper")?.innerText ?? "",
+  };
+});
+await customPage.evaluate(() => {
+  document.querySelector('[aria-label="显示板块 语言"]')?.click();
+});
+await customPage.waitForFunction(
+  () => document.querySelector(".resume-paper")?.innerText.includes("CET-6"),
+  { timeout: 5000 },
+);
+expect(
+  "自定义板块可隐藏并重新显示",
+  hiddenState.visible === false && !hiddenState.paper.includes("CET-6"),
+  JSON.stringify(hiddenState),
+);
+
+await customPage.evaluate(() => {
+  const section = [...document.querySelectorAll('[data-custom-section="true"]')].find(
+    (node) =>
+      node.querySelector('input[aria-label^="板块名称"]')?.value === "证书",
+  );
+  section?.querySelector('[aria-label="删除自定义条目"]')?.click();
+});
+await customPage.waitForFunction(
+  () =>
+    document.body.innerText.includes("已删除自定义条目") &&
+    !document.querySelector(".resume-paper")?.innerText.includes("PMP"),
+  { timeout: 5000 },
+);
+await customPage.evaluate(() => {
+  [...document.querySelectorAll('[role="status"] button')]
+    .find((button) => button.textContent?.trim() === "撤销")
+    ?.click();
+});
+await customPage.waitForFunction(
+  () => document.querySelector(".resume-paper")?.innerText.includes("PMP"),
+  { timeout: 5000 },
+);
+expect("自定义条目删除可撤销", true);
+
+await customPage.evaluate(() => {
+  document.querySelector('[aria-label="删除板块 语言"]')?.click();
+});
+await customPage.waitForFunction(
+  () =>
+    document.body.innerText.includes("已删除自定义板块") &&
+    !document.querySelector(".resume-paper")?.innerText.includes("CET-6"),
+  { timeout: 5000 },
+);
+await customPage.evaluate(() => {
+  [...document.querySelectorAll('[role="status"] button')]
+    .find((button) => button.textContent?.trim() === "撤销")
+    ?.click();
+});
+await customPage.waitForFunction(
+  () => document.querySelector(".resume-paper")?.innerText.includes("CET-6"),
+  { timeout: 5000 },
+);
+expect("自定义板块删除可撤销", true);
+
+const customTemplates = [
+  { label: "现代", id: "modern" },
+  { label: "经典", id: "classic" },
+  { label: "紧凑", id: "compact" },
+  { label: "侧栏", id: "sidebar" },
+  { label: "时间轴", id: "timeline" },
+];
+const customTemplateResult = {};
+for (const { label, id } of customTemplates) {
+  await clickText(customPage, label);
+  await customPage.waitForFunction(
+    (templateLabel) =>
+      [...document.querySelectorAll("button")].some(
+        (button) =>
+          button.textContent?.trim() === templateLabel &&
+          button.getAttribute("aria-pressed") === "true",
+      ),
+    {},
+    label,
+  );
+  customTemplateResult[id] = await customPage.evaluate(() => {
+    const text = document.querySelector(".resume-paper")?.innerText ?? "";
+    return {
+      certificate: text.includes("PMP") && text.includes("证书"),
+      language: text.includes("CET-6") && text.includes("语言"),
+    };
+  });
+  const paper = await customPage.$(".resume-paper");
+  await paper?.screenshot({ path: `${OUT}/qa-custom-${id}.png` });
+}
+expect(
+  "五套模板渲染自定义板块",
+  Object.values(customTemplateResult).every(
+    (item) => item.certificate && item.language,
+  ),
+  JSON.stringify(customTemplateResult),
+);
+
+const customEditor = await customPage.evaluateHandle(() => {
+  const heading = [...document.querySelectorAll("h2")].find(
+    (node) => node.textContent?.trim() === "自定义板块",
+  );
+  return heading?.closest("section") ?? null;
+});
+if (customEditor.asElement()) {
+  await customEditor.asElement().screenshot({
+    path: `${OUT}/qa-custom-editor.png`,
+  });
+}
+
+await customPage.setViewport({
+  width: 390,
+  height: 844,
+  deviceScaleFactor: 1,
+  isMobile: true,
+  hasTouch: true,
+});
+await pause(500);
+const customMobile = await customPage.evaluate(() => ({
+  viewport: window.innerWidth,
+  scrollWidth: document.documentElement.scrollWidth,
+  sections: document.querySelectorAll('[data-custom-section="true"]').length,
+  addButton: [...document.querySelectorAll("button")].some(
+    (button) => button.textContent?.trim() === "+ 添加条目",
+  ),
+}));
+expect(
+  "手机端自定义板块无横向溢出",
+  customMobile.sections === 2 &&
+    customMobile.addButton &&
+    customMobile.scrollWidth <= customMobile.viewport,
+  JSON.stringify(customMobile),
+);
+await customPage.screenshot({
+  path: `${OUT}/qa-custom-mobile.png`,
+  fullPage: true,
+});
+
+await customPage.evaluate(() => {
+  window.__customExport = null;
+  const originalCreate = URL.createObjectURL.bind(URL);
+  URL.createObjectURL = (blob) => {
+    window.__customExport = blob;
+    return originalCreate(blob);
+  };
+  HTMLAnchorElement.prototype.click = function () {};
+});
+await clickText(customPage, "导出");
+await customPage.waitForFunction(() => Boolean(window.__customExport), {
+  timeout: 5000,
+});
+const customExport = await customPage.evaluate(async () => {
+  const payload = JSON.parse(await window.__customExport.text());
+  return {
+    count: payload.customSections?.length ?? 0,
+    titles: payload.customSections?.map((section) => section.title) ?? [],
+    visible: payload.customSections?.map((section) => section.visible) ?? [],
+    items: payload.customSections?.map((section) =>
+      section.items?.map((item) => item.title),
+    ) ?? [],
+  };
+});
+expect(
+  "JSON 备份包含自定义板块",
+  customExport.count === 2 &&
+    customExport.titles.join(",") === "语言,证书" &&
+    customExport.visible.every(Boolean) &&
+    customExport.items.flat().includes("PMP") &&
+    customExport.items.flat().includes("英语"),
+  JSON.stringify(customExport),
+);
+await customPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await customPage.close();
 
 // 打印前用「姓名-头衔」作 document.title，Chrome 存 PDF 时用作文件名
 const pdfNamePage = await open({ width: 1440, height: 1000 });
