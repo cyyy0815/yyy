@@ -1,12 +1,13 @@
 "use client";
 
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import {
   newId,
   type CustomItem,
   type CustomSection,
   type Resume,
 } from "@/lib/types";
+import { validateUrl } from "@/lib/validate";
 import { Button } from "@/components/ui/Button";
 import { Field, TextArea, TextInput } from "@/components/ui/Field";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -45,6 +46,10 @@ type Props = {
 };
 
 export function CustomSectionsEditor({ sections, onChange, onDelete }: Props) {
+  const [touchedLinks, setTouchedLinks] = useState<Record<string, boolean>>({});
+  const touchLink = (id: string) =>
+    setTouchedLinks((prev) => (prev[id] ? prev : { ...prev, [id]: true }));
+
   const addSection = (rawTitle: string) => {
     const title = rawTitle.trim();
     if (!title) return;
@@ -321,11 +326,22 @@ export function CustomSectionsEditor({ sections, onChange, onDelete }: Props) {
                             }
                           />
                         </Field>
-                        <Field label="链接" hint="选填">
+                        <Field
+                          label="链接"
+                          hint="选填"
+                          error={
+                            touchedLinks[item.id] ? validateUrl(item.link) : ""
+                          }
+                        >
                           <TextInput
                             value={item.link}
                             maxLength={300}
                             placeholder="https://..."
+                            onBlur={() => touchLink(item.id)}
+                            aria-invalid={
+                              Boolean(validateUrl(item.link)) &&
+                              Boolean(touchedLinks[item.id])
+                            }
                             onChange={(event) =>
                               patchItem(section.id, item.id, {
                                 link: event.target.value,

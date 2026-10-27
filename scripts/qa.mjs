@@ -53,6 +53,47 @@ async function open({ width = 1440, height = 1000, mobile = false } = {}) {
   return page;
 }
 
+/** 按可见标签写入值并失焦，用于触发格式校验提示。 */
+async function setFieldByLabel(page, labelText, value, index = 0) {
+  return page.evaluate(
+    ({ label, nextValue, labelIndex }) => {
+      const labels = [...document.querySelectorAll("label")].filter(
+        (node) =>
+          node.querySelector("span span")?.textContent?.trim() === label,
+      );
+      const target = labels[labelIndex];
+      const input = target?.querySelector("input, textarea");
+      if (!input) return false;
+      const proto =
+        input instanceof HTMLTextAreaElement
+          ? HTMLTextAreaElement.prototype
+          : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(
+        input,
+        nextValue,
+      );
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
+      input.blur();
+      return true;
+    },
+    { label: labelText, nextValue: value, labelIndex: index },
+  );
+}
+
+async function labelText(page, labelText, index = 0) {
+  return page.evaluate(
+    ({ label, labelIndex }) => {
+      const labels = [...document.querySelectorAll("label")].filter(
+        (node) =>
+          node.querySelector("span span")?.textContent?.trim() === label,
+      );
+      return labels[labelIndex]?.textContent?.trim() ?? "";
+    },
+    { label: labelText, labelIndex: index },
+  );
+}
+
 async function clickText(page, text, scope = "body") {
   const found = await page.evaluate(
     ({ label, root }) => {
@@ -1780,6 +1821,76 @@ await multiPage.evaluate(() => {
   localStorage.setItem("resume-workshop:template", "modern");
 });
 await multiPage.close();
+
+// P3 输入校验：格式提示只在失焦后出现，不阻止保存
+const validationPage = await open({ width: 1440, height: 1000 });
+await validationPage.goto(BASE, { waitUntil: "networkidle0" });
+await validationPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.removeItem("resume-workshop:library:v1");
+  localStorage.removeItem("resume-workshop:last-saved-at");
+});
+await validationPage.reload({ waitUntil: "networkidle0" });
+await pause(600);
+
+await setFieldByLabel(validationPage, "邮箱", "not-an-email");
+await pause(150);
+const emailInvalid = await labelText(validationPage, "邮箱");
+expect(
+  "邮箱格式错误有提示",
+  emailInvalid.includes("邮箱格式不正确"),
+  emailInvalid,
+);
+await setFieldByLabel(validationPage, "邮箱", "me@example.com");
+await pause(150);
+const emailValid = await labelText(validationPage, "邮箱");
+expect("邮箱改正后提示消失", !emailValid.includes("邮箱格式不正确"), emailValid);
+
+await setFieldByLabel(validationPage, "手机", "abc");
+await pause(150);
+expect(
+  "手机格式错误有提示",
+  (await labelText(validationPage, "手机")).includes("电话只能包含"),
+);
+
+await setFieldByLabel(validationPage, "期望月薪（最低）", "30");
+await setFieldByLabel(validationPage, "期望月薪（最高）", "20");
+await pause(150);
+const salaryError = await labelText(validationPage, "期望月薪（最高）");
+expect(
+  "薪资区间倒置有提示",
+  salaryError.includes("最高月薪不能低于最低月薪"),
+  salaryError,
+);
+
+await setFieldByLabel(validationPage, "开始时间", "abc");
+await pause(150);
+const dateError = await validationPage.evaluate(() =>
+  document.body.innerText.includes("开始时间格式建议为 2023.05"),
+);
+expect("日期格式错误有提示", dateError);
+
+await setFieldByLabel(validationPage, "项目链接", "not-a-url");
+await pause(150);
+const linkError = await labelText(validationPage, "项目链接");
+expect(
+  "项目链接格式错误有提示",
+  linkError.includes("链接格式不正确"),
+  linkError,
+);
+
+await setFieldByLabel(validationPage, "姓名", "");
+await pause(150);
+const nameError = await labelText(validationPage, "姓名");
+expect("姓名必填提示", nameError.includes("请填写姓名"), nameError);
+
+await validationPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.removeItem("resume-workshop:library:v1");
+  localStorage.removeItem("resume-workshop:last-saved-at");
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await validationPage.close();
 
 // P3 跨标签页：后保存的标签页不得静默覆盖前一份
 const crossA = await open({ width: 1440, height: 1000 });

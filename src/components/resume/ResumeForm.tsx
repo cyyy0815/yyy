@@ -11,6 +11,14 @@ import {
 import { analyzeResume } from "@/lib/matching";
 import { fileToPhoto } from "@/lib/photo";
 import {
+  validateDateRange,
+  validateEmail,
+  validateName,
+  validatePhone,
+  validateSalary,
+  validateUrl,
+} from "@/lib/validate";
+import {
   newId,
   type BasicInfo,
   type Education,
@@ -37,6 +45,15 @@ type Props = {
 type SectionProps = Props & {
   onDelete: (target: DeleteTarget) => void;
 };
+
+/** 失焦后再显示格式提示，避免用户刚输入第一个字符就看到报错。 */
+function useTouched() {
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const touch = useCallback((key: string) => {
+    setTouched((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
+  }, []);
+  return { touched, touch };
+}
 
 function moveById<T extends { id: string }>(
   list: T[],
@@ -166,6 +183,7 @@ function ExperienceSection({
   onDelete,
 }: SectionProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const { touched, touch } = useTouched();
 
   const update = (id: string, patch: Partial<Experience>) => {
     onChange((prev) => ({
@@ -186,7 +204,11 @@ function ExperienceSection({
           <EmptyBlock text="还没有工作经历，点击下方按钮添加" />
         ) : null}
 
-        {resume.experiences.map((item, index) => (
+        {resume.experiences.map((item, index) => {
+          const dateError = touched[`exp-${item.id}`]
+            ? validateDateRange(item.start, item.end)
+            : "";
+          return (
           <div
             key={item.id}
             onDragOver={(event) => {
@@ -260,6 +282,7 @@ function ExperienceSection({
                 <TextInput
                   value={item.start}
                   onChange={(event) => update(item.id, { start: event.target.value })}
+                  onBlur={() => touch(`exp-${item.id}`)}
                   placeholder="2023.03"
                 />
               </Field>
@@ -267,9 +290,15 @@ function ExperienceSection({
                 <TextInput
                   value={item.end}
                   onChange={(event) => update(item.id, { end: event.target.value })}
+                  onBlur={() => touch(`exp-${item.id}`)}
                   placeholder="至今"
                 />
               </Field>
+              {dateError ? (
+                <p className="text-[11px] leading-4 text-red-600 sm:col-span-2">
+                  {dateError}
+                </p>
+              ) : null}
               <Field
                 label="工作内容"
                 hint="每行一条"
@@ -286,7 +315,8 @@ function ExperienceSection({
               </Field>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
       <div className="mt-3">
         <Button
@@ -318,6 +348,7 @@ function ExperienceSection({
 
 function ProjectSection({ resume, onChange, onDelete }: SectionProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const { touched, touch } = useTouched();
 
   const update = (id: string, patch: Partial<Project>) => {
     onChange((prev) => ({
@@ -335,7 +366,14 @@ function ProjectSection({ resume, onChange, onDelete }: SectionProps) {
           <EmptyBlock text="还没有项目经历" />
         ) : null}
 
-        {resume.projects.map((item, index) => (
+        {resume.projects.map((item, index) => {
+          const dateError = touched[`proj-${item.id}`]
+            ? validateDateRange(item.start, item.end)
+            : "";
+          const linkError = touched[`proj-link-${item.id}`]
+            ? validateUrl(item.link)
+            : "";
+          return (
           <div
             key={item.id}
             onDragOver={(event) => {
@@ -407,6 +445,7 @@ function ProjectSection({ resume, onChange, onDelete }: SectionProps) {
                 <TextInput
                   value={item.start}
                   onChange={(event) => update(item.id, { start: event.target.value })}
+                  onBlur={() => touch(`proj-${item.id}`)}
                   placeholder="2023.05"
                 />
               </Field>
@@ -414,13 +453,25 @@ function ProjectSection({ resume, onChange, onDelete }: SectionProps) {
                 <TextInput
                   value={item.end}
                   onChange={(event) => update(item.id, { end: event.target.value })}
+                  onBlur={() => touch(`proj-${item.id}`)}
                   placeholder="至今"
                 />
               </Field>
-              <Field label="项目链接" hint="选填" className="sm:col-span-2">
+              {dateError ? (
+                <p className="text-[11px] leading-4 text-red-600 sm:col-span-2">
+                  {dateError}
+                </p>
+              ) : null}
+              <Field
+                label="项目链接"
+                hint="选填"
+                error={linkError}
+                className="sm:col-span-2"
+              >
                 <TextInput
                   value={item.link}
                   onChange={(event) => update(item.id, { link: event.target.value })}
+                  onBlur={() => touch(`proj-link-${item.id}`)}
                   placeholder="github.com/you/project"
                 />
               </Field>
@@ -435,7 +486,8 @@ function ProjectSection({ resume, onChange, onDelete }: SectionProps) {
               </Field>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
       <div className="mt-3">
         <Button
@@ -468,6 +520,7 @@ function ProjectSection({ resume, onChange, onDelete }: SectionProps) {
 
 function EducationSection({ resume, onChange, onDelete }: SectionProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const { touched, touch } = useTouched();
 
   const update = (id: string, patch: Partial<Education>) => {
     onChange((prev) => ({
@@ -485,7 +538,11 @@ function EducationSection({ resume, onChange, onDelete }: SectionProps) {
           <EmptyBlock text="还没有教育经历" />
         ) : null}
 
-        {resume.educations.map((item, index) => (
+        {resume.educations.map((item, index) => {
+          const dateError = touched[`edu-${item.id}`]
+            ? validateDateRange(item.start, item.end)
+            : "";
+          return (
           <div
             key={item.id}
             onDragOver={(event) => {
@@ -564,6 +621,7 @@ function EducationSection({ resume, onChange, onDelete }: SectionProps) {
                   <TextInput
                     value={item.start}
                     onChange={(event) => update(item.id, { start: event.target.value })}
+                    onBlur={() => touch(`edu-${item.id}`)}
                     placeholder="2017.09"
                   />
                 </Field>
@@ -571,9 +629,15 @@ function EducationSection({ resume, onChange, onDelete }: SectionProps) {
                   <TextInput
                     value={item.end}
                     onChange={(event) => update(item.id, { end: event.target.value })}
+                    onBlur={() => touch(`edu-${item.id}`)}
                     placeholder="2021.06"
                   />
                 </Field>
+                {dateError ? (
+                  <p className="col-span-2 text-[11px] leading-4 text-red-600">
+                    {dateError}
+                  </p>
+                ) : null}
               </div>
               <Field label="GPA" hint="选填">
                 <TextInput
@@ -615,7 +679,8 @@ function EducationSection({ resume, onChange, onDelete }: SectionProps) {
               </Field>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
       <div className="mt-3">
         <Button
@@ -755,6 +820,18 @@ export function ResumeForm({ resume, onChange }: Props) {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState("");
+  const { touched, touch } = useTouched();
+
+  const nameError = touched.name ? validateName(resume.basic.name) : "";
+  const emailError = touched.email ? validateEmail(resume.basic.email) : "";
+  const phoneError = touched.phone ? validatePhone(resume.basic.phone) : "";
+  const websiteError = touched.website
+    ? validateUrl(resume.basic.website)
+    : "";
+  const githubError = touched.github ? validateUrl(resume.basic.github) : "";
+  const salaryErrors = touched.salary
+    ? validateSalary(resume.intent.salaryMin, resume.intent.salaryMax)
+    : {};
 
   const clearUndo = useCallback(() => {
     if (undoTimer.current !== null) {
@@ -987,10 +1064,12 @@ export function ResumeForm({ resume, onChange }: Props) {
           />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="姓名">
+          <Field label="姓名" error={nameError}>
             <TextInput
               value={resume.basic.name}
               onChange={(event) => updateBasic({ name: event.target.value })}
+              onBlur={() => touch("name")}
+              aria-invalid={Boolean(nameError)}
               placeholder="你的名字"
             />
           </Field>
@@ -1001,18 +1080,22 @@ export function ResumeForm({ resume, onChange }: Props) {
               placeholder="如 前端工程师"
             />
           </Field>
-          <Field label="手机">
+          <Field label="手机" error={phoneError}>
             <TextInput
               value={resume.basic.phone}
               onChange={(event) => updateBasic({ phone: event.target.value })}
+              onBlur={() => touch("phone")}
+              aria-invalid={Boolean(phoneError)}
               placeholder="138-0000-0000"
             />
           </Field>
-          <Field label="邮箱">
+          <Field label="邮箱" error={emailError}>
             <TextInput
               type="email"
               value={resume.basic.email}
               onChange={(event) => updateBasic({ email: event.target.value })}
+              onBlur={() => touch("email")}
+              aria-invalid={Boolean(emailError)}
               placeholder="you@example.com"
             />
           </Field>
@@ -1023,17 +1106,26 @@ export function ResumeForm({ resume, onChange }: Props) {
               placeholder="如 上海"
             />
           </Field>
-          <Field label="个人网站" hint="选填">
+          <Field label="个人网站" hint="选填" error={websiteError}>
             <TextInput
               value={resume.basic.website}
               onChange={(event) => updateBasic({ website: event.target.value })}
+              onBlur={() => touch("website")}
+              aria-invalid={Boolean(websiteError)}
               placeholder="your.site"
             />
           </Field>
-          <Field label="GitHub" hint="选填" className="sm:col-span-2">
+          <Field
+            label="GitHub"
+            hint="选填"
+            error={githubError}
+            className="sm:col-span-2"
+          >
             <TextInput
               value={resume.basic.github}
               onChange={(event) => updateBasic({ github: event.target.value })}
+              onBlur={() => touch("github")}
+              aria-invalid={Boolean(githubError)}
               placeholder="github.com/yourname"
             />
           </Field>
@@ -1070,21 +1162,33 @@ export function ResumeForm({ resume, onChange }: Props) {
               placeholder="如 上海"
             />
           </Field>
-          <Field label="期望月薪（最低）" hint="单位：K">
+          <Field
+            label="期望月薪（最低）"
+            hint="单位：K"
+            error={salaryErrors.min}
+          >
             <TextInput
               type="number"
               min={0}
               value={resume.intent.salaryMin}
               onChange={(event) => updateIntent({ salaryMin: event.target.value })}
+              onBlur={() => touch("salary")}
+              aria-invalid={Boolean(salaryErrors.min)}
               placeholder="20"
             />
           </Field>
-          <Field label="期望月薪（最高）" hint="单位：K">
+          <Field
+            label="期望月薪（最高）"
+            hint="单位：K"
+            error={salaryErrors.max}
+          >
             <TextInput
               type="number"
               min={0}
               value={resume.intent.salaryMax}
               onChange={(event) => updateIntent({ salaryMax: event.target.value })}
+              onBlur={() => touch("salary")}
+              aria-invalid={Boolean(salaryErrors.max)}
               placeholder="30"
             />
           </Field>

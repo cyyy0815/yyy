@@ -6,11 +6,13 @@ const inputBase =
 export function Field({
   label,
   hint,
+  error,
   children,
   className = "",
 }: {
   label: string;
   hint?: string;
+  error?: string;
   children: ReactNode;
   className?: string;
 }) {
@@ -21,6 +23,11 @@ export function Field({
         {hint ? <span className="text-[11px] text-zinc-400">{hint}</span> : null}
       </span>
       {children}
+      {error ? (
+        <span className="mt-1 block text-[11px] leading-4 text-red-600">
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }
