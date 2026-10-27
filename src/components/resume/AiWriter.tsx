@@ -310,7 +310,15 @@ export function AiWriter({ resume, onChange }: Props) {
           ...prev,
           projects: [
             ...prev.projects,
-            { id, name: "", role: "", description: text, link: "" },
+            {
+              id,
+              name: "",
+              role: "",
+              start: "",
+              end: "",
+              description: text,
+              link: "",
+            },
           ],
         }));
         setUndo({

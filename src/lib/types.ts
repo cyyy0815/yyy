@@ -43,6 +43,8 @@ export type Project = {
   id: string;
   name: string;
   role: string;
+  start: string;
+  end: string;
   description: string;
   link: string;
   /** 打印时从新的一页开始 */

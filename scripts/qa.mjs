@@ -643,7 +643,15 @@ await writeFile(
     intent: {},
     educations: [],
     experiences: [],
-    projects: [],
+    projects: [
+      {
+        id: "legacy-p1",
+        name: "旧版项目",
+        role: "",
+        description: "没有起止时间的旧数据",
+        link: "",
+      },
+    ],
     skills: [],
     template: "classic",
   }),
@@ -695,15 +703,39 @@ expect(
   importedTemplate.pressed && importedTemplate.stored === "classic",
   JSON.stringify(importedTemplate),
 );
+await safetyPage.waitForFunction(
+  () => {
+    try {
+      const data = JSON.parse(
+        localStorage.getItem("resume-workshop:v1") ?? "{}",
+      );
+      return (
+        data.basic?.name === "导入测试" &&
+        data.projects?.[0]?.name === "旧版项目"
+      );
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 5000 },
+);
 const oldJsonCompat = await safetyPage.evaluate(() => {
   const data = JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}");
-  return (
-    Array.isArray(data.customSections) &&
-    data.customSections.length === 0 &&
-    document.body.innerText.includes("还没有自定义板块")
-  );
+  return {
+    customSections:
+      Array.isArray(data.customSections) && data.customSections.length === 0,
+    emptyState: document.body.innerText.includes("还没有自定义板块"),
+    projectDates:
+      data.projects?.[0]?.start === "" && data.projects?.[0]?.end === "",
+  };
 });
-expect("旧 JSON 兼容自定义板块", oldJsonCompat);
+expect(
+  "旧 JSON 兼容自定义板块与项目时间",
+  oldJsonCompat.customSections &&
+    oldJsonCompat.emptyState &&
+    oldJsonCompat.projectDates,
+  JSON.stringify(oldJsonCompat),
+);
 await safetyPage.evaluate(() => {
   localStorage.removeItem("resume-workshop:v1");
 });
@@ -920,6 +952,8 @@ await customPage.evaluate(() => {
           id: "cp1",
           name: "增长项目",
           role: "负责人",
+          start: "2023.05",
+          end: "2024.06",
           description: "把新用户次留提升 8 个百分点。",
           link: "",
         },
@@ -933,6 +967,48 @@ await customPage.evaluate(() => {
 });
 await customPage.reload({ waitUntil: "networkidle0" });
 await pause(700);
+
+const projectDatePreview = await customPage.evaluate(() =>
+  document.querySelector(".resume-paper")?.innerText.includes("2023.05 – 2024.06"),
+);
+expect("项目起止时间渲染到简历", projectDatePreview);
+
+const projectDateEdited = await customPage.evaluate(() => {
+  const startLabel = [...document.querySelectorAll("label")].find((label) =>
+    label.querySelector('input[placeholder="2023.05"]'),
+  );
+  const card = startLabel?.closest("div.rounded-xl");
+  const endLabel = [...(card?.querySelectorAll("label") ?? [])].find((label) =>
+    label.querySelector("span")?.textContent?.includes("结束时间"),
+  );
+  const input = endLabel?.querySelector("input");
+  if (!input) return false;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+    input,
+    "至今",
+  );
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  return true;
+});
+expect("项目结束时间可编辑", projectDateEdited);
+await customPage.waitForFunction(
+  () => {
+    try {
+      const data = JSON.parse(
+        localStorage.getItem("resume-workshop:v1") ?? "{}",
+      );
+      return (
+        data.projects?.[0]?.end === "至今" &&
+        document.querySelector(".resume-paper")?.innerText.includes(
+          "2023.05 – 至今",
+        )
+      );
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 5000 },
+);
 
 await clickText(customPage, "+ 证书");
 await customPage.waitForSelector('[data-custom-section="true"]', {
@@ -1106,15 +1182,16 @@ for (const { label, id } of customTemplates) {
     return {
       certificate: text.includes("PMP") && text.includes("证书"),
       language: text.includes("CET-6") && text.includes("语言"),
+      projectDates: text.includes("2023.05 – 至今"),
     };
   });
   const paper = await customPage.$(".resume-paper");
   await paper?.screenshot({ path: `${OUT}/qa-custom-${id}.png` });
 }
 expect(
-  "五套模板渲染自定义板块",
+  "五套模板渲染自定义板块与项目时间",
   Object.values(customTemplateResult).every(
-    (item) => item.certificate && item.language,
+    (item) => item.certificate && item.language && item.projectDates,
   ),
   JSON.stringify(customTemplateResult),
 );
@@ -1181,15 +1258,21 @@ const customExport = await customPage.evaluate(async () => {
     items: payload.customSections?.map((section) =>
       section.items?.map((item) => item.title),
     ) ?? [],
+    projectDates: {
+      start: payload.projects?.[0]?.start,
+      end: payload.projects?.[0]?.end,
+    },
   };
 });
 expect(
-  "JSON 备份包含自定义板块",
+  "JSON 备份包含自定义板块与项目时间",
   customExport.count === 2 &&
     customExport.titles.join(",") === "语言,证书" &&
     customExport.visible.every(Boolean) &&
     customExport.items.flat().includes("PMP") &&
-    customExport.items.flat().includes("英语"),
+    customExport.items.flat().includes("英语") &&
+    customExport.projectDates.start === "2023.05" &&
+    customExport.projectDates.end === "至今",
   JSON.stringify(customExport),
 );
 await customPage.evaluate(() => {

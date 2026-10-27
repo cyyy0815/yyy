@@ -403,6 +403,20 @@ function ProjectSection({ resume, onChange, onDelete }: SectionProps) {
                   placeholder="如 技术负责人"
                 />
               </Field>
+              <Field label="开始时间">
+                <TextInput
+                  value={item.start}
+                  onChange={(event) => update(item.id, { start: event.target.value })}
+                  placeholder="2023.05"
+                />
+              </Field>
+              <Field label="结束时间">
+                <TextInput
+                  value={item.end}
+                  onChange={(event) => update(item.id, { end: event.target.value })}
+                  placeholder="至今"
+                />
+              </Field>
               <Field label="项目链接" hint="选填" className="sm:col-span-2">
                 <TextInput
                   value={item.link}
@@ -432,7 +446,15 @@ function ProjectSection({ resume, onChange, onDelete }: SectionProps) {
               ...prev,
               projects: [
                 ...prev.projects,
-                { id: newId(), name: "", role: "", description: "", link: "" },
+                {
+                  id: newId(),
+                  name: "",
+                  role: "",
+                  start: "",
+                  end: "",
+                  description: "",
+                  link: "",
+                },
               ],
             }))
           }

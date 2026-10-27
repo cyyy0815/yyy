@@ -69,6 +69,8 @@ export function normalizeResume(input: unknown): Resume {
       id: asString(item.id) || newId(),
       name: asString(item.name),
       role: asString(item.role),
+      start: asString(item.start),
+      end: asString(item.end),
       description: asString(item.description),
       link: asString(item.link),
       ...(item.pageBreakBefore === true ? { pageBreakBefore: true } : {}),

@@ -325,10 +325,19 @@ function ModernTemplate({ resume }: { resume: Resume }) {
                           <span className="text-zinc-500"> · {item.role}</span>
                         ) : null}
                       </p>
-                      {item.link ? (
-                        <span className="shrink-0 text-[9.5px] text-zinc-400">
-                          {displayUrl(item.link)}
-                        </span>
+                      {item.link || item.start || item.end ? (
+                        <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+                          {range(item.start, item.end) ? (
+                            <span className="text-[9.5px] tabular-nums text-zinc-400">
+                              {range(item.start, item.end)}
+                            </span>
+                          ) : null}
+                          {item.link ? (
+                            <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
+                              {displayUrl(item.link)}
+                            </span>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
                     <p className="mt-1 text-[11.5px] leading-[1.7] text-zinc-600">
@@ -558,10 +567,19 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
                       <span className="text-zinc-600"> / {item.role}</span>
                     ) : null}
                   </p>
-                  {item.link ? (
-                    <span className="shrink-0 text-[9px] text-zinc-400">
-                      {displayUrl(item.link)}
-                    </span>
+                  {item.link || item.start || item.end ? (
+                    <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+                      {range(item.start, item.end) ? (
+                        <span className="text-[9px] tabular-nums text-zinc-400">
+                          {range(item.start, item.end)}
+                        </span>
+                      ) : null}
+                      {item.link ? (
+                        <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
+                          {displayUrl(item.link)}
+                        </span>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
                 <p className="mt-1 text-[10.5px] leading-[1.8] text-zinc-600">
@@ -748,10 +766,19 @@ function CompactTemplate({ resume }: { resume: Resume }) {
                       <span className="text-zinc-500"> ｜ {item.role}</span>
                     ) : null}
                   </p>
-                  {item.link ? (
-                    <span className="shrink-0 text-[8.5px] text-zinc-400">
-                      {displayUrl(item.link)}
-                    </span>
+                  {item.link || item.start || item.end ? (
+                    <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+                      {range(item.start, item.end) ? (
+                        <span className="text-[8.5px] tabular-nums text-zinc-400">
+                          {range(item.start, item.end)}
+                        </span>
+                      ) : null}
+                      {item.link ? (
+                        <span className="max-w-[45mm] break-all text-[8.5px] text-zinc-400">
+                          {displayUrl(item.link)}
+                        </span>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
                 <p className="mt-0.5 text-[9.5px] leading-[1.65] text-zinc-600">
@@ -1004,10 +1031,19 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
                         <span className="text-zinc-500"> · {item.role}</span>
                       ) : null}
                     </p>
-                    {item.link ? (
-                      <span className="shrink-0 text-[9.5px] text-zinc-400">
-                        {displayUrl(item.link)}
-                      </span>
+                    {item.link || item.start || item.end ? (
+                      <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+                        {range(item.start, item.end) ? (
+                          <span className="text-[9.5px] tabular-nums text-zinc-400">
+                            {range(item.start, item.end)}
+                          </span>
+                        ) : null}
+                        {item.link ? (
+                          <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
+                            {displayUrl(item.link)}
+                          </span>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                   <p className="mt-1 text-[11.5px] leading-[1.7] text-zinc-600">
@@ -1167,10 +1203,19 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
                       <span className="text-zinc-500"> · {item.role}</span>
                     ) : null}
                   </p>
-                  {item.link ? (
-                    <span className="shrink-0 text-[9px] text-zinc-400">
-                      {displayUrl(item.link)}
-                    </span>
+                  {item.link || item.start || item.end ? (
+                    <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+                      {range(item.start, item.end) ? (
+                        <span className="text-[9px] tabular-nums text-zinc-400">
+                          {range(item.start, item.end)}
+                        </span>
+                      ) : null}
+                      {item.link ? (
+                        <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
+                          {displayUrl(item.link)}
+                        </span>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
                 <p className="mt-1 text-[11px] leading-[1.7] text-zinc-600">

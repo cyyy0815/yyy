@@ -49,6 +49,8 @@ export function createSampleResume(): Resume {
         id: newId(),
         name: "可视化运营后台",
         role: "技术负责人",
+        start: "2023.05",
+        end: "2024.06",
         description:
           "基于 React + ECharts 搭建拖拽式报表平台，支持 30+ 图表组件与权限配置，服务内部 200+ 运营人员。",
         link: "",
@@ -57,6 +59,8 @@ export function createSampleResume(): Resume {
         id: newId(),
         name: "开源组件库 Resuikit",
         role: "作者",
+        start: "2022.08",
+        end: "至今",
         description:
           "维护 20+ 高复用组件，GitHub 1.2k stars，配套完整文档与单元测试。",
         link: "github.com/linyi/resuikit",
