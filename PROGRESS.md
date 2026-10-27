@@ -26,7 +26,7 @@
 | 8 | 编辑体验（追加） | ✅ 完成 |
 | 9 | 主题色与新模板（追加） | ✅ 完成 |
 | 10 | 分页控制与 PDF 页码（追加） | ✅ 完成 |
-| 11 | AI 写简历（DeepSeek，追加） | 🟡 方案完成，待 API Key |
+| 11 | AI 写简历（DeepSeek，追加） | 🟡 进行中（M0–M1 完成） |
 
 ## 阶段明细
 
@@ -118,9 +118,13 @@
 - [x] 合并 `GAPS.md` + `AI-PLAN.md` 为单一方案 `PLAN.md`
 - [x] 方案确定：Next.js Route Handler + DeepSeek OpenAI 兼容接口 + SSE 流式 + 按板块生成 + 采用/撤销
 - [x] 安全方案：Key 只放服务端环境变量，不发送姓名/电话/邮箱/整份简历
-- [ ] 等待用户提供 DeepSeek API Key
-- [ ] M0：`git init` + `.env.example` + mock 上游
-- [ ] M1：`/api/ai/status`、`/api/ai/generate`、SSE 转换
+- [x] 用户提供 DeepSeek API Key，写入 `.env.local`（已被 gitignore）
+- [x] `/models` 确认真实模型：`deepseek-flash`、`deepseek-v4-pro`；首版用 `deepseek-flash`
+- [x] M0：`git init -b main`、首次提交、`.env.example`、mock 上游
+- [x] M1：`/api/ai/status`、`/api/ai/generate`、SSE 转换
+- [x] 真实 Key 联调：流式 delta、done + usage、简介单段、经历逐行要点
+- [x] 发现并修复：`deepseek-flash` 默认 high effort 会耗尽 `max_tokens`，改用 `reasoning_effort: "low"`
+- [x] 校验分支：400（参数/JSON）、413（64KB）、429（限流）返回正确
 - [ ] M2：AI 弹窗 + 个人简介生成 + 采用
 - [ ] M3：工作/项目目标选择 + 优化模式 + 停止/重试/撤销
 - [ ] M4：QA、README/PROGRESS、真实 Key 联调、build
@@ -129,41 +133,38 @@
 
 ## 当前进度
 
-- 最近更新：2026-10-26
-- 状态：**阶段 0–10 已完成；阶段 11「AI 写简历」方案完成，等待 DeepSeek API Key**
-- 代码状态：应用代码未改动（本次只新增/合并了 Markdown 方案）
-- 暂停原因：用户关机前保存进度；拿到 DeepSeek Key 后继续
+- 最近更新：2026-10-27
+- 状态：**阶段 0–10 已完成；阶段 11「AI 写简历」进行中，M0–M1 完成**
+- 代码状态：
+  - M0：git 仓库、`.env.example`、`scripts/mock-deepseek.mjs` 完成
+  - M1：`/api/ai/status`、`/api/ai/generate`、SSE 转换完成
+  - M2–M4 未开始：页面尚未接入 AI 入口，用户还看不到功能
 - 本地地址：http://localhost:3000 （推荐页 http://localhost:3000/#jobs）
-- 当前开发服务器：关机后会停止；开机后重新执行 `npm run dev`
 - 一键自检：先 `npm run dev`，再 `npm run qa`（截图输出到 `.screenshots/`）
-- 单一方案文档：**`PLAN.md`**（原 `GAPS.md`、`AI-PLAN.md` 已合并并删除）
+- 单一方案文档：**`PLAN.md`**
 
-### 本次会话日志（2026-10-26）
+### 本次会话日志（2026-10-27）
 
-- 完成全站缺口审计，确认 AI 写简历功能尚未实现
-- 用户指定 AI 写简历为最高优先级（P0）
-- 确定接入 DeepSeek（OpenAI 兼容接口），不走 Claude API
-- 完成 AI 方案：Route Handler、SSE 流式、Prompt、隐私、测试、M0–M4
-- 将 `GAPS.md` + `AI-PLAN.md` 合并为 `PLAN.md`，并删除原文件
-- 未修改任何应用代码；当前应用仍可正常运行、构建、打印
+- 拿到 DeepSeek Key，写入 `.env.local`（已 gitignore，未提交）
+- 调 `/models` 确认：`deepseek-flash`（V4.1-Flash）、`deepseek-v4-pro`；首版用前者
+- M0：`git init -b main` + 首次提交；mock 上游自测通过（SSE / usage / [DONE]）
+- M1：status / generate 路由 + SSE 转换；真实 Key 流式生成验证通过
+- 关键修复：`deepseek-flash` 默认 high effort 把 450 token 全消耗在 reasoning 上，
+  正文为空；改为 `reasoning_effort: "low"`，预算调为简介 700 / 经历与项目 1500
+- 提示词按板块拆分格式规则：简介单段，经历/项目逐行要点且不编号
+- 验证：400 / 413 分支、`tsc`、`npm run lint` 均通过
 
 ### 下次继续
 
-1. 先读 `PLAN.md` 的「P0：AI 写简历」和「路线图」
-2. 在项目根目录创建 `.env.local`：
-   ```bash
-   DEEPSEEK_API_KEY=sk-...
-   DEEPSEEK_MODEL=deepseek-flash
-   # 可选
-   DEEPSEEK_BASE_URL=https://api.deepseek.com
-   ```
-3. `npm run dev`；先调用 `GET /api/ai/models`（M1 实现后）确认模型名
-4. 按 M0 → M1 → M2 → M3 → M4 实施；每完成一步更新本文件
-5. 开工前确认三个待定项：按板块/整份生成、本机/公网部署、无 Key 是否做本地兜底
+1. 先读 `PLAN.md` 的 1.2–1.7 与「路线图」，再读本文件阶段 11
+2. 实施 M2：`AiWriter.tsx` 弹窗 + 简介生成 + 采用 + 未配置 Key 状态
+3. M3：工作/项目目标选择、优化模式、停止/重试、撤销
+4. M4：QA 脚本、README/PROGRESS、真实 Key 联调、`npm run build`
+5. 注意：覆盖非空内容必须在 M2/M3 内做确认 + 撤销，不能拖到 P1
 
 ## 可选后续
 
-- [x] AI 写简历（DeepSeek）— 方案完成，待 API Key；详见 `PLAN.md`
+- [x] AI 写简历（DeepSeek）— M0–M1 完成，M2 进行中；详见 `PLAN.md`
 - [ ] AI 润色 / JD 匹配改写 / 多语言翻译（AI 首版跑通后再考虑）
 - [ ] 接入职位聚合 API（JSearch / Adzuna），用 Next.js Route Handler 隐藏 key
 - [ ] 更多字体搭配 / 模板变体（配色已支持）
@@ -209,12 +210,17 @@ scripts/qa.mjs          无头浏览器截图、溢出检查、分页与 PDF 页
 PLAN.md                单一优化方案（AI 为 P0；数据安全、内容能力、路线图）
 ```
 
-### 计划中（阶段 11，待实现）
+### 阶段 11 新增文件
 
 ```
-src/app/api/ai/                    status / generate / models 路由
-src/lib/ai/                        类型、Prompt、DeepSeek SSE 转换
-src/components/resume/AiWriter.tsx AI 弹窗、流式预览、采用/撤销
-scripts/mock-deepseek.mjs          本地 mock 上游
-.env.example                       环境变量示例
+src/app/api/ai/status/route.ts     ✅ Key / 模型状态（运行时读取）
+src/app/api/ai/generate/route.ts   ✅ 校验、限流、SSE 转换
+src/lib/ai/types.ts                ✅ 请求 / 事件类型
+src/lib/ai/config.ts               ✅ 环境变量读取
+src/lib/ai/prompt.ts               ✅ 提示词、payload、输出清洗
+src/lib/ai/deepseek.ts             ✅ 上游请求、重试、SSE 解析
+scripts/mock-deepseek.mjs          ✅ 本地 mock 上游
+.env.example                       ✅ 环境变量示例
+src/components/resume/AiWriter.tsx ⬜ 待实现（M2）
+src/app/api/ai/models/route.ts     ⬜ 可选，暂不实现
 ```
