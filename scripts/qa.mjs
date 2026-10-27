@@ -3036,6 +3036,44 @@ expect(
 );
 await notFoundPage.close();
 
+// P4：SEO / 分享卡片 / manifest / 图标
+const [homeResponse, manifestResponse, iconResponse, ogResponse] =
+  await Promise.all([
+    fetch(`${BASE}/`),
+    fetch(`${BASE}/manifest.webmanifest`),
+    fetch(`${BASE}/icon-192.png`),
+    fetch(`${BASE}/opengraph-image`),
+  ]);
+const homeHtml = await homeResponse.text();
+const manifest = await manifestResponse.json();
+expect(
+  "首页包含 OG / Twitter / manifest / 图标元数据",
+  homeResponse.ok &&
+    homeHtml.includes('property="og:title"') &&
+    homeHtml.includes('name="twitter:card"') &&
+    homeHtml.includes('name="theme-color"') &&
+    homeHtml.includes('rel="manifest"') &&
+    homeHtml.includes("/icon.svg?"),
+  `${homeResponse.status}`,
+);
+expect(
+  "manifest 提供可安装信息与 192/512 图标",
+  manifestResponse.ok &&
+    manifest.name.includes("简历工坊") &&
+    manifest.theme_color === "#1d4ed8" &&
+    manifest.icons?.some((icon) => icon.sizes === "192x192") &&
+    manifest.icons?.some((icon) => icon.sizes === "512x512"),
+  JSON.stringify(manifest),
+);
+expect(
+  "PWA 图标与 OG 图片可访问",
+  iconResponse.ok &&
+    iconResponse.headers.get("content-type")?.startsWith("image/png") &&
+    ogResponse.ok &&
+    ogResponse.headers.get("content-type")?.startsWith("image/png"),
+  `${iconResponse.status} ${ogResponse.status}`,
+);
+
 await browser.close();
 if (failures.length > 0) {
   console.error(`QA failures: ${failures.length}`);

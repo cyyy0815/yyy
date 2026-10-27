@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="简历工坊">
+  <rect width="64" height="64" rx="14" fill="#1d4ed8" />
+  <path
+    d="M20 13h16.5L46 22.5V47a4 4 0 0 1-4 4H20a4 4 0 0 1-4-4V17a4 4 0 0 1 4-4Z"
+    fill="#ffffff"
+  />
+  <path d="M36.5 13 46 22.5h-9.5V13Z" fill="#bfd3ff" />
+  <rect x="22" y="29" width="20" height="3.4" rx="1.7" fill="#1d4ed8" />
+  <rect x="22" y="36" width="20" height="3.4" rx="1.7" fill="#93b4f8" />
+  <rect x="22" y="43" width="12" height="3.4" rx="1.7" fill="#93b4f8" />
+</svg>

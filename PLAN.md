@@ -285,7 +285,7 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 - **数据最小化**：不发送姓名、电话、邮箱、GitHub、整份简历；只发送当前板块和面板填写内容。
 - **提示注入**：关键词视为素材，系统提示明确忽略其中指令；即使被绕，也只影响用户自己看到的预览。
 - **滥用防护**：长度限制 + IP 限流；公开部署时建议再加登录或共享密钥。
-- **成本控制**：按板块生成、`max_tokens` 上限、单次重试；关闭「整份生成」直到确认用量。
+- **成本控制**：按板块生成、`max_tokens` 上限、单次重试；整份生成按 3 次串行调用计量，占用同一 IP 限流额度。
 - **数据去向**：弹窗和 README 明确写「内容会发送到 DeepSeek」。
 - **部署**：API 路由需要 Node 运行时（`next start` / Vercel），不能再纯静态导出；不要在前端直连 DeepSeek。
 
@@ -415,14 +415,15 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 
 ---
 
-## 5. P4：工程化与分发
+## 5. P4：工程化与分发（已完成）
 
 - **git**：P0 前置已完成；后续每个阶段独立提交。
-- **单元测试**：覆盖 `normalizeResume`、`parseResumeJSON`、匹配打分、JD 识别、SSE 解析；建议 Vitest。
-- **CI**：lint + build + 单元测试；QA 截图可选。
-- **SEO/分享**：Open Graph、manifest、theme-color、自定义 favicon；`layout.tsx` 目前只有 title/description。
-- **PWA/离线**：纯本地工具适合离线，但不是必需。
-- **清理**：`public/` 里未使用的 Next 默认 SVG。
+- **单元测试**：已接入 Vitest，45 个用例覆盖 `normalizeResume`、`parseResumeJSON`、技能匹配与评分、JD 关键词/年限/学历、输入校验、SSE 分片与中止。命令：`npm test` / `npm run test:watch`。
+- **CI**：`.github/workflows/ci.yml` 在 push / PR 时执行 lint、`tsc --noEmit`、单元测试与生产构建；QA 截图需要本机 Chrome，未放入 CI。
+- **SEO/分享**：`layout.tsx` 已补 Open Graph、Twitter Card、keywords、theme-color 与 `formatDetection`；`opengraph-image.tsx` 生成 1200×630 分享图；`manifest.ts` 提供安装清单；自定义 `icon.svg` / `apple-icon.png` / `favicon.ico`。分享图文案用英文，避免 `ImageResponse` 默认字体缺中文字形。
+- **部署地址**：支持 `NEXT_PUBLIC_SITE_URL`；Vercel 自动使用 `VERCEL_PROJECT_PRODUCTION_URL`，本地回退 `http://localhost:3000`。
+- **PWA/离线**：只提供 manifest 与 192/512 图标，不注册 Service Worker，没有离线缓存。
+- **清理**：已删除 `public/` 里未使用的 Next 默认 SVG。
 
 ---
 
@@ -438,17 +439,17 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 | 5 | P1 | 侧栏跨页、保存失败、覆盖保护、PDF 文件名、手机导入、模板随 JSON | 数据安全与打印交付达标 |
 | 6 | P2 | 照片、自定义板块、项目时间、教育增强、多份简历 | 内容模型完善 |
 | 7 | P3 | 跨标签页、校验、错误边界、打印兼容、可访问性 | 体验与健壮性达标 |
-| 8 | P4 | 单元测试、CI、OG/manifest、PWA | 工程化完善 |
+| 8 | P4 ✅ | 单元测试、CI、OG/manifest、图标清理 | 工程化完善；离线缓存未做 |
 
 ---
 
-## 7. 待确认
+## 7. 已确认事项
 
-1. **模型**：拿到 Key 后先查 `/models`；优先非思考型模型（低延迟、低成本）。
-2. **范围**：首版按板块生成（推荐），还是首版就做「一次生成整份简历」？
-3. **部署**：只在本机用，还是要部署到公网？公网需要补限流/访问控制。
-4. **隐私**：是否接受把「目标板块文本 + 岗位/年限/关键词」发送给 DeepSeek？
-5. **降级**：未配置 Key 时只显示配置提示，还是加本地模板版兜底？
+1. **模型**：已用 `/models` 确认真实模型，当前 `deepseek-flash`，`reasoning_effort: "low"`。
+2. **范围**：按板块生成与整份串行生成均已实现。
+3. **部署**：目前按本机 / Node 运行时设计；公网部署仍需自行补登录或访问控制。
+4. **隐私**：只发送当前板块文本、岗位/年限/关键词与参考 JD，不发送姓名、联系方式和整份简历。
+5. **降级**：未配置 Key 时显示配置步骤，不阻塞原有编辑。
 
 ---
 
@@ -456,7 +457,7 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 
 - 不做真实职位抓取（平台无公开 API），只生成搜索入口。
 - 不做账号体系、云同步、多人协作。
-- 首版不做 AI 整份简历生成、AI 自动投递、AI 面试。
+- 不做 AI 自动投递、AI 面试；整份简历生成已在阶段 15 实现（仍不生成教育、技能与自定义板块）。
 - 不做英文简历（除非后续明确需要）。
 - 加 AI 后不能再纯静态导出；需要 Node 运行时。
 - 页码依赖 Chrome `@page` margin box，Firefox/Safari 会缺失。

@@ -31,6 +31,7 @@
 | 13 | P2 内容能力（追加） | ✅ 完成（3.1–3.5） |
 | 14 | P3 体验与健壮性（追加） | ✅ 完成（4.1–4.8） |
 | 15 | AI 功能完善（追加） | ✅ 完成（JD 定制 + 整份生成） |
+| 16 | P4 工程化与分发（追加） | ✅ 完成（单测 / CI / SEO / manifest / 清理） |
 
 ## 阶段明细
 
@@ -233,10 +234,24 @@
 - [x] 接口校验实测：`polish` + 空关键词 + 超长 JD 返回 JD 长度错误，证明空关键词在优化模式下已通过校验
 - [x] 验证：`tsc`、`npm run lint`、`npm run qa` 通过（build 在提交前执行）
 
+### 阶段 16 — P4 工程化与分发（追加）✅
+
+- [x] 接入 Vitest：`npm test` / `npm run test:watch`；升级 `@types/node` 到 24 以匹配 Vitest 5
+- [x] 单元测试 45 个：`normalizeResume` / `parseResumeJSON`、技能匹配与评分、JD 关键词/年限/学历、输入校验、SSE 解析（跨分片、CRLF、`reasoning_content`、`[DONE]`、中止）
+- [x] CI：`.github/workflows/ci.yml`，Node 24 下执行 `npm ci`、lint、`tsc --noEmit`、单元测试与生产构建
+- [x] SEO：`layout.tsx` 补充 OG / Twitter / 关键词 / `theme-color` / `formatDetection`；支持 `NEXT_PUBLIC_SITE_URL` 与 Vercel 生产域名
+- [x] 分享卡片：`opengraph-image.tsx` 生成 1200×630 PNG；因 `ImageResponse` 默认字体缺中文字形，文案使用英文
+- [x] 安装清单：`manifest.ts` + `public/icon-192.png` / `icon-512.png`；自定义 `favicon.ico`、`icon.svg`、`apple-icon.png`
+- [x] 清理 `public/` 下未使用的 Next 默认 SVG
+- [x] QA 新增 OG / Twitter / manifest / 图标元数据与 192/512 图标、分享图可访问检查
+- [x] README 补充测试、CI、SEO/OG、manifest、`NEXT_PUBLIC_SITE_URL` 与无 Service Worker 说明
+- [x] 验证：`tsc`、`npm run lint`、`npm test`（45 passed）、`npm run qa`、`npm run build` 通过
+- [x] 有意不做：Service Worker 离线缓存（只提供可安装清单）
+
 ## 当前进度
 
 - 最近更新：2026-10-27
-- 状态：**阶段 0–15 全部完成；P2 3.1–3.5、P3 4.1–4.8 与 AI 功能完善全部完成**
+- 状态：**阶段 0–16 全部完成；P1–P4 与 AI 功能完善全部完成**
 - 代码状态：
   - M0：git 仓库、`.env.example`、`scripts/mock-deepseek.mjs` 完成
   - M1：`/api/ai/status`、`/api/ai/generate`、SSE 转换完成
@@ -245,7 +260,9 @@
   - M4：QA AI 检查、README、lint/build/qa、生产模式真实 Key 联调完成
 - P2 进度：3.1 证件照、3.2 自定义板块、3.3 项目起止时间、3.4 教育增强、3.5 多份简历全部完成
 - P3 进度：4.1 多标签页防覆盖、4.2 输入校验、4.3 保存时间与备份提醒、4.4 导入校验、4.5 错误边界、4.6 页码开关/打印对比度/可访问性、4.7 推荐门槛与 JD 缺口一键补、4.8 岗位库与城市覆盖全部完成
-- AI 增强：参考 JD 定制、优化模式空关键词、整份简历串行生成与整体撤销全部完成；P4 待确认后再开始
+- AI 增强：参考 JD 定制、优化模式空关键词、整份简历串行生成与整体撤销全部完成
+- P4 进度：Vitest 单元测试、GitHub Actions CI、SEO/OG、manifest 与图标、静态资源清理全部完成；离线缓存未实现
+- 工程命令：`npm test` 运行单元测试；CI 覆盖 lint + 类型检查 + 单测 + 构建
 - 本地地址：http://localhost:3000 （推荐页 http://localhost:3000/#jobs）
 - 一键自检：先 `npm run dev`，再 `npm run qa`（截图输出到 `.screenshots/`）
 - 单一方案文档：**`PLAN.md`**
@@ -334,13 +351,21 @@
 - AI 增强：「整份简历」串行生成三块内容、独立预览可改、一次采用（覆盖简介 + 各新增一条空经历/项目）并支持整体撤销
 - AI 增强 QA：JD 自动读取、polish 空关键词、请求携带 JD、整份三段生成 / 采用 / 撤销全部通过
 - AI 增强验证：`tsc`、`npm run lint`、`npm run qa` 通过；接口实测 polish + 空关键词已通过参数校验
+- P4：安装 Vitest 5，`@types/node` 升到 24；新增 4 个测试文件、45 个用例
+- P4：单测覆盖 normalize / import 校验、技能匹配与评分、JD 识别、输入校验、SSE 分片与中止
+- P4：新增 GitHub Actions，依次执行 lint、`tsc --noEmit`、`npm test`、`npm run build`
+- P4：metadata 增加 OG / Twitter / keywords / theme-color；`metadataBase` 支持 `NEXT_PUBLIC_SITE_URL`、Vercel 域名与 localhost 回退
+- P4：新增 1200×630 `opengraph-image.tsx`（英文文案避免中文字形缺失）
+- P4：新增 `manifest.ts`、192/512 PNG 图标、`icon.svg`、`apple-icon.png`，替换默认 favicon
+- P4：删除 `public/` 下未使用的 5 个默认 SVG；QA 增加元数据、manifest 与图标检查
+- P4 验证：`tsc`、`lint`、`npm test`（45 passed）、`npm run qa`、`npm run build` 全部通过，构建无 metadataBase 警告
 
 ### 下次继续
 
 1. 先读 `PLAN.md` 与 `PROGRESS.md`「当前进度」
-2. P3 4.1–4.8 与 AI 增强（JD 定制、整份生成）已全部完成；下一阶段 P4（工程化与分发）需用户确认后再开始
-3. 可先看 `PLAN.md` P4 范围与 P2 其余可选缺口（全局撤销、技能分组、可点击链接、双语）
-4. 每完成一项跑 `npm run lint`、`npm run build`、`npm run qa` 并更新本文件
+2. 阶段 0–16 全部完成；P1–P4 与 AI 增强均已完成
+3. 可选后续：P2 剩余缺口（全局撤销、技能分组、可点击链接、双语）、AI 求职信 / 英文输出、离线缓存
+4. 每完成一项跑 `npm run lint`、`npm test`、`npm run build`、`npm run qa` 并更新本文件
 
 ## 可选后续
 
@@ -350,20 +375,24 @@
 - [ ] 更多字体搭配 / 模板变体（配色已支持）
 - [ ] 拖拽排序替换上下按钮（注：阶段 8 已实现拖拽手柄，此处仅剩纯鼠标拖拽体验优化）
 - [x] P1 数据安全与打印交付（侧栏跨页、保存失败、覆盖保护、PDF 文件名等；详见 `PLAN.md`）
+- [x] P4 工程化与分发（Vitest、CI、SEO/OG、manifest、图标清理；离线缓存未做）
 
 ## 如何继续
 
 1. 读「当前进度」和 `PLAN.md` 的「P0：AI 写简历」
 2. 确认 `.env.local` 里的 `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL`
 3. `npm run dev`
-4. AI（P0）、AI 增强、P1、P2（3.1–3.5）与 P3（4.1–4.8）均已完成；P4 需确认后开始
-5. 每完成一步更新本文件，尤其是「当前进度」与阶段 15 勾选项
+4. AI（P0）、AI 增强、P1、P2（3.1–3.5）、P3（4.1–4.8）与 P4 均已完成
+5. 每完成一步更新本文件，尤其是「当前进度」与阶段 16 勾选项
 
 ## 文件地图
 
 ```
 src/
   app/                  layout.tsx / page.tsx / error.tsx / global-error.tsx / not-found.tsx / globals.css（含打印样式）
+    manifest.ts         Web App Manifest
+    opengraph-image.tsx 1200×630 分享卡片
+    icon.svg / apple-icon.png / favicon.ico
   components/
     AppShell.tsx        顶栏、标签页、导入导出、打印、客户端挂载门控
     resume/
@@ -389,7 +418,11 @@ src/
     jdStorage.ts        JD 本地保存与 AI 参考 JD 读取
     jobBoards.ts        招聘站 URL 与城市编码
     theme.ts            主题色校验、可读性压暗与 CSS 变量
+    __tests__/          Vitest：storage / matching / jdMatch / validate / SSE
+public/
+  icon-192.png / icon-512.png  安装清单图标
 scripts/qa.mjs          无头浏览器截图、溢出检查、分页与 PDF 页数自检
+.github/workflows/ci.yml lint + 类型检查 + 单测 + 构建
 PLAN.md                单一优化方案（AI 为 P0；数据安全、内容能力、路线图）
 ```
 

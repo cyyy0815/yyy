@@ -61,6 +61,7 @@
 - Tailwind CSS 4
 - localStorage 持久化
 - DeepSeek Chat Completions（OpenAI 兼容，SSE 流式），仅服务端调用
+- Vitest（纯函数与 SSE 解析单元测试）
 - puppeteer-core（仅开发时用于截图自检，不参与构建）
 
 ## 开发
@@ -69,6 +70,7 @@
 npm install
 npm run dev       # http://localhost:3000
 npm run lint
+npm test          # Vitest 单元测试
 npm run build
 ```
 
@@ -112,6 +114,25 @@ DEEPSEEK_BASE_URL=http://127.0.0.1:8787 npm run dev
 
 mock 默认监听 8787；被占用时用 `MOCK_PORT=8790` 启动，并同步修改 `DEEPSEEK_BASE_URL`。`MOCK_FAIL=401|429|500|hang` 可模拟上游错误。
 
+### 单元测试与 CI
+
+```bash
+npm test            # 运行一次
+npm run test:watch  # 监听模式
+```
+
+覆盖 `normalizeResume` / `parseResumeJSON`、技能匹配与评分、JD 关键词与年限/学历识别、输入校验，以及上游 SSE 解析（跨分片、CRLF、`reasoning_content`、`[DONE]` 与中止）。
+
+`.github/workflows/ci.yml` 在 push / PR 时依次执行 lint、`tsc --noEmit`、单元测试和生产构建。
+
+### SEO、分享卡片与安装清单
+
+- `app/layout.tsx` 提供 OG / Twitter / `theme-color` / 关键词等元数据
+- `app/opengraph-image.tsx` 生成 1200×630 分享图；文案使用英文，避免 `ImageResponse` 默认字体缺少中文字形
+- `app/manifest.ts` 与 `public/icon-192.png` / `icon-512.png` 提供可安装清单
+- 只提供 manifest，不注册 Service Worker，因此没有离线缓存
+- 公网部署时设置 `NEXT_PUBLIC_SITE_URL=https://你的域名`；否则 OG 图片地址会使用请求域名（本地为 localhost）
+
 ### 视觉与 AI 自检
 
 先启动 dev server，再执行：
@@ -120,7 +141,7 @@ mock 默认监听 8787；被占用时用 `MOCK_PORT=8790` 启动，并同步修�
 npm run qa
 ```
 
-会在 `.screenshots/` 生成桌面、移动端、五套模板、主题色、分页、打印视图，以及 AI 弹窗、AI 移动端、未配置 Key 的截图，并检查横向溢出、纸面页数与 PDF 实际页数。另含侧栏模板多页回归：打印时侧栏只作用于首页，续页正文不得保留 62mm 侧栏缩进。还覆盖保存失败提示、删除撤销、导入 / 载入示例确认、手机导入、模板随 JSON 备份、打印文件名等数据安全场景，以及证件照压缩、自定义板块排序 / 显隐 / 删除撤销、项目起止时间编辑、教育增强字段编辑、多份简历切换 / 复制 / 重命名 / 刷新保留与五套模板渲染。P3 新增回归：多标签页冲突与阻止覆盖、表单格式校验、7 天备份提醒与暂停、导入结构与 5MB 限制、页码开关、打印对比度、移动端 `aria-pressed`、自定义 404、推荐页放宽门槛、JD 缺口一键补、非技术岗位画像与新增城市编码。AI 部分通过拦截接口返回固定 SSE 来验证弹窗、采用、撤销与未配置状态，并新增「自动读取 JD」「优化模式空关键词」「整份生成三段内容 / 一次采用 / 整体撤销」检查，不消耗真实额度；任一检查失败时命令以非 0 退出。
+会在 `.screenshots/` 生成桌面、移动端、五套模板、主题色、分页、打印视图，以及 AI 弹窗、AI 移动端、未配置 Key 的截图，并检查横向溢出、纸面页数与 PDF 实际页数。另含侧栏模板多页回归：打印时侧栏只作用于首页，续页正文不得保留 62mm 侧栏缩进。还覆盖保存失败提示、删除撤销、导入 / 载入示例确认、手机导入、模板随 JSON 备份、打印文件名等数据安全场景，以及证件照压缩、自定义板块排序 / 显隐 / 删除撤销、项目起止时间编辑、教育增强字段编辑、多份简历切换 / 复制 / 重命名 / 刷新保留与五套模板渲染。P3 新增回归：多标签页冲突与阻止覆盖、表单格式校验、7 天备份提醒与暂停、导入结构与 5MB 限制、页码开关、打印对比度、移动端 `aria-pressed`、自定义 404、推荐页放宽门槛、JD 缺口一键补、非技术岗位画像与新增城市编码。AI 部分通过拦截接口返回固定 SSE 来验证弹窗、采用、撤销与未配置状态，并新增「自动读取 JD」「优化模式空关键词」「整份生成三段内容 / 一次采用 / 整体撤销」检查，不消耗真实额度。P4 还会检查首页 OG / Twitter / manifest / 图标元数据，以及 192 / 512 图标和分享图是否可访问；任一检查失败时命令以非 0 退出。
 
 默认使用本机 Chrome，可通过环境变量覆盖：
 
@@ -134,12 +155,20 @@ CHROME_PATH="C:/path/to/chrome.exe" QA_BASE="http://localhost:3000" npm run qa
 - AI 只把当前板块文本、目标岗位、年限、关键词发给 DeepSeek；服务端会移除邮箱、手机号、网址和 GitHub 链接。日志只记录状态码、耗时和 token 数，不记录 Key、提示词或生成内容。
 - 生成接口限制请求体大小（64KB），并按 IP 做简单限流（10 次 / 10 分钟，内存实现）。多实例部署需换成 Redis / KV 等共享存储；公网部署建议再加登录或访问控制。
 - AI 路由需要 Node.js 运行时（`next start` 或 Vercel 等），不能再使用纯静态导出；不要从浏览器直连 DeepSeek。
+- 公网部署建议设置 `NEXT_PUBLIC_SITE_URL`（例如 `https://resume.example.com`），让 OG / Twitter 分享图使用绝对地址；未设置时 Next.js 会退回请求域名。
+- 提供 manifest 与图标，方便添加到主屏，但没有 Service Worker，不做离线缓存。
 
 ## 目录结构
 
 ```
 src/
   app/                  layout / page / error / global-error / not-found / 全局样式（含打印样式）
+    layout.tsx          SEO 元数据（OG / Twitter / theme-color / 关键词）
+    icon.svg           浏览器标签图标
+    apple-icon.png     iOS 主屏图标
+    favicon.ico        多尺寸 favicon
+    manifest.ts        Web App Manifest（可安装清单）
+    opengraph-image.tsx 1200×630 分享卡片
     api/ai/
       status/route.ts   Key / 模型状态（运行时读取）
       generate/route.ts 校验、限流、SSE 转换
@@ -182,8 +211,13 @@ src/
       prompt.ts         提示词、payload、输出清洗、联系方式过滤
       deepseek.ts       上游请求、重试、SSE 解析
       client.ts         浏览器端 SSE 客户端
+    __tests__/          Vitest：storage / matching / jdMatch / validate / SSE
+public/
+  icon-192.png          安装清单图标
+  icon-512.png          安装清单图标
 scripts/qa.mjs          截图、溢出检查、分页与 PDF 页数、AI/照片/自定义板块/多简历自检
 scripts/mock-deepseek.mjs 本地 mock 上游（开发自测）
+.github/workflows/ci.yml lint + 类型检查 + 单元测试 + 构建
 .env.example            环境变量示例
 PROGRESS.md             工作流与进度（中断后从这里继续）
 ```
@@ -198,3 +232,5 @@ PROGRESS.md             工作流与进度（中断后从这里继续）
 - 打印页码依赖 Chrome / Edge 的 `@page` margin box，Firefox 与 Safari 不会显示「第 N / M 页」，但简历正文、分页与配色仍可正常打印。导出 PDF 建议使用 Chrome / Edge；其他浏览器可在打印对话框中关闭页眉页脚，或关闭本工具的页码开关后自行添加页码
 - 证件照只在浏览器内压缩为 400×400 JPEG，不保留原图，也不做抠图或美颜；照片会增加 JSON 备份与 localStorage 的体积
 - 多份简历只保存在当前浏览器；JSON 导出只包含当前一份，其他简历不会进入备份；删除简历不可撤销
+- 有 manifest 与安装图标，但没有 Service Worker，断网无法打开，离线缓存未实现
+- 分享卡片文案为英文：`ImageResponse` 默认字体不含中文字形，直接渲染中文会变成方框
