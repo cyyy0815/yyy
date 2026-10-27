@@ -13,6 +13,7 @@ export const LAST_SAVED_KEY = "resume-workshop:last-saved-at";
 export const FIRST_USE_KEY = "resume-workshop:first-use-at";
 export const LAST_EXPORT_KEY = "resume-workshop:last-export-at";
 export const BACKUP_SNOOZE_KEY = "resume-workshop:backup-snooze-at";
+export const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 
 function asString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
@@ -22,15 +23,23 @@ function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
+}
+
 /** 把任意来源的数据收敛成合法的 Resume，避免旧版本或坏文件导致崩溃。 */
 export function normalizeResume(input: unknown): Resume {
   const base = createEmptyResume();
-  if (!input || typeof input !== "object") return base;
+  if (!isRecord(input)) return base;
 
-  const raw = input as Record<string, unknown>;
-  const basic = (raw.basic ?? {}) as Record<string, unknown>;
-  const intent = (raw.intent ?? {}) as Record<string, unknown>;
-  const theme = (raw.theme ?? {}) as Record<string, unknown>;
+  const raw = input;
+  const basic = asRecord(raw.basic);
+  const intent = asRecord(raw.intent);
+  const theme = asRecord(raw.theme);
 
   return {
     basic: {
@@ -52,7 +61,7 @@ export function normalizeResume(input: unknown): Resume {
       jobType: asString(intent.jobType, "全职"),
       experience: asString(intent.experience),
     },
-    educations: asArray<Record<string, unknown>>(raw.educations).map((item) => ({
+    educations: asArray<unknown>(raw.educations).filter(isRecord).map((item) => ({
       id: asString(item.id) || newId(),
       school: asString(item.school),
       major: asString(item.major),
@@ -64,7 +73,7 @@ export function normalizeResume(input: unknown): Resume {
       courses: asString(item.courses),
       honors: asString(item.honors),
     })),
-    experiences: asArray<Record<string, unknown>>(raw.experiences).map((item) => ({
+    experiences: asArray<unknown>(raw.experiences).filter(isRecord).map((item) => ({
       id: asString(item.id) || newId(),
       company: asString(item.company),
       role: asString(item.role),
@@ -73,7 +82,7 @@ export function normalizeResume(input: unknown): Resume {
       description: asString(item.description),
       ...(item.pageBreakBefore === true ? { pageBreakBefore: true } : {}),
     })),
-    projects: asArray<Record<string, unknown>>(raw.projects).map((item) => ({
+    projects: asArray<unknown>(raw.projects).filter(isRecord).map((item) => ({
       id: asString(item.id) || newId(),
       name: asString(item.name),
       role: asString(item.role),
@@ -83,12 +92,13 @@ export function normalizeResume(input: unknown): Resume {
       link: asString(item.link),
       ...(item.pageBreakBefore === true ? { pageBreakBefore: true } : {}),
     })),
-    customSections: asArray<Record<string, unknown>>(raw.customSections).map(
-      (section) => ({
+    customSections: asArray<unknown>(raw.customSections)
+      .filter(isRecord)
+      .map((section) => ({
         id: asString(section.id) || newId(),
         title: asString(section.title),
         visible: section.visible !== false,
-        items: asArray<Record<string, unknown>>(section.items).map((item) => ({
+        items: asArray<unknown>(section.items).filter(isRecord).map((item) => ({
           id: asString(item.id) || newId(),
           title: asString(item.title),
           subtitle: asString(item.subtitle),
@@ -96,8 +106,7 @@ export function normalizeResume(input: unknown): Resume {
           description: asString(item.description),
           link: asString(item.link),
         })),
-      }),
-    ),
+      })),
     skills: asArray<unknown>(raw.skills)
       .filter((skill): skill is string => typeof skill === "string")
       .map((skill) => skill.trim())
@@ -217,19 +226,70 @@ export type ImportResult =
   | { ok: true; resume: Resume; template?: TemplateId }
   | { ok: false; error: string };
 
-export function parseResumeJSON(text: string): ImportResult {
-  try {
-    const data: unknown = JSON.parse(text);
-    if (!data || typeof data !== "object" || !("basic" in data)) {
-      return { ok: false, error: "文件格式不正确：缺少 basic 字段" };
+const BASIC_KEYS = [
+  "name",
+  "headline",
+  "email",
+  "phone",
+  "city",
+  "website",
+  "github",
+  "summary",
+  "photo",
+] as const;
+
+const ENTRY_ARRAYS: [string, string][] = [
+  ["educations", "教育经历"],
+  ["experiences", "工作经历"],
+  ["projects", "项目经历"],
+  ["customSections", "自定义板块"],
+];
+
+/** 不追求完整 schema，只拦截明显不是本工具导出的结构。 */
+function checkImportShape(data: unknown): string | null {
+  if (!isRecord(data)) return "文件内容必须是 JSON 对象";
+  if (!("basic" in data)) return "文件格式不正确：缺少 basic 字段";
+  const basic = data.basic;
+  if (!isRecord(basic)) return "基本信息（basic）必须是对象";
+  if (!BASIC_KEYS.some((key) => key in basic)) {
+    return "基本信息（basic）缺少简历字段";
+  }
+  for (const [key, label] of ENTRY_ARRAYS) {
+    const value = data[key];
+    if (value === undefined) continue;
+    if (!Array.isArray(value)) return `${label}（${key}）必须是数组`;
+    if (value.some((item) => !isRecord(item))) {
+      return `${label}（${key}）中存在无效条目`;
     }
-    const template = (data as { template?: unknown }).template;
-    return {
-      ok: true,
-      resume: normalizeResume(data),
-      ...(isTemplateId(template) ? { template } : {}),
-    };
+  }
+  if (data.skills !== undefined) {
+    if (!Array.isArray(data.skills)) return "技能（skills）必须是数组";
+    if (data.skills.some((skill) => typeof skill !== "string")) {
+      return "技能（skills）中存在非文本条目";
+    }
+  }
+  if (data.theme !== undefined && !isRecord(data.theme)) {
+    return "主题色（theme）必须是对象";
+  }
+  return null;
+}
+
+export function parseResumeJSON(text: string): ImportResult {
+  if (text.length > MAX_IMPORT_BYTES) {
+    return { ok: false, error: "文件过大（超过 5 MB），请检查是否选错了文件" };
+  }
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
   } catch {
     return { ok: false, error: "无法解析该文件，请选择由本工具导出的 JSON" };
   }
+  const shapeError = checkImportShape(data);
+  if (shapeError) return { ok: false, error: shapeError };
+  const template = (data as { template?: unknown }).template;
+  return {
+    ok: true,
+    resume: normalizeResume(data),
+    ...(isTemplateId(template) ? { template } : {}),
+  };
 }

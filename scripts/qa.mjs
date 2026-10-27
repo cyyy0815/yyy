@@ -802,6 +802,83 @@ await safetyPage.evaluate(() => {
 });
 await safetyPage.close();
 
+// P3 导入校验：结构错误与超大文件应直接拒绝
+const importCheckPage = await open({ width: 1440, height: 1000 });
+await importCheckPage.goto(BASE, { waitUntil: "networkidle0" });
+await importCheckPage.evaluate(() => {
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: { name: "导入校验基线", headline: "", email: "", phone: "" },
+      intent: {},
+      educations: [],
+      experiences: [],
+      projects: [],
+      customSections: [],
+      skills: [],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+});
+await importCheckPage.reload({ waitUntil: "networkidle0" });
+await pause(500);
+
+async function uploadBadImport(name, content, expectedText) {
+  const filePath = path.join(OUT, name);
+  await writeFile(filePath, content);
+  const input = await importCheckPage.$(
+    'input[type="file"][accept*="json"]',
+  );
+  if (!input) throw new Error("file input not found");
+  await input.uploadFile(filePath);
+  await importCheckPage.waitForFunction(
+    (text) => document.body.innerText.includes(text),
+    { timeout: 5000 },
+    expectedText,
+  );
+}
+
+await uploadBadImport(
+  "qa-import-bad-basic.json",
+  JSON.stringify({ basic: "not-an-object" }),
+  "基本信息（basic）必须是对象",
+);
+expect("导入拒绝 basic 类型错误", true);
+
+await uploadBadImport(
+  "qa-import-empty-basic.json",
+  JSON.stringify({ basic: {} }),
+  "基本信息（basic）缺少简历字段",
+);
+expect("导入拒绝空 basic", true);
+
+await uploadBadImport(
+  "qa-import-bad-skills.json",
+  JSON.stringify({ basic: { name: "x" }, skills: "React" }),
+  "技能（skills）必须是数组",
+);
+expect("导入拒绝 skills 类型错误", true);
+
+await uploadBadImport(
+  "qa-import-bad-entry.json",
+  JSON.stringify({ basic: { name: "x" }, experiences: [null] }),
+  "工作经历（experiences）中存在无效条目",
+);
+expect("导入拒绝无效条目", true);
+
+await uploadBadImport(
+  "qa-import-too-large.json",
+  "x".repeat(5 * 1024 * 1024 + 1),
+  "文件过大（超过 5 MB）",
+);
+expect("导入拒绝超大文件", true);
+
+await importCheckPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.removeItem("resume-workshop:last-saved-at");
+});
+await importCheckPage.close();
+
 // P2 证件照：上传后压缩保存、五套模板展示、JSON 备份包含、可移除
 const photoFixture = path.join(OUT, "qa-photo-fixture.svg");
 await writeFile(
@@ -2424,6 +2501,21 @@ console.log(
   `qa-sidebar: float=${sidebarPrint.float} width=${sidebarPrint.sideWidth} pdfPages=${sidebarPages}`,
 );
 expect("侧栏多页 PDF 页数", sidebarPages === 2, String(sidebarPages));
+
+// P3 错误边界：未知路径显示自定义 404
+const notFoundPage = await open({ width: 1000, height: 800 });
+const notFoundResponse = await notFoundPage.goto(`${BASE}/qa-not-found`, {
+  waitUntil: "networkidle0",
+});
+const notFoundText = await notFoundPage.evaluate(
+  () => document.body.innerText,
+);
+expect(
+  "未知路径显示自定义 404",
+  notFoundResponse?.status() === 404 && notFoundText.includes("页面不存在"),
+  `${notFoundResponse?.status()} ${notFoundText.slice(0, 60)}`,
+);
+await notFoundPage.close();
 
 await browser.close();
 if (failures.length > 0) {

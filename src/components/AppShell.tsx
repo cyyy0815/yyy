@@ -16,6 +16,7 @@ import {
 } from "@/lib/backupReminder";
 import {
   downloadResumeJSON,
+  MAX_IMPORT_BYTES,
   parseResumeJSON,
   recordExport,
   snoozeBackupReminder,
@@ -179,7 +180,20 @@ function ResumeWorkspace() {
   };
 
   const handleImport = async (file: File) => {
-    const text = await file.text();
+    if (file.size > MAX_IMPORT_BYTES) {
+      setNotice({
+        type: "error",
+        message: "文件过大（超过 5 MB），请检查是否选错了文件",
+      });
+      return;
+    }
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      setNotice({ type: "error", message: "无法读取该文件，请重试" });
+      return;
+    }
     const result = parseResumeJSON(text);
     if (!result.ok) {
       setNotice({ type: "error", message: result.error });
