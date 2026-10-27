@@ -26,7 +26,7 @@
 | 8 | 编辑体验（追加） | ✅ 完成 |
 | 9 | 主题色与新模板（追加） | ✅ 完成 |
 | 10 | 分页控制与 PDF 页码（追加） | ✅ 完成 |
-| 11 | AI 写简历（DeepSeek，追加） | 🟡 进行中（M0–M3 完成） |
+| 11 | AI 写简历（DeepSeek，追加） | ✅ 完成（M0–M4） |
 
 ## 阶段明细
 
@@ -136,20 +136,25 @@
   - 新建项目：条目 +1、名称/角色/链接留空；撤销恢复数量
   - 编辑预览后再采用：写入的是编辑后的文本；撤销恢复原简介
   - 390px 弹窗宽度 390、无横向溢出；未配置 Key 显示配置步骤；无控制台错误
-- [ ] M4：QA、README/PROGRESS、真实 Key 联调、build
+- [x] M4：QA 接入 AI 弹窗检查（拦截固定 SSE，不消耗额度）
+- [x] M4：README 补充 AI 功能、DeepSeek 配置、隐私、Node 运行时部署与 mock 联调
+- [x] M4：`npm run lint` / `npm run build` / `npm run qa` 全绿
+- [x] M4：生产模式 `next start` + 真实 Key 流式联调通过（status 200，delta + done + usage）
+- [x] M4 验收：`/` 静态预渲染，`/api/ai/status`、`/api/ai/generate` 为动态路由
 
 > 方案细节、接口契约、Prompt、测试与验收全部在 `PLAN.md`。
 
 ## 当前进度
 
 - 最近更新：2026-10-27
-- 状态：**阶段 0–10 已完成；阶段 11「AI 写简历」M0–M3 完成，M4 待做**
+- 状态：**阶段 0–11 全部完成；AI 写简历 M0–M4 已完成**
 - 代码状态：
   - M0：git 仓库、`.env.example`、`scripts/mock-deepseek.mjs` 完成
   - M1：`/api/ai/status`、`/api/ai/generate`、SSE 转换完成
   - M2：编辑页顶部「AI 帮我写」入口 + 简介弹窗 + 流式预览 + 采用/撤销完成
   - M3：简介/工作/项目三板块、写入到现有或新建条目、替换/追加、可编辑预览、按条目撤销完成
-  - M4 待做：QA 脚本接入 AI、README、真实 Key 联调、build
+  - M4：QA AI 检查、README、lint/build/qa、生产模式真实 Key 联调完成
+- 下一步：进入 P1 数据安全与打印交付（侧栏跨页、保存失败、覆盖保护、PDF 文件名等）
 - 本地地址：http://localhost:3000 （推荐页 http://localhost:3000/#jobs）
 - 一键自检：先 `npm run dev`，再 `npm run qa`（截图输出到 `.screenshots/`）
 - 单一方案文档：**`PLAN.md`**
@@ -172,17 +177,23 @@
 - M3：预览可编辑；采用后清空，重新打开需重新生成
 - M3 无头验证：新建/替换/撤销、项目新建/撤销、编辑后采用、390px、未配置状态全部通过
 - 验证：400 / 413 分支、`tsc`、`npm run lint` 均通过
+- M4：`scripts/qa.mjs` 增加 AI 检查（预览/覆盖确认/采用/撤销/重开清空/390px/未配置）
+- M4：QA 的 AI 接口用固定 SSE 拦截，不消耗真实额度；检查失败时命令非 0 退出
+- M4：README 补齐 AI 配置、隐私数据流、限流、Node 运行时部署与 mock 用法
+- M4：`npm run lint`、`npm run build`、`npm run qa` 全绿；构建产物 `/` 静态、AI 路由动态
+- M4：`next start` + 真实 Key 联调通过（`configured:true`、流式 delta、done + usage）
+- 备注：`npm start` 前需结束残留 dev 子进程，否则 3000 端口 `EADDRINUSE`
 
 ### 下次继续
 
-1. 先读 `PLAN.md` 的 1.2–1.7 与「路线图」，再读本文件阶段 11
-2. M4：QA 脚本接入 AI 弹窗与 mock 生成、README（功能 / 配置 / 隐私 / Node 运行时部署）
-3. M4：真实 Key 联调一次三板块生成，再跑 `npm run lint`、`npm run build`、`npm run qa`
-4. M4 完成后进入 P1 数据安全与打印交付（详见 `PLAN.md`）
+1. 先读 `PLAN.md` 的「2. P1：数据安全与打印交付」，再读本文件「当前进度」
+2. P1 优先：侧栏模板跨页错位、保存失败静默、删除/导入覆盖保护、PDF 文件名
+3. 其余：移动端导入入口、模板导出、打印兼容说明
+4. 每完成一项跑 `npm run lint`、`npm run build`、`npm run qa` 并更新本文件
 
 ## 可选后续
 
-- [x] AI 写简历（DeepSeek）— M0–M3 完成，M4 待做；详见 `PLAN.md`
+- [x] AI 写简历（DeepSeek）— M0–M4 完成；详见 `PLAN.md`
 - [ ] AI 润色 / JD 匹配改写 / 多语言翻译（AI 首版跑通后再考虑）
 - [ ] 接入职位聚合 API（JSearch / Adzuna），用 Next.js Route Handler 隐藏 key
 - [ ] 更多字体搭配 / 模板变体（配色已支持）
@@ -194,7 +205,7 @@
 1. 读「当前进度」和 `PLAN.md` 的「P0：AI 写简历」
 2. 确认 `.env.local` 里的 `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL`
 3. `npm run dev`
-4. 按 M0 → M1 → M2 → M3 → M4 实施
+4. AI 阶段 M0 → M4 已完成；后续按 `PLAN.md` 的 P1 顺序推进
 5. 每完成一步更新本文件，尤其是「当前进度」与阶段 11 勾选项
 
 ## 文件地图
@@ -240,6 +251,6 @@ src/lib/ai/prompt.ts               ✅ 提示词、payload、输出清洗、联�
 src/lib/ai/deepseek.ts             ✅ 上游请求、重试、SSE 解析
 scripts/mock-deepseek.mjs          ✅ 本地 mock 上游
 .env.example                       ✅ 环境变量示例
-src/components/resume/AiWriter.tsx ✅ 弹窗、流式预览、采用/撤销（简介）
+src/components/resume/AiWriter.tsx ✅ 三板块弹窗、可编辑流式预览、新建/替换/追加、撤销
 src/app/api/ai/models/route.ts     ⬜ 可选，暂不实现
 ```
