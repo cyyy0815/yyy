@@ -1892,6 +1892,123 @@ await validationPage.evaluate(() => {
 });
 await validationPage.close();
 
+// P3 备份提醒：超过 7 天未导出提示，稍后可暂停 3 天
+const backupPage = await open({ width: 1440, height: 1000 });
+await backupPage.goto(BASE, { waitUntil: "networkidle0" });
+await backupPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:library:v1");
+  localStorage.removeItem("resume-workshop:last-export-at");
+  localStorage.removeItem("resume-workshop:backup-snooze-at");
+  localStorage.setItem(
+    "resume-workshop:first-use-at",
+    String(Date.now() - 8 * 24 * 60 * 60 * 1000),
+  );
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: {
+        name: "备份提醒测试",
+        headline: "产品经理",
+        email: "",
+        phone: "",
+        city: "杭州",
+        website: "",
+        github: "",
+        summary: "",
+        photo: "",
+      },
+      intent: { targetRole: "产品经理" },
+      educations: [],
+      experiences: [],
+      projects: [],
+      customSections: [],
+      skills: ["需求分析"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+});
+await backupPage.reload({ waitUntil: "networkidle0" });
+const reminderVisible = await backupPage
+  .waitForSelector('[data-qa="backup-reminder"]', {
+    visible: true,
+    timeout: 5000,
+  })
+  .then(() => true)
+  .catch(() => false);
+expect("超过 7 天未导出显示备份提醒", reminderVisible);
+
+await clickText(backupPage, "3 天后再提醒");
+await pause(300);
+const snoozed = await backupPage.evaluate(() => ({
+  banner: Boolean(document.querySelector('[data-qa="backup-reminder"]')),
+  snoozeAt: Number(
+    localStorage.getItem("resume-workshop:backup-snooze-at") ?? 0,
+  ),
+}));
+expect(
+  "备份提醒可暂停",
+  !snoozed.banner && snoozed.snoozeAt > 0,
+  JSON.stringify(snoozed),
+);
+
+await backupPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+const snoozeKept = await backupPage.evaluate(
+  () => !document.querySelector('[data-qa="backup-reminder"]'),
+);
+expect("刷新后仍遵守暂停", snoozeKept);
+
+await backupPage.evaluate(() => {
+  localStorage.setItem(
+    "resume-workshop:backup-snooze-at",
+    String(Date.now() - 4 * 24 * 60 * 60 * 1000),
+  );
+  localStorage.removeItem("resume-workshop:last-export-at");
+});
+await backupPage.reload({ waitUntil: "networkidle0" });
+await backupPage.waitForSelector('[data-qa="backup-reminder"]', {
+  visible: true,
+  timeout: 5000,
+});
+await backupPage.evaluate(() => {
+  HTMLAnchorElement.prototype.click = function click() {
+    window.__downloadClicked = true;
+  };
+  window.__downloadClicked = false;
+});
+await clickText(backupPage, "导出 JSON");
+await backupPage.waitForFunction(
+  () =>
+    Boolean(localStorage.getItem("resume-workshop:last-export-at")) &&
+    !document.querySelector('[data-qa="backup-reminder"]'),
+  { timeout: 5000 },
+);
+const exportedAt = await backupPage.evaluate(() => ({
+  lastExport: Boolean(
+    localStorage.getItem("resume-workshop:last-export-at"),
+  ),
+  clicked: Boolean(window.__downloadClicked),
+}));
+expect(
+  "从提醒导出后记录备份时间",
+  exportedAt.lastExport,
+  JSON.stringify(exportedAt),
+);
+
+await backupPage.evaluate(() => {
+  for (const key of [
+    "resume-workshop:v1",
+    "resume-workshop:library:v1",
+    "resume-workshop:first-use-at",
+    "resume-workshop:last-export-at",
+    "resume-workshop:last-saved-at",
+    "resume-workshop:backup-snooze-at",
+  ]) {
+    localStorage.removeItem(key);
+  }
+});
+await backupPage.close();
+
 // P3 跨标签页：后保存的标签页不得静默覆盖前一份
 const crossA = await open({ width: 1440, height: 1000 });
 await crossA.goto(BASE, { waitUntil: "networkidle0" });

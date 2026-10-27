@@ -9,7 +9,17 @@ import { ThemePicker } from "@/components/resume/ThemePicker";
 import { Button } from "@/components/ui/Button";
 import { useResume } from "@/hooks/useResume";
 import { useResumeDocuments } from "@/hooks/useResumeDocuments";
-import { downloadResumeJSON, parseResumeJSON } from "@/lib/storage";
+import {
+  getBackupReminderSnapshot,
+  refreshBackupReminder,
+  subscribeBackupReminder,
+} from "@/lib/backupReminder";
+import {
+  downloadResumeJSON,
+  parseResumeJSON,
+  recordExport,
+  snoozeBackupReminder,
+} from "@/lib/storage";
 import { isTemplateId, type Resume, type TemplateId } from "@/lib/types";
 
 const TEMPLATES: { id: TemplateId; label: string }[] = [
@@ -108,6 +118,11 @@ function ResumeWorkspace() {
   const [mobilePane, setMobilePane] = useState<MobilePane>("form");
   const [notice, setNotice] = useState<Notice>(null);
   const [resumeVersion, setResumeVersion] = useState(0);
+  const backupDue = useSyncExternalStore(
+    subscribeBackupReminder,
+    getBackupReminderSnapshot,
+    () => false,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const documents = useResumeDocuments({
     resume,
@@ -148,6 +163,20 @@ function ResumeWorkspace() {
     const timer = window.setTimeout(() => setNotice(null), 2800);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  const showBackupReminder =
+    backupDue && !isSample && hasResumeContent(resume);
+
+  const handleExport = () => {
+    downloadResumeJSON(resume, template);
+    recordExport();
+    refreshBackupReminder();
+  };
+
+  const handleSnoozeBackup = () => {
+    snoozeBackupReminder();
+    refreshBackupReminder();
+  };
 
   const handleImport = async (file: File) => {
     const text = await file.text();
@@ -411,11 +440,7 @@ function ResumeWorkspace() {
             >
               导入
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => downloadResumeJSON(resume, template)}
-            >
+            <Button variant="outline" size="sm" onClick={handleExport}>
               导出
             </Button>
             <Button variant="primary" size="sm" onClick={handlePrint}>
@@ -476,6 +501,26 @@ function ResumeWorkspace() {
               </div>
             ) : null}
 
+            {showBackupReminder ? (
+              <div
+                data-qa="backup-reminder"
+                className="print-hide mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50/80 px-4 py-3"
+              >
+                <p className="text-[12.5px] leading-6 text-sky-900">
+                  简历只保存在这台浏览器里，已超过 7 天没有导出备份。建议导出一份
+                  JSON 存到网盘或邮箱。
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="primary" size="sm" onClick={handleExport}>
+                    导出 JSON
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={handleSnoozeBackup}>
+                    3 天后再提醒
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
             {saveState === "error" && !isSample ? (
               <div
                 role="alert"
@@ -485,11 +530,7 @@ function ResumeWorkspace() {
                   保存失败：浏览器存储不可用或空间已满。请立即导出 JSON
                   备份，避免内容丢失。
                 </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => downloadResumeJSON(resume, template)}
-                >
+                <Button variant="outline" size="sm" onClick={handleExport}>
                   导出 JSON
                 </Button>
               </div>

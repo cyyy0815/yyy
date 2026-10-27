@@ -10,6 +10,9 @@ import {
 
 export const STORAGE_KEY = "resume-workshop:v1";
 export const LAST_SAVED_KEY = "resume-workshop:last-saved-at";
+export const FIRST_USE_KEY = "resume-workshop:first-use-at";
+export const LAST_EXPORT_KEY = "resume-workshop:last-export-at";
+export const BACKUP_SNOOZE_KEY = "resume-workshop:backup-snooze-at";
 
 function asString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
@@ -113,14 +116,48 @@ export function readStoredResumeRaw(): string | null {
   }
 }
 
-export function readLastSavedAt(): number | null {
+function readTimestamp(key: string): number | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(LAST_SAVED_KEY);
+    const raw = window.localStorage.getItem(key);
     const value = raw ? Number(raw) : NaN;
     return Number.isFinite(value) && value > 0 ? value : null;
   } catch {
     return null;
+  }
+}
+
+export function readLastSavedAt(): number | null {
+  return readTimestamp(LAST_SAVED_KEY);
+}
+
+export function readFirstUseAt(): number | null {
+  return readTimestamp(FIRST_USE_KEY);
+}
+
+export function readLastExportAt(): number | null {
+  return readTimestamp(LAST_EXPORT_KEY);
+}
+
+export function readBackupSnoozeAt(): number | null {
+  return readTimestamp(BACKUP_SNOOZE_KEY);
+}
+
+export function recordExport(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LAST_EXPORT_KEY, String(Date.now()));
+  } catch {
+    // ignore
+  }
+}
+
+export function snoozeBackupReminder(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(BACKUP_SNOOZE_KEY, String(Date.now()));
+  } catch {
+    // ignore
   }
 }
 
@@ -140,6 +177,9 @@ export function saveResume(resume: Resume): boolean {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resume));
     window.localStorage.setItem(LAST_SAVED_KEY, String(Date.now()));
+    if (!window.localStorage.getItem(FIRST_USE_KEY)) {
+      window.localStorage.setItem(FIRST_USE_KEY, String(Date.now()));
+    }
     return true;
   } catch {
     // 隐私模式、配额已满或存储被禁用：交给调用方提示用户导出备份
