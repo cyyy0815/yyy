@@ -268,6 +268,25 @@ function ResumeWorkspace() {
               </div>
             ) : null}
 
+            {saveState === "error" && !isSample ? (
+              <div
+                role="alert"
+                className="print-hide mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3"
+              >
+                <p className="text-[12.5px] text-red-900">
+                  保存失败：浏览器存储不可用或空间已满。请立即导出 JSON
+                  备份，避免内容丢失。
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadResumeJSON(resume)}
+                >
+                  导出 JSON
+                </Button>
+              </div>
+            ) : null}
+
             <div className="resume-grid grid gap-6 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)]">
               <div
                 className={`print-hide ${
@@ -282,14 +301,18 @@ function ResumeWorkspace() {
                         ? "bg-amber-400"
                         : saveState === "saved"
                           ? "bg-emerald-500"
-                          : "animate-pulse bg-amber-400"
+                          : saveState === "error"
+                            ? "bg-red-500"
+                            : "animate-pulse bg-amber-400"
                     }`}
                   />
                   {isSample
                     ? "示例数据不会保存，编辑后自动转为你自己的简历"
                     : saveState === "saved"
                       ? "已自动保存到本机浏览器"
-                      : "保存中…"}
+                      : saveState === "error"
+                        ? "保存失败，请导出 JSON 备份"
+                        : "保存中…"}
                 </p>
               </div>
 

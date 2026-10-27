@@ -5,7 +5,7 @@ import { createSampleResume } from "@/lib/defaultResume";
 import { clearResume, loadResume, saveResume } from "@/lib/storage";
 import { createEmptyResume, type Resume } from "@/lib/types";
 
-export type SaveState = "saved" | "saving";
+export type SaveState = "saved" | "saving" | "error";
 
 export type UseResume = {
   resume: Resume;
@@ -37,8 +37,7 @@ export function useResume(): UseResume {
   useEffect(() => {
     if (isSample) return;
     const timer = window.setTimeout(() => {
-      saveResume(resume);
-      setSaveState("saved");
+      setSaveState(saveResume(resume) ? "saved" : "error");
     }, 400);
     return () => window.clearTimeout(timer);
   }, [resume, isSample]);

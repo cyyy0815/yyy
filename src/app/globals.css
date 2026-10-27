@@ -172,6 +172,23 @@ body {
     background-color: transparent !important;
   }
 
+  /*
+   * 侧栏模板跨页：flex 的列宽会延续到续页，导致第 2 页正文仍缩进 62mm。
+   * 打印时改成首页浮动栏（高度锁一页），续页没有浮动元素，正文自然回到整宽。
+   */
+  .resume-paper-sidebar {
+    display: block !important;
+  }
+
+  .resume-paper-sidebar > .resume-side {
+    float: left;
+    /* 浮动盒多留 10mm 作栏间距，内边距保证侧栏文字仍收在 62mm 深色区内 */
+    width: 72mm !important;
+    padding-right: 18mm !important;
+    /* 至少占满首页；侧栏内容再多也不裁切，避免丢信息 */
+    min-height: 289mm;
+  }
+
   /* 网格跨页时分栏可能失效：续页仍保持首页主栏宽度，避免文字忽然变宽 */
   .resume-aside-grid > .resume-main {
     max-width: 117.5mm !important;

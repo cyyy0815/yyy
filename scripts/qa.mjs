@@ -16,10 +16,10 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function expect(label, condition, detail = "") {
   if (condition) {
-    console.log(`qa-ai: ${label} ok`);
+    console.log(`qa-check: ${label} ok`);
     return;
   }
-  const message = `qa-ai: ${label} FAILED${detail ? ` (${detail})` : ""}`;
+  const message = `qa-check: ${label} FAILED${detail ? ` (${detail})` : ""}`;
   console.error(message);
   failures.push(message);
 }
@@ -403,6 +403,44 @@ expect(
 );
 await aiOff.close();
 
+// 保存失败：localStorage 抛错时不能继续显示「已保存」，要提示导出备份
+const saveFailPage = await open({ width: 1440, height: 1000 });
+await saveFailPage.goto(BASE, { waitUntil: "networkidle0" });
+await pause(500);
+const saveEditTriggered = await saveFailPage.evaluate(() => {
+  Storage.prototype.setItem = () => {
+    throw new DOMException("QuotaExceededError");
+  };
+  const label = [...document.querySelectorAll("label")].find((node) =>
+    node.textContent?.includes("姓名"),
+  );
+  const input = label?.querySelector("input");
+  if (!input) return false;
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value",
+  )?.set;
+  setter?.call(input, "保存失败测试");
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  return true;
+});
+expect("保存失败用例可触发编辑", saveEditTriggered);
+await saveFailPage.waitForSelector('[role="alert"]', { timeout: 5000 });
+const saveFail = await saveFailPage.evaluate(() => ({
+  text: (document.querySelector('[role="alert"]')?.textContent ?? "").trim(),
+  exportButton: [...document.querySelectorAll("button")].some(
+    (button) => button.textContent?.trim() === "导出 JSON",
+  ),
+  status: (document.body.innerText.match(/保存失败[^\n]*/) ?? [])[0] ?? "",
+}));
+expect(
+  "保存失败提示与备份入口",
+  saveFail.text.includes("导出 JSON") && saveFail.exportButton,
+  JSON.stringify(saveFail),
+);
+await saveFailPage.screenshot({ path: `${OUT}/qa-save-error.png` });
+await saveFailPage.close();
+
 // 打印媒体下的视觉检查
 const printPage = await open({ width: 1200, height: 1000 });
 await printPage.goto(BASE, { waitUntil: "networkidle0" });
@@ -531,6 +569,86 @@ const pdfPages = (pdfBytes.toString("latin1").match(/\/Type\s*\/Page\b/g) ?? [])
 console.log(
   `qa-pagination: ${pageInfo.pill} | 分页按钮=${pageInfo.breakButtons} | 引导线=${pageInfo.guides} | pdfPages=${pdfPages}`,
 );
+
+// 侧栏模板多页：打印时侧栏只作用于首页，续页正文回到整宽
+const sidebarPage = await open({ width: 1440, height: 1100 });
+await sidebarPage.goto(BASE, { waitUntil: "networkidle0" });
+await sidebarPage.evaluate(() => {
+  const experiences = Array.from({ length: 14 }, (_, index) => ({
+    id: `qa-sidebar-e${index}`,
+    company: `示例科技有限公司 ${index + 1}`,
+    role: "高级前端工程师",
+    start: "2021.03",
+    end: "2022.06",
+    description:
+      "负责核心业务前端架构设计与性能优化，主导中后台平台重构，覆盖 12 条业务线；" +
+      "建设组件库与工程化体系，重复开发工时下降约 35%；" +
+      "搭建前端监控与指标看板，线上白屏率由 1.2% 降至 0.3%。",
+  }));
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: {
+        name: "林一",
+        headline: "前端工程师",
+        email: "linyi@example.com",
+        phone: "138-0000-0000",
+        city: "上海",
+        website: "linyi.dev",
+        github: "github.com/linyi",
+        summary:
+          "4 年前端开发经验，专注 React 技术栈与性能优化，主导过日活 20 万的中后台产品重构。",
+      },
+      intent: {},
+      educations: [],
+      experiences,
+      projects: [],
+      skills: ["React", "TypeScript"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.setItem("resume-workshop:template", "sidebar");
+});
+await sidebarPage.reload({ waitUntil: "networkidle0" });
+await pause(900);
+await sidebarPage.emulateMediaType("print");
+await pause(300);
+const sidebarPrint = await sidebarPage.evaluate(() => {
+  const side = document.querySelector(".resume-side");
+  const paper = document.querySelector(".resume-paper-sidebar");
+  return {
+    float: side ? getComputedStyle(side).float : "none",
+    sideWidth: side ? getComputedStyle(side).width : "0",
+    paperDisplay: paper ? getComputedStyle(paper).display : "none",
+  };
+});
+const expectedSideWidth = (72 * 96) / 25.4;
+expect(
+  "侧栏打印浮动布局",
+  sidebarPrint.float === "left" &&
+    sidebarPrint.paperDisplay === "block" &&
+    Math.abs(Number.parseFloat(sidebarPrint.sideWidth) - expectedSideWidth) < 1,
+  JSON.stringify(sidebarPrint),
+);
+await sidebarPage.screenshot({
+  path: `${OUT}/qa-sidebar-multipage.png`,
+  fullPage: true,
+});
+await sidebarPage.pdf({
+  path: `${OUT}/qa-sidebar-multipage.pdf`,
+  format: "A4",
+  printBackground: true,
+  preferCSSPageSize: true,
+});
+await sidebarPage.close();
+const sidebarBytes = await readFile(`${OUT}/qa-sidebar-multipage.pdf`);
+const sidebarPages = (
+  sidebarBytes.toString("latin1").match(/\/Type\s*\/Page\b/g) ?? []
+).length;
+console.log(
+  `qa-sidebar: float=${sidebarPrint.float} width=${sidebarPrint.sideWidth} pdfPages=${sidebarPages}`,
+);
+expect("侧栏多页 PDF 页数", sidebarPages === 2, String(sidebarPages));
 
 await browser.close();
 if (failures.length > 0) {

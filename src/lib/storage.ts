@@ -84,12 +84,14 @@ export function loadResume(): Resume | null {
   }
 }
 
-export function saveResume(resume: Resume): void {
-  if (typeof window === "undefined") return;
+export function saveResume(resume: Resume): boolean {
+  if (typeof window === "undefined") return false;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resume));
+    return true;
   } catch {
-    // 存储不可用或已满时静默失败，不影响编辑
+    // 隐私模式、配额已满或存储被禁用：交给调用方提示用户导出备份
+    return false;
   }
 }
 
