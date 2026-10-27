@@ -8,7 +8,7 @@ import { ThemePicker } from "@/components/resume/ThemePicker";
 import { Button } from "@/components/ui/Button";
 import { useResume } from "@/hooks/useResume";
 import { downloadResumeJSON, parseResumeJSON } from "@/lib/storage";
-import type { TemplateId } from "@/lib/types";
+import { isTemplateId, type Resume, type TemplateId } from "@/lib/types";
 
 const TEMPLATES: { id: TemplateId; label: string }[] = [
   { id: "modern", label: "现代" },
@@ -28,10 +28,6 @@ const subscribeToHydration = () => () => {};
 const getClientSnapshot = () => true;
 const getServerSnapshot = () => false;
 
-function isTemplateId(value: string | null): value is TemplateId {
-  return TEMPLATES.some((item) => item.id === value);
-}
-
 function readTemplate(): TemplateId {
   try {
     const saved = window.localStorage.getItem(TEMPLATE_KEY);
@@ -40,6 +36,21 @@ function readTemplate(): TemplateId {
     // ignore
   }
   return "modern";
+}
+
+function hasResumeContent(resume: Resume): boolean {
+  return Boolean(
+    resume.basic.name ||
+      resume.basic.headline ||
+      resume.basic.email ||
+      resume.basic.phone ||
+      resume.basic.summary ||
+      resume.intent.targetRole ||
+      resume.experiences.length ||
+      resume.projects.length ||
+      resume.educations.length ||
+      resume.skills.length,
+  );
 }
 
 /** 只在客户端挂载后渲染工作区，避免 SSR 与 localStorage 数据不一致。 */
@@ -78,6 +89,7 @@ function ResumeWorkspace() {
   const [template, setTemplate] = useState<TemplateId>(readTemplate);
   const [mobilePane, setMobilePane] = useState<MobilePane>("form");
   const [notice, setNotice] = useState<Notice>(null);
+  const [resumeVersion, setResumeVersion] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -115,12 +127,24 @@ function ResumeWorkspace() {
   const handleImport = async (file: File) => {
     const text = await file.text();
     const result = parseResumeJSON(text);
-    if (result.ok) {
-      replaceResume(result.resume);
-      setNotice({ type: "ok", message: "简历已导入" });
-    } else {
+    if (!result.ok) {
       setNotice({ type: "error", message: result.error });
+      return;
     }
+    if (
+      !isSample &&
+      hasResumeContent(resume) &&
+      !window.confirm(
+        "导入会覆盖当前简历，建议先导出 JSON 备份。确定继续导入吗？",
+      )
+    ) {
+      setNotice({ type: "ok", message: "已取消导入" });
+      return;
+    }
+    replaceResume(result.resume);
+    if (result.template) setTemplate(result.template);
+    setResumeVersion((value) => value + 1);
+    setNotice({ type: "ok", message: "简历已导入" });
   };
 
   const handleAccent = (accent: string) => {
@@ -130,14 +154,61 @@ function ResumeWorkspace() {
   const handlePrint = () => {
     setTab("edit");
     setMobilePane("preview");
-    window.setTimeout(() => window.print(), 100);
+
+    const previousTitle = document.title;
+    const name = resume.basic.name.trim();
+    const headline = resume.basic.headline.trim();
+    const rawTitle =
+      name && headline
+        ? `${name}-${headline}`
+        : name || headline || "我的简历";
+    const printTitle =
+      rawTitle
+        .replace(/[\\/:*?"<>|]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 80) || "我的简历";
+
+    let restored = false;
+    const restoreTitle = () => {
+      if (restored) return;
+      restored = true;
+      document.title = previousTitle;
+      window.removeEventListener("afterprint", restoreTitle);
+    };
+
+    // Chrome 用 document.title 作为「另存为 PDF」的默认文件名
+    document.title = printTitle;
+    window.addEventListener("afterprint", restoreTitle);
+
+    window.setTimeout(() => {
+      window.print();
+      // 取消打印或浏览器不触发 afterprint 时兜底恢复
+      window.setTimeout(restoreTitle, 1000);
+    }, 100);
   };
 
   const handleClear = () => {
     if (window.confirm("确定清空简历吗？此操作不可撤销，建议先导出 JSON 备份。")) {
       clearAll();
+      setResumeVersion((value) => value + 1);
       setNotice({ type: "ok", message: "已清空，可以开始写新简历" });
     }
+  };
+
+  const handleLoadSample = () => {
+    if (
+      !isSample &&
+      hasResumeContent(resume) &&
+      !window.confirm(
+        "载入示例会覆盖当前简历，建议先导出 JSON 备份。确定继续吗？",
+      )
+    ) {
+      return;
+    }
+    loadSample();
+    setResumeVersion((value) => value + 1);
+    setNotice({ type: "ok", message: "已载入示例简历" });
   };
 
   return (
@@ -210,14 +281,14 @@ function ResumeWorkspace() {
               variant="ghost"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
-              className="max-sm:hidden"
+              aria-label="导入 JSON 简历"
             >
               导入
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => downloadResumeJSON(resume)}
+              onClick={() => downloadResumeJSON(resume, template)}
             >
               导出
             </Button>
@@ -280,7 +351,7 @@ function ResumeWorkspace() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => downloadResumeJSON(resume)}
+                  onClick={() => downloadResumeJSON(resume, template)}
                 >
                   导出 JSON
                 </Button>
@@ -293,7 +364,11 @@ function ResumeWorkspace() {
                   mobilePane === "form" ? "block" : "hidden"
                 } lg:block`}
               >
-                <ResumeForm resume={resume} onChange={updateResume} />
+                <ResumeForm
+                  key={resumeVersion}
+                  resume={resume}
+                  onChange={updateResume}
+                />
                 <p className="mt-4 flex items-center gap-1.5 px-1 text-[11px] text-zinc-400">
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${
@@ -346,7 +421,11 @@ function ResumeWorkspace() {
                     />
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" onClick={loadSample}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleLoadSample}
+                    >
                       载入示例
                     </Button>
                     <Button variant="ghost" size="sm" onClick={handleClear}>

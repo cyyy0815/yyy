@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import puppeteer from "puppeteer-core";
 
@@ -183,6 +183,31 @@ await shot("qa-jobs-mobile", {
   mobile: true,
   fullPage: true,
 });
+
+// 手机端必须有导入入口，且头部不能把页面撑宽
+const mobileImportPage = await open({
+  width: 390,
+  height: 844,
+  mobile: true,
+});
+await mobileImportPage.goto(BASE, { waitUntil: "networkidle0" });
+await pause(500);
+const mobileImport = await mobileImportPage.evaluate(() => {
+  const button = [...document.querySelectorAll("button")].find(
+    (item) => item.textContent?.trim() === "导入",
+  );
+  return {
+    visible: Boolean(button?.offsetParent),
+    viewport: window.innerWidth,
+    pageWidth: document.documentElement.scrollWidth,
+  };
+});
+expect(
+  "手机端有导入入口且无横向溢出",
+  mobileImport.visible && mobileImport.pageWidth <= mobileImport.viewport,
+  JSON.stringify(mobileImport),
+);
+await mobileImportPage.close();
 
 // JD 匹配：填入一段真实JD并检查结果
 const jdPage = await open({ width: 1440, height: 1000 });
@@ -440,6 +465,273 @@ expect(
 );
 await saveFailPage.screenshot({ path: `${OUT}/qa-save-error.png` });
 await saveFailPage.close();
+
+// 删除撤销 + 载入示例 / 导入覆盖确认
+const safetyPage = await open({ width: 1440, height: 1000 });
+await safetyPage.goto(BASE, { waitUntil: "networkidle0" });
+await safetyPage.evaluate(() => {
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: {
+        name: "安全测试",
+        headline: "前端工程师",
+        email: "",
+        phone: "",
+        city: "",
+        website: "",
+        github: "",
+        summary: "原始简介",
+      },
+      intent: {},
+      educations: [
+        { id: "e1", school: "原学校", major: "", degree: "", start: "", end: "" },
+      ],
+      experiences: [
+        {
+          id: "x1",
+          company: "原公司",
+          role: "前端工程师",
+          start: "",
+          end: "",
+          description: "原描述",
+        },
+      ],
+      projects: [{ id: "p1", name: "原项目", role: "", description: "", link: "" }],
+      skills: ["React"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await safetyPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+
+const countDeletes = () =>
+  safetyPage.$$eval('[aria-label="删除"]', (nodes) => nodes.length);
+const beforeDelete = await countDeletes();
+await safetyPage.evaluate(() => {
+  document.querySelector('[aria-label="删除"]')?.click();
+});
+await safetyPage.waitForFunction(
+  () => document.body.innerText.includes("已删除工作经历"),
+  { timeout: 5000 },
+);
+const afterDelete = await countDeletes();
+await safetyPage.evaluate(() => {
+  const toast = document.querySelector('[role="status"]');
+  [...(toast?.querySelectorAll("button") ?? [])]
+    .find((button) => button.textContent?.trim() === "撤销")
+    ?.click();
+});
+await safetyPage.waitForFunction(
+  () => !document.body.innerText.includes("已删除工作经历"),
+  { timeout: 5000 },
+);
+const afterUndo = await countDeletes();
+const companyBack = await safetyPage.evaluate(() =>
+  document.body.innerText.includes("原公司"),
+);
+expect(
+  "删除可撤销并恢复条目",
+  beforeDelete === 3 && afterDelete === 2 && afterUndo === 3 && companyBack,
+  JSON.stringify({ beforeDelete, afterDelete, afterUndo, companyBack }),
+);
+
+const readName = () =>
+  safetyPage.evaluate(() => {
+    const label = [...document.querySelectorAll("label")].find((node) =>
+      node.textContent?.includes("姓名"),
+    );
+    return label?.querySelector("input")?.value ?? "";
+  });
+
+let sampleDialog = "";
+safetyPage.once("dialog", async (dialog) => {
+  sampleDialog = dialog.message();
+  await dialog.dismiss();
+});
+await safetyPage.evaluate(() => {
+  [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.trim() === "载入示例")
+    ?.click();
+});
+await pause(700);
+const nameAfterSampleCancel = await readName();
+expect(
+  "载入示例可取消",
+  sampleDialog.includes("覆盖") && nameAfterSampleCancel === "安全测试",
+  JSON.stringify({ sampleDialog, nameAfterSampleCancel }),
+);
+
+safetyPage.once("dialog", async (dialog) => {
+  await dialog.accept();
+});
+await safetyPage.evaluate(() => {
+  [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.trim() === "载入示例")
+    ?.click();
+});
+await pause(700);
+const nameAfterSample = await readName();
+expect(
+  "载入示例确认后生效",
+  nameAfterSample === "林一",
+  nameAfterSample,
+);
+
+// 改成非示例数据后再测导入确认
+await safetyPage.evaluate(() => {
+  const label = [...document.querySelectorAll("label")].find((node) =>
+    node.textContent?.includes("姓名"),
+  );
+  const input = label?.querySelector("input");
+  if (!input) return;
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value",
+  )?.set;
+  setter?.call(input, "导入前");
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await pause(700);
+
+const importPath = path.join(OUT, "qa-import.json");
+await writeFile(
+  importPath,
+  JSON.stringify({
+    basic: { name: "导入测试", summary: "导入的简介" },
+    intent: {},
+    educations: [],
+    experiences: [],
+    projects: [],
+    skills: [],
+    template: "classic",
+  }),
+);
+const fileInput = await safetyPage.$('input[type="file"]');
+if (!fileInput) throw new Error("file input not found");
+
+let importDialog = "";
+safetyPage.once("dialog", async (dialog) => {
+  importDialog = dialog.message();
+  await dialog.dismiss();
+});
+await fileInput.uploadFile(importPath);
+await safetyPage.waitForFunction(
+  () => document.body.innerText.includes("已取消导入"),
+  { timeout: 5000 },
+);
+const nameAfterImportCancel = await readName();
+expect(
+  "导入可取消",
+  importDialog.includes("覆盖") && nameAfterImportCancel === "导入前",
+  JSON.stringify({ importDialog, nameAfterImportCancel }),
+);
+
+safetyPage.once("dialog", async (dialog) => {
+  await dialog.accept();
+});
+await fileInput.uploadFile(importPath);
+await safetyPage.waitForFunction(
+  () => document.body.innerText.includes("简历已导入"),
+  { timeout: 5000 },
+);
+const nameAfterImport = await readName();
+expect("导入确认后生效", nameAfterImport === "导入测试", nameAfterImport);
+await pause(300);
+const importedTemplate = await safetyPage.evaluate(() => {
+  const classic = [...document.querySelectorAll("button")].find(
+    (button) => button.textContent?.trim() === "经典",
+  );
+  return {
+    pressed: classic?.getAttribute("aria-pressed") === "true",
+    stored: localStorage.getItem("resume-workshop:template"),
+  };
+});
+expect(
+  "导入恢复模板",
+  importedTemplate.pressed && importedTemplate.stored === "classic",
+  JSON.stringify(importedTemplate),
+);
+await safetyPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+});
+await safetyPage.close();
+
+// 打印前用「姓名-头衔」作 document.title，Chrome 存 PDF 时用作文件名
+const pdfNamePage = await open({ width: 1440, height: 1000 });
+await pdfNamePage.goto(BASE, { waitUntil: "networkidle0" });
+await pause(700);
+await pdfNamePage.evaluate(() => {
+  window.__printTitle = "";
+  window.print = () => {
+    window.__printTitle = document.title;
+  };
+  [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.includes("打印"))
+    ?.click();
+});
+await pdfNamePage.waitForFunction(() => Boolean(window.__printTitle), {
+  timeout: 5000,
+});
+const printTitle = await pdfNamePage.evaluate(() => window.__printTitle);
+expect(
+  "打印标题用作 PDF 文件名",
+  printTitle === "林一-前端工程师",
+  printTitle,
+);
+await pause(1300);
+const restoredTitle = await pdfNamePage.evaluate(() => document.title);
+expect(
+  "打印后标题恢复",
+  restoredTitle === "简历工坊 · 简历制作与求职推荐",
+  restoredTitle,
+);
+
+await pdfNamePage.evaluate(() => {
+  [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.trim() === "现代")
+    ?.click();
+});
+await pause(300);
+await pdfNamePage.evaluate(() => {
+  window.__exportedBlob = null;
+  window.__downloadName = "";
+  const originalCreate = URL.createObjectURL.bind(URL);
+  URL.createObjectURL = (blob) => {
+    window.__exportedBlob = blob;
+    return originalCreate(blob);
+  };
+  HTMLAnchorElement.prototype.click = function () {
+    window.__downloadName = this.download;
+  };
+});
+await pdfNamePage.evaluate(() => {
+  [...document.querySelectorAll("button")]
+    .find((button) => button.textContent?.trim() === "导出")
+    ?.click();
+});
+await pdfNamePage.waitForFunction(() => Boolean(window.__exportedBlob), {
+  timeout: 5000,
+});
+const exported = await pdfNamePage.evaluate(async () => {
+  const blob = window.__exportedBlob;
+  const payload = JSON.parse(await blob.text());
+  return {
+    template: payload.template,
+    name: payload.basic?.name,
+    downloadName: window.__downloadName,
+  };
+});
+expect(
+  "导出包含模板且文件名正确",
+  exported.template === "modern" &&
+    exported.name === "林一" &&
+    exported.downloadName === "林一.json",
+  JSON.stringify(exported),
+);
+await pdfNamePage.close();
 
 // 打印媒体下的视觉检查
 const printPage = await open({ width: 1200, height: 1000 });

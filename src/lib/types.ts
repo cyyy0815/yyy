@@ -64,12 +64,22 @@ export type Resume = {
   theme: ResumeTheme;
 };
 
-export type TemplateId =
-  | "modern"
-  | "classic"
-  | "compact"
-  | "sidebar"
-  | "timeline";
+export const TEMPLATE_IDS = [
+  "modern",
+  "classic",
+  "compact",
+  "sidebar",
+  "timeline",
+] as const;
+
+export type TemplateId = (typeof TEMPLATE_IDS)[number];
+
+export function isTemplateId(value: unknown): value is TemplateId {
+  return (
+    typeof value === "string" &&
+    (TEMPLATE_IDS as readonly string[]).includes(value)
+  );
+}
 
 export function newId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {

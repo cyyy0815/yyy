@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, type Dispatch, type SetStateAction } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { analyzeResume } from "@/lib/matching";
 import {
   newId,
@@ -19,6 +26,15 @@ import { SectionCard } from "@/components/ui/SectionCard";
 type Props = {
   resume: Resume;
   onChange: Dispatch<SetStateAction<Resume>>;
+};
+
+type DeleteTarget =
+  | { kind: "experience"; item: Experience; index: number }
+  | { kind: "project"; item: Project; index: number }
+  | { kind: "education"; item: Education; index: number };
+
+type SectionProps = Props & {
+  onDelete: (target: DeleteTarget) => void;
 };
 
 function moveById<T extends { id: string }>(
@@ -146,7 +162,8 @@ function EmptyBlock({ text }: { text: string }) {
 function ExperienceSection({
   resume,
   onChange,
-}: Props) {
+  onDelete,
+}: SectionProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const update = (id: string, patch: Partial<Experience>) => {
@@ -219,10 +236,7 @@ function ExperienceSection({
                   }))
                 }
                 onRemove={() =>
-                  onChange((prev) => ({
-                    ...prev,
-                    experiences: prev.experiences.filter((exp) => exp.id !== item.id),
-                  }))
+                  onDelete({ kind: "experience", item, index })
                 }
               />
             </div>
@@ -301,7 +315,7 @@ function ExperienceSection({
   );
 }
 
-function ProjectSection({ resume, onChange }: Props) {
+function ProjectSection({ resume, onChange, onDelete }: SectionProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const update = (id: string, patch: Partial<Project>) => {
@@ -370,12 +384,7 @@ function ProjectSection({ resume, onChange }: Props) {
                     projects: moveById(prev.projects, item.id, direction),
                   }))
                 }
-                onRemove={() =>
-                  onChange((prev) => ({
-                    ...prev,
-                    projects: prev.projects.filter((project) => project.id !== item.id),
-                  }))
-                }
+                onRemove={() => onDelete({ kind: "project", item, index })}
               />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -434,7 +443,7 @@ function ProjectSection({ resume, onChange }: Props) {
   );
 }
 
-function EducationSection({ resume, onChange }: Props) {
+function EducationSection({ resume, onChange, onDelete }: SectionProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const update = (id: string, patch: Partial<Education>) => {
@@ -495,12 +504,7 @@ function EducationSection({ resume, onChange }: Props) {
                   }))
                 }
                 onRemove={() =>
-                  onChange((prev) => ({
-                    ...prev,
-                    educations: prev.educations.filter(
-                      (education) => education.id !== item.id,
-                    ),
-                  }))
+                  onDelete({ kind: "education", item, index })
                 }
               />
             </div>
@@ -678,7 +682,105 @@ function SkillsSection({ resume, onChange }: Props) {
   );
 }
 
+const UNDO_WINDOW_MS = 8000;
+
 export function ResumeForm({ resume, onChange }: Props) {
+  const [deleted, setDeleted] = useState<DeleteTarget | null>(null);
+  const undoTimer = useRef<number | null>(null);
+
+  const clearUndo = useCallback(() => {
+    if (undoTimer.current !== null) {
+      window.clearTimeout(undoTimer.current);
+      undoTimer.current = null;
+    }
+    setDeleted(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (undoTimer.current !== null) window.clearTimeout(undoTimer.current);
+    };
+  }, []);
+
+  const handleDelete = useCallback(
+    (target: DeleteTarget) => {
+      onChange((prev) => {
+        switch (target.kind) {
+          case "experience":
+            return {
+              ...prev,
+              experiences: prev.experiences.filter(
+                (item) => item.id !== target.item.id,
+              ),
+            };
+          case "project":
+            return {
+              ...prev,
+              projects: prev.projects.filter(
+                (item) => item.id !== target.item.id,
+              ),
+            };
+          case "education":
+            return {
+              ...prev,
+              educations: prev.educations.filter(
+                (item) => item.id !== target.item.id,
+              ),
+            };
+        }
+      });
+      setDeleted(target);
+      if (undoTimer.current !== null) window.clearTimeout(undoTimer.current);
+      undoTimer.current = window.setTimeout(() => {
+        undoTimer.current = null;
+        setDeleted(null);
+      }, UNDO_WINDOW_MS);
+    },
+    [onChange],
+  );
+
+  const handleUndoDelete = useCallback(() => {
+    if (!deleted) return;
+    onChange((prev) => {
+      switch (deleted.kind) {
+        case "experience": {
+          if (prev.experiences.some((item) => item.id === deleted.item.id)) {
+            return prev;
+          }
+          const list = [...prev.experiences];
+          list.splice(Math.min(deleted.index, list.length), 0, deleted.item);
+          return { ...prev, experiences: list };
+        }
+        case "project": {
+          if (prev.projects.some((item) => item.id === deleted.item.id)) {
+            return prev;
+          }
+          const list = [...prev.projects];
+          list.splice(Math.min(deleted.index, list.length), 0, deleted.item);
+          return { ...prev, projects: list };
+        }
+        case "education": {
+          if (prev.educations.some((item) => item.id === deleted.item.id)) {
+            return prev;
+          }
+          const list = [...prev.educations];
+          list.splice(Math.min(deleted.index, list.length), 0, deleted.item);
+          return { ...prev, educations: list };
+        }
+      }
+    });
+    clearUndo();
+  }, [deleted, onChange, clearUndo]);
+
+  const deletedLabel =
+    deleted?.kind === "experience"
+      ? "工作经历"
+      : deleted?.kind === "project"
+        ? "项目"
+        : deleted?.kind === "education"
+          ? "教育经历"
+          : "";
+
   const updateBasic = (patch: Partial<BasicInfo>) =>
     onChange((prev) => ({ ...prev, basic: { ...prev.basic, ...patch } }));
 
@@ -820,10 +922,38 @@ export function ResumeForm({ resume, onChange }: Props) {
         </div>
       </SectionCard>
 
-      <ExperienceSection resume={resume} onChange={onChange} />
-      <ProjectSection resume={resume} onChange={onChange} />
-      <EducationSection resume={resume} onChange={onChange} />
+      <ExperienceSection
+        resume={resume}
+        onChange={onChange}
+        onDelete={handleDelete}
+      />
+      <ProjectSection
+        resume={resume}
+        onChange={onChange}
+        onDelete={handleDelete}
+      />
+      <EducationSection
+        resume={resume}
+        onChange={onChange}
+        onDelete={handleDelete}
+      />
       <SkillsSection resume={resume} onChange={onChange} />
+
+      {deleted ? (
+        <div
+          role="status"
+          className="print-hide fixed bottom-20 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-3 whitespace-nowrap rounded-full bg-zinc-900 px-4 py-2 text-[12px] text-white shadow-lg"
+        >
+          <span>已删除{deletedLabel}</span>
+          <button
+            type="button"
+            onClick={handleUndoDelete}
+            className="rounded-full px-2 py-0.5 font-medium text-amber-300 transition hover:bg-white/10 hover:text-amber-200"
+          >
+            撤销
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

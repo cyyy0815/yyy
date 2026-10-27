@@ -1,5 +1,11 @@
 import { normalizeAccent } from "./theme";
-import { createEmptyResume, newId, type Resume } from "./types";
+import {
+  createEmptyResume,
+  isTemplateId,
+  newId,
+  type Resume,
+  type TemplateId,
+} from "./types";
 
 export const STORAGE_KEY = "resume-workshop:v1";
 
@@ -104,8 +110,12 @@ export function clearResume(): void {
   }
 }
 
-export function downloadResumeJSON(resume: Resume): void {
-  const blob = new Blob([JSON.stringify(resume, null, 2)], {
+export function downloadResumeJSON(
+  resume: Resume,
+  template?: TemplateId,
+): void {
+  const payload = template ? { ...resume, template } : resume;
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
   });
   const url = URL.createObjectURL(blob);
@@ -117,7 +127,7 @@ export function downloadResumeJSON(resume: Resume): void {
 }
 
 export type ImportResult =
-  | { ok: true; resume: Resume }
+  | { ok: true; resume: Resume; template?: TemplateId }
   | { ok: false; error: string };
 
 export function parseResumeJSON(text: string): ImportResult {
@@ -126,7 +136,12 @@ export function parseResumeJSON(text: string): ImportResult {
     if (!data || typeof data !== "object" || !("basic" in data)) {
       return { ok: false, error: "文件格式不正确：缺少 basic 字段" };
     }
-    return { ok: true, resume: normalizeResume(data) };
+    const template = (data as { template?: unknown }).template;
+    return {
+      ok: true,
+      resume: normalizeResume(data),
+      ...(isTemplateId(template) ? { template } : {}),
+    };
   } catch {
     return { ok: false, error: "无法解析该文件，请选择由本工具导出的 JSON" };
   }
