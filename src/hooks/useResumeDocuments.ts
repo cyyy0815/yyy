@@ -160,6 +160,31 @@ export function useResumeDocuments({
     return true;
   };
 
+  /** 用外部生成的内容新建一份简历，当前简历作为快照保留；返回新简历标题。 */
+  const createFromResume = (
+    nextResume: Resume,
+    baseTitle: string,
+  ): string | null => {
+    if (!saveResume(nextResume)) return null;
+
+    const nextId = newId();
+    const title = uniqueTitle(baseTitle.trim() || "AI 生成简历", titles);
+    const library: ResumeLibrary = {
+      activeId: nextId,
+      activeTitle: title,
+      others: isSample ? others : [currentDocument(), ...others],
+    };
+    if (!saveResumeLibrary(library)) {
+      saveResume(resume);
+      return null;
+    }
+
+    setState({ library, activeTitle: title });
+    replaceResume(nextResume);
+    setTemplate(template);
+    return title;
+  };
+
   const deleteActive = (): boolean => {
     if (others.length === 0) return false;
     const [next, ...rest] = others;
@@ -198,6 +223,7 @@ export function useResumeDocuments({
     canDelete: others.length > 0,
     switchTo,
     createBlank,
+    createFromResume,
     duplicateCurrent,
     deleteActive,
     renameActive,

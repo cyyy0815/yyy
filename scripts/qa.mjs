@@ -198,7 +198,10 @@ async function fillCustomItem(page, sectionIndex, values) {
 }
 
 /** 拦截 AI 接口，用固定 SSE 验证前端闭环，不消耗真实额度。 */
-async function interceptAi(page, { configured = true, text = "" } = {}) {
+async function interceptAi(
+  page,
+  { configured = true, text = "", fullText = text } = {},
+) {
   await page.setRequestInterception(true);
   page.on("request", (request) => {
     const url = request.url();
@@ -210,15 +213,15 @@ async function interceptAi(page, { configured = true, text = "" } = {}) {
       });
       return;
     }
-    if (url.includes("/api/ai/generate")) {
+    if (url.includes("/api/ai/generate") || url.includes("/api/ai/full")) {
       let payload = {};
       try {
         payload = JSON.parse(request.postData() ?? "{}");
       } catch {
         // 保持空对象，按默认文本返回。
       }
-      const resolved =
-        typeof text === "function" ? text(payload) : text;
+      const source = url.includes("/api/ai/full") ? fullText : text;
+      const resolved = typeof source === "function" ? source(payload) : source;
       const split = Math.max(1, Math.floor(resolved.length / 2));
       const body = [
         { event: "delta", data: { text: resolved.slice(0, split) } },
@@ -580,16 +583,50 @@ await aiJdPage.evaluate(() => {
 });
 await aiJdPage.close();
 
-// AI 整份简历：依次生成简介 / 工作 / 项目，一次采用并可整体撤销
-const FULL_AI_TEXTS = {
+// AI 整份简历：一段自述 -> 结构化整份 -> 新建一份简历（旧简历保留）
+const FULL_RESUME_JSON = {
+  headline: "产品经理",
+  city: "上海",
   summary: "3 年 B 端产品经验，主导客服工单系统从 0 到 1 落地。",
-  experience: "负责客服工单系统需求分析与产品设计。\n推动跨团队协作，交付周期缩短 30%。",
-  project: "主导工单系统重构，覆盖 12 条业务线。\n建立需求优先级机制，线上问题下降 25%。",
+  intent: { targetRole: "产品经理", targetCity: "上海", experience: "3-5 年" },
+  educations: [
+    {
+      school: "华东师范大学",
+      major: "信息管理与信息系统",
+      degree: "本科",
+      start: "2017.09",
+      end: "2021.06",
+      gpa: "",
+      ranking: "",
+      courses: "",
+      honors: "",
+    },
+  ],
+  experiences: [
+    {
+      company: "星河科技",
+      role: "产品经理",
+      start: "2021.07",
+      end: "至今",
+      description:
+        "负责客服工单系统需求分析与产品设计。\n推动跨团队协作，交付周期缩短 30%。",
+    },
+  ],
+  projects: [
+    {
+      name: "工单系统重构",
+      role: "产品负责人",
+      start: "2022.03",
+      end: "2023.06",
+      description: "主导工单系统重构，覆盖 12 条业务线。",
+      link: "https://example.com/fake",
+    },
+  ],
+  skills: ["需求分析", "Axure", "SQL"],
 };
+const FULL_RESUME_TEXT = JSON.stringify(FULL_RESUME_JSON);
 const aiFullPage = await open({ width: 1440, height: 1100 });
-await interceptAi(aiFullPage, {
-  text: (payload) => FULL_AI_TEXTS[payload.section] ?? "",
-});
+await interceptAi(aiFullPage, { fullText: FULL_RESUME_TEXT });
 await aiFullPage.goto(BASE, { waitUntil: "networkidle0" });
 await aiFullPage.evaluate(() => {
   localStorage.setItem(
@@ -624,6 +661,7 @@ await aiFullPage.evaluate(() => {
     }),
   );
   localStorage.removeItem("resume-workshop:jd");
+  localStorage.removeItem("resume-workshop:library:v1");
 });
 await aiFullPage.reload({ waitUntil: "networkidle0" });
 await pause(500);
@@ -634,89 +672,98 @@ await aiFullPage.evaluate(() => {
 });
 await aiFullPage.waitForSelector('[data-qa="ai-keywords"]', { timeout: 15000 });
 await clickText(aiFullPage, "整份简历", '[role="dialog"]');
+await aiFullPage.waitForSelector('[data-qa="ai-resume-brief"]', {
+  timeout: 5000,
+});
 await setQaValue(
   aiFullPage,
-  '[data-qa="ai-keywords"]',
-  "B 端产品；工单系统；跨团队协作",
+  '[data-qa="ai-resume-brief"]',
+  "2021 年本科毕业，信息管理专业；在星河科技做产品经理 3 年，负责客服工单系统；做过工单系统重构项目；会用 Axure 和 SQL。",
 );
 await clickText(aiFullPage, "生成整份简历", '[role="dialog"]');
+await aiFullPage.waitForSelector('[data-qa="ai-full-preview"]', {
+  timeout: 20000,
+});
 await aiFullPage.waitForFunction(
-  () => document.querySelectorAll('[data-qa^="ai-full-"]').length === 3,
-  { timeout: 20000 },
+  () =>
+    (document.querySelector('[data-qa="ai-full-preview"]')?.textContent ?? "")
+      .includes("星河科技"),
+  { timeout: 15000 },
 );
 await pause(300);
-const fullPreview = await aiFullPage.evaluate(() =>
-  [...document.querySelectorAll('[data-qa^="ai-full-"]')].map(
-    (element) => element.value,
-  ),
+const fullPreviewText = await aiFullPage.$eval(
+  '[data-qa="ai-full-preview"]',
+  (element) => element.textContent ?? "",
 );
 const fullDialog = await aiFullPage.$('[role="dialog"]');
 if (fullDialog) {
   await fullDialog.screenshot({ path: `${OUT}/qa-ai-full.png` });
 }
 expect(
-  "整份生成三段内容",
-  fullPreview.length === 3 &&
-    fullPreview[0] === FULL_AI_TEXTS.summary &&
-    fullPreview[1] === FULL_AI_TEXTS.experience &&
-    fullPreview[2] === FULL_AI_TEXTS.project,
-  JSON.stringify(fullPreview),
+  "整份预览包含简介/教育/工作/项目/技能",
+  ["3 年 B 端产品经验", "华东师范大学", "星河科技", "工单系统重构", "Axure"].every(
+    (text) => fullPreviewText.includes(text),
+  ),
+  fullPreviewText.slice(0, 120),
 );
 
-await clickText(aiFullPage, "采用整份简历", '[role="dialog"]');
-await pause(300);
-const fullConfirmShown = await aiFullPage.evaluate(() =>
-  [...document.querySelectorAll('[role="dialog"] button')].some(
-    (button) => button.textContent?.trim() === "确认覆盖",
-  ),
-);
-if (fullConfirmShown) {
-  await clickText(aiFullPage, "确认覆盖", '[role="dialog"]');
-}
+await clickText(aiFullPage, "生成新简历", '[role="dialog"]');
 await aiFullPage.waitForFunction(
   () => !document.querySelector('[role="dialog"]'),
 );
 await pause(1300);
 const fullAdopted = await aiFullPage.evaluate(() => {
   const data = JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}");
+  const library = JSON.parse(
+    localStorage.getItem("resume-workshop:library:v1") ?? "{}",
+  );
   return {
+    name: data.basic?.name ?? "",
     summary: data.basic?.summary,
+    headline: data.basic?.headline,
+    educations: (data.educations ?? []).length,
     experiences: data.experiences ?? [],
     projects: data.projects ?? [],
+    skills: data.skills ?? [],
+    activeTitle: library.activeTitle,
+    others: (library.others ?? []).map((document) => ({
+      title: document.title,
+      summary: document.resume?.basic?.summary,
+      experiences: (document.resume?.experiences ?? []).length,
+    })),
   };
 });
 expect(
-  "整份采用写入简介并新增工作/项目条目",
-  fullAdopted.summary === FULL_AI_TEXTS.summary &&
-    fullAdopted.experiences.length === 2 &&
-    fullAdopted.experiences[1].description === FULL_AI_TEXTS.experience &&
-    fullAdopted.experiences[1].company === "" &&
-    fullAdopted.projects.length === 2 &&
-    fullAdopted.projects[1].description === FULL_AI_TEXTS.project &&
-    fullAdopted.projects[1].name === "",
+  "整份生成写入新简历",
+  fullAdopted.summary === FULL_RESUME_JSON.summary &&
+    fullAdopted.headline === "产品经理" &&
+    fullAdopted.educations === 1 &&
+    fullAdopted.experiences.length === 1 &&
+    fullAdopted.experiences[0].company === "星河科技" &&
+    fullAdopted.experiences[0].start === "2021.07" &&
+    fullAdopted.projects.length === 1 &&
+    fullAdopted.projects[0].name === "工单系统重构" &&
+    fullAdopted.projects[0].link === "" &&
+    fullAdopted.skills.length === 3,
   JSON.stringify({
     summary: fullAdopted.summary,
     experiences: fullAdopted.experiences.length,
     projects: fullAdopted.projects.length,
+    skills: fullAdopted.skills.length,
   }),
 );
-
-await clickText(aiFullPage, "撤销");
-await pause(1300);
-const fullUndone = await aiFullPage.evaluate(() => {
-  const data = JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}");
-  return {
-    summary: data.basic?.summary,
-    experiences: (data.experiences ?? []).length,
-    projects: (data.projects ?? []).length,
-  };
-});
 expect(
-  "整份采用可整体撤销",
-  fullUndone.summary === "旧简介" &&
-    fullUndone.experiences === 1 &&
-    fullUndone.projects === 1,
-  JSON.stringify(fullUndone),
+  "整份生成不写入姓名与联系方式",
+  fullAdopted.name === "",
+  fullAdopted.name,
+);
+expect(
+  "旧简历保留在文档列表",
+  fullAdopted.others.length === 1 &&
+    fullAdopted.others[0].summary === "旧简介" &&
+    fullAdopted.others[0].experiences === 1 &&
+    fullAdopted.activeTitle === "产品经理",
+  JSON.stringify(fullAdopted.others),
 );
 expect(
   "AI 整份简历无控制台错误",
@@ -726,6 +773,7 @@ expect(
 await aiFullPage.evaluate(() => {
   localStorage.removeItem("resume-workshop:v1");
   localStorage.removeItem("resume-workshop:jd");
+  localStorage.removeItem("resume-workshop:library:v1");
 });
 await aiFullPage.close();
 

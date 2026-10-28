@@ -50,7 +50,7 @@ export function buildSystemPrompt(section: AiSection, hasJd = false): string {
  * 隐私兜底：姓名来自独立字段，本模块从不读取 `basic.name`；
  * 若用户把邮箱、手机、链接写进了简介或关键词，也在发送前过滤掉。
  */
-function stripContactInfo(text: string): string {
+export function stripContactInfo(text: string): string {
   return text
     .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "")
     .replace(/(?:\+?86[\s-]?)?1[3-9]\d{9}/g, "")

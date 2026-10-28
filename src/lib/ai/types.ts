@@ -19,6 +19,18 @@ export type AiGenerateRequest = {
   tone: AiTone;
 };
 
+/**
+ * 整份简历生成：用户给一段自述，AI 返回结构化简历 JSON。
+ * 不包含姓名、邮箱、电话等联系方式字段，避免把隐私发往上游。
+ */
+export type AiFullResumeRequest = {
+  brief: string;
+  role: string;
+  years: string;
+  jd?: string;
+  tone: AiTone;
+};
+
 export type AiUsage = {
   prompt_tokens: number;
   completion_tokens: number;

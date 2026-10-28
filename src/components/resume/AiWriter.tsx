@@ -6,15 +6,18 @@ import {
   useRef,
   useState,
   type Dispatch,
+  type ReactNode,
   type SetStateAction,
 } from "react";
 import { Button } from "@/components/ui/Button";
 import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
-import { streamGenerate } from "@/lib/ai/client";
+import { streamFullResume, streamGenerate } from "@/lib/ai/client";
+import {
+  parseFullResumeOutput,
+  type FullResumeStats,
+} from "@/lib/ai/fullResume";
 import { cleanAiText } from "@/lib/ai/prompt";
 import {
-  AI_SECTIONS,
-  type AiGenerateRequest,
   type AiMode,
   type AiSection,
   type AiStatus,
@@ -49,12 +52,6 @@ const TONES: { value: AiTone; label: string }[] = [
 type AdoptMode = "replace" | "append";
 type AiTab = AiSection | "full";
 
-const EMPTY_FULL_OUTPUT: Record<AiSection, string> = {
-  summary: "",
-  experience: "",
-  project: "",
-};
-
 type UndoState =
   | { kind: "summary"; previous: string }
   | {
@@ -68,21 +65,15 @@ type UndoState =
       id: string;
       previousDescription: string;
       created: boolean;
-    }
-  | {
-      kind: "full";
-      previousSummary: string;
-      summaryChanged: boolean;
-      experienceId: string | null;
-      projectId: string | null;
     };
 
 type Props = {
   resume: Resume;
   onChange: Dispatch<SetStateAction<Resume>>;
+  onCreateDocument: (resume: Resume, title: string) => boolean;
 };
 
-export function AiWriter({ resume, onChange }: Props) {
+export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<AiStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -102,15 +93,17 @@ export function AiWriter({ resume, onChange }: Props) {
   const [mode, setMode] = useState<AiMode>("draft");
 
   const [output, setOutput] = useState("");
-  const [fullOutput, setFullOutput] =
-    useState<Record<AiSection, string>>(EMPTY_FULL_OUTPUT);
-  const [fullStage, setFullStage] = useState<AiSection | null>(null);
+  const [brief, setBrief] = useState("");
+  const [fullRaw, setFullRaw] = useState("");
+  const [fullDraft, setFullDraft] = useState<Resume | null>(null);
+  const [fullStats, setFullStats] = useState<FullResumeStats | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const [undo, setUndo] = useState<UndoState | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
+  const fullRawRef = useRef("");
   const prefilledRef = useRef(false);
 
   const currentText =
@@ -135,11 +128,8 @@ export function AiWriter({ resume, onChange }: Props) {
           }))
         : [];
 
-  const fullHasOutput = AI_SECTIONS.some(
-    (item) => fullOutput[item].trim().length > 0,
-  );
   const canGenerate = fullMode
-    ? Boolean(keywords.trim())
+    ? Boolean(brief.trim())
     : Boolean(keywords.trim()) ||
       (mode === "polish" && Boolean(currentText.trim()));
 
@@ -161,7 +151,6 @@ export function AiWriter({ resume, onChange }: Props) {
     abortRef.current?.abort();
     abortRef.current = null;
     setStreaming(false);
-    setFullStage(null);
     setConfirmOverwrite(false);
     setOpen(false);
   }, []);
@@ -213,8 +202,9 @@ export function AiWriter({ resume, onChange }: Props) {
       setAdoptMode("replace");
       setMode("draft");
       setOutput("");
-      setFullOutput(EMPTY_FULL_OUTPUT);
-      setFullStage(null);
+      setFullRaw("");
+      setFullDraft(null);
+      setFullStats(null);
       setError(null);
       setConfirmOverwrite(false);
       return;
@@ -226,8 +216,9 @@ export function AiWriter({ resume, onChange }: Props) {
     setAdoptMode("replace");
     setMode("draft");
     setOutput("");
-    setFullOutput(EMPTY_FULL_OUTPUT);
-    setFullStage(null);
+    setFullRaw("");
+    setFullDraft(null);
+    setFullStats(null);
     setError(null);
     setConfirmOverwrite(false);
   };
@@ -294,10 +285,21 @@ export function AiWriter({ resume, onChange }: Props) {
     setStreaming(false);
   };
 
+  /** 流式接收完整 JSON 后一次性解析；解析失败时保留错误提示。 */
+  const finishFullGeneration = (raw: string) => {
+    const parsed = parseFullResumeOutput(raw);
+    if (!parsed.ok) {
+      setError(parsed.error);
+      return;
+    }
+    setFullDraft(parsed.resume);
+    setFullStats(parsed.stats);
+  };
+
   const handleGenerateFull = async () => {
-    const trimmedKeywords = keywords.trim();
-    if (!trimmedKeywords) {
-      setError("整份生成需要先填写关键词或成果");
+    const trimmedBrief = brief.trim();
+    if (!trimmedBrief) {
+      setError("请先写一段个人经历自述");
       return;
     }
 
@@ -305,45 +307,40 @@ export function AiWriter({ resume, onChange }: Props) {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    fullRawRef.current = "";
     setStreaming(true);
-    setFullOutput(EMPTY_FULL_OUTPUT);
+    setFullRaw("");
+    setFullDraft(null);
+    setFullStats(null);
     setError(null);
     setConfirmOverwrite(false);
 
-    const base: Omit<AiGenerateRequest, "section"> = {
-      mode: "draft",
-      tone,
-      role: role.trim(),
-      years: years.trim(),
-      keywords: trimmedKeywords,
-      jd: jd.trim() || undefined,
-    };
-
-    let failed = false;
-    for (const nextSection of AI_SECTIONS) {
-      if (controller.signal.aborted) break;
-      setFullStage(nextSection);
-      await streamGenerate(
-        { ...base, section: nextSection },
-        controller.signal,
-        {
-          onDelta: (text) =>
-            setFullOutput((previous) => ({
-              ...previous,
-              [nextSection]: previous[nextSection] + text,
-            })),
-          onDone: () => {},
-          onError: (_code, message) => {
-            failed = true;
-            setError(`生成${SECTION_LABELS[nextSection]}失败：${message}`);
-          },
+    await streamFullResume(
+      {
+        brief: trimmedBrief,
+        role: role.trim(),
+        years: years.trim(),
+        jd: jd.trim() || undefined,
+        tone,
+      },
+      controller.signal,
+      {
+        onDelta: (text) => {
+          fullRawRef.current += text;
+          setFullRaw(fullRawRef.current);
         },
-      );
-      if (failed || controller.signal.aborted) break;
-    }
+        onDone: () => {
+          setStreaming(false);
+          finishFullGeneration(fullRawRef.current);
+        },
+        onError: (_code, message) => {
+          setError(message);
+          setStreaming(false);
+        },
+      },
+    );
 
     if (abortRef.current === controller) abortRef.current = null;
-    setFullStage(null);
     setStreaming(false);
   };
 
@@ -351,7 +348,6 @@ export function AiWriter({ resume, onChange }: Props) {
     abortRef.current?.abort();
     abortRef.current = null;
     setStreaming(false);
-    setFullStage(null);
   };
 
   const applyAdopt = () => {
@@ -469,63 +465,23 @@ export function AiWriter({ resume, onChange }: Props) {
   };
 
   const applyFullAdopt = () => {
-    const cleaned = {
-      summary: cleanAiText(fullOutput.summary, "summary"),
-      experience: cleanAiText(fullOutput.experience, "experience"),
-      project: cleanAiText(fullOutput.project, "project"),
-    };
-    if (!cleaned.summary && !cleaned.experience && !cleaned.project) {
-      setError("还没有生成内容，请先生成整份简历");
+    if (!fullDraft) return;
+
+    const title =
+      fullDraft.basic.headline.trim() ||
+      fullDraft.intent.targetRole.trim() ||
+      role.trim() ||
+      "AI 生成简历";
+
+    if (!onCreateDocument(fullDraft, title)) {
+      setError("新建简历失败：浏览器存储不可用或空间已满");
       return;
     }
 
-    const previousSummary = resume.basic.summary;
-    const summaryChanged = Boolean(cleaned.summary);
-    const experienceId = cleaned.experience ? newId() : null;
-    const projectId = cleaned.project ? newId() : null;
-
-    onChange((prev) => ({
-      ...prev,
-      basic: summaryChanged
-        ? { ...prev.basic, summary: cleaned.summary }
-        : prev.basic,
-      experiences: experienceId
-        ? [
-            ...prev.experiences,
-            {
-              id: experienceId,
-              company: "",
-              role: "",
-              start: "",
-              end: "",
-              description: cleaned.experience,
-            },
-          ]
-        : prev.experiences,
-      projects: projectId
-        ? [
-            ...prev.projects,
-            {
-              id: projectId,
-              name: "",
-              role: "",
-              start: "",
-              end: "",
-              description: cleaned.project,
-              link: "",
-            },
-          ]
-        : prev.projects,
-    }));
-
-    setUndo({
-      kind: "full",
-      previousSummary,
-      summaryChanged,
-      experienceId,
-      projectId,
-    });
-    setFullOutput(EMPTY_FULL_OUTPUT);
+    fullRawRef.current = "";
+    setFullRaw("");
+    setFullDraft(null);
+    setFullStats(null);
     setError(null);
     setConfirmOverwrite(false);
     setOpen(false);
@@ -535,19 +491,7 @@ export function AiWriter({ resume, onChange }: Props) {
     if (streaming) return;
 
     if (fullMode) {
-      const hasOutput = AI_SECTIONS.some(
-        (item) => cleanAiText(fullOutput[item], item).length > 0,
-      );
-      if (!hasOutput) return;
-
-      const destructive = Boolean(
-        resume.basic.summary.trim() &&
-          cleanAiText(fullOutput.summary, "summary"),
-      );
-      if (destructive && !confirmOverwrite) {
-        setConfirmOverwrite(true);
-        return;
-      }
+      if (!fullDraft) return;
       applyFullAdopt();
       return;
     }
@@ -589,20 +533,6 @@ export function AiWriter({ resume, onChange }: Props) {
                 : entry,
             ),
       }));
-    } else if (undo.kind === "full") {
-      const { previousSummary, summaryChanged, experienceId, projectId } = undo;
-      onChange((prev) => ({
-        ...prev,
-        basic: summaryChanged
-          ? { ...prev.basic, summary: previousSummary }
-          : prev.basic,
-        experiences: experienceId
-          ? prev.experiences.filter((entry) => entry.id !== experienceId)
-          : prev.experiences,
-        projects: projectId
-          ? prev.projects.filter((entry) => entry.id !== projectId)
-          : prev.projects,
-      }));
     } else {
       const { id, previousDescription, created } = undo;
       onChange((prev) => ({
@@ -626,7 +556,7 @@ export function AiWriter({ resume, onChange }: Props) {
         <div>
           <p className="text-[13px] font-semibold text-zinc-900">AI 帮我写</p>
           <p className="mt-0.5 text-[11.5px] text-zinc-500">
-            生成个人简介、工作经历或项目描述草稿，确认后写入简历。
+            生成单板块草稿，或用一段个人经历直接生成整份简历。
           </p>
         </div>
         <Button
@@ -817,24 +747,41 @@ export function AiWriter({ resume, onChange }: Props) {
                     </>
                   ) : null}
 
-                  <Field
-                    label="关键词 / 成果"
-                    hint={`${keywords.length}/2000${
-                      !fullMode && mode === "polish"
-                        ? " · 优化模式可只传现有内容"
-                        : ""
-                    }`}
-                  >
-                    <TextArea
-                      autoFocus
-                      data-qa="ai-keywords"
-                      value={keywords}
-                      onChange={(event) => setKeywords(event.target.value)}
-                      maxLength={2000}
-                      className="min-h-[96px]"
-                      placeholder="一条一行，如：主导中后台重构；首屏性能提升 40%；带过 3 人小组"
-                    />
-                  </Field>
+                  {fullMode ? (
+                    <Field
+                      label="个人经历自述"
+                      hint={`${brief.length}/4000 · 没提到的字段会留空`}
+                    >
+                      <TextArea
+                        autoFocus
+                        data-qa="ai-resume-brief"
+                        value={brief}
+                        onChange={(event) => setBrief(event.target.value)}
+                        maxLength={4000}
+                        className="min-h-[140px]"
+                        placeholder={
+                          "用自己的话写，例如：\n2021 年本科毕业，计算机专业；在 A 公司做前端 3 年，负责中后台系统，用 React/TS，带过 2 人小组；做过数据看板项目；熟悉 Node。"
+                        }
+                      />
+                    </Field>
+                  ) : (
+                    <Field
+                      label="关键词 / 成果"
+                      hint={`${keywords.length}/2000${
+                        mode === "polish" ? " · 优化模式可只传现有内容" : ""
+                      }`}
+                    >
+                      <TextArea
+                        autoFocus
+                        data-qa="ai-keywords"
+                        value={keywords}
+                        onChange={(event) => setKeywords(event.target.value)}
+                        maxLength={2000}
+                        className="min-h-[96px]"
+                        placeholder="一条一行，如：主导中后台重构；首屏性能提升 40%；带过 3 人小组"
+                      />
+                    </Field>
+                  )}
 
                   <Field
                     label="参考 JD"
@@ -916,7 +863,7 @@ export function AiWriter({ resume, onChange }: Props) {
                       disabled={streaming || !canGenerate}
                     >
                       {fullMode
-                        ? fullHasOutput
+                        ? fullDraft
                           ? "重新生成整份"
                           : "生成整份简历"
                         : output
@@ -930,61 +877,35 @@ export function AiWriter({ resume, onChange }: Props) {
                     ) : null}
                     {status?.model ? (
                       <span className="ml-auto text-[11px] text-zinc-400">
-                        {fullMode ? "依次调用 3 次 AI" : status.model}
+                        {fullMode ? "一次生成，约 10–20 秒" : status.model}
                       </span>
                     ) : null}
                   </div>
 
                   {fullMode ? (
-                    <div className="space-y-2">
-                      {AI_SECTIONS.map((item) => {
-                        const active = fullStage === item;
-                        return (
-                          <div
-                            key={item}
-                            className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3"
-                          >
-                            <div className="mb-1.5 flex items-center justify-between text-[11px] text-zinc-400">
-                              <span>
-                                {SECTION_LABELS[item]}
-                                {active
-                                  ? " · 生成中…"
-                                  : fullOutput[item]
-                                    ? " · 可直接修改"
-                                    : " · 等待生成"}
-                              </span>
-                              {fullOutput[item] ? (
-                                <span>{fullOutput[item].length} 字</span>
-                              ) : null}
-                            </div>
-                            {fullOutput[item] && !active ? (
-                              <textarea
-                                data-qa={`ai-full-${item}`}
-                                value={fullOutput[item]}
-                                onChange={(event) =>
-                                  setFullOutput((previous) => ({
-                                    ...previous,
-                                    [item]: event.target.value,
-                                  }))
-                                }
-                                aria-label={`${SECTION_LABELS[item]}生成预览，可直接修改`}
-                                className="min-h-[84px] w-full resize-y bg-transparent text-[13px] leading-6 text-zinc-800 outline-none"
-                              />
-                            ) : (
-                              <div className="min-h-[84px] whitespace-pre-wrap text-[13px] leading-6 text-zinc-800">
-                                {fullOutput[item] ||
-                                  (active ? "AI 正在写…" : "等待生成")}
-                                {active ? (
-                                  <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-zinc-900 align-middle" />
-                                ) : null}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                      <p className="text-[10.5px] leading-4 text-zinc-400">
-                        采用后会覆盖个人简介，并各新增一条工作经历和项目经历；公司、职位、项目名和时间仍需你补充。
-                      </p>
+                    <div data-qa="ai-full-preview" className="space-y-2">
+                      {fullDraft ? (
+                        <>
+                          <FullResumePreview
+                            draft={fullDraft}
+                            stats={fullStats}
+                          />
+                          <p className="text-[10.5px] leading-4 text-zinc-400">
+                            采用后会新建一份简历并切换过去，当前简历保留在顶部列表里。
+                          </p>
+                        </>
+                      ) : (
+                        <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3 text-[13px] leading-6 text-zinc-500">
+                          {streaming
+                            ? `AI 正在整理整份简历…（已接收 ${fullRaw.length} 字）`
+                            : fullRaw
+                              ? "生成已停止或返回内容不完整，请重新生成。"
+                              : "写一段个人经历后点击生成；没提到的公司、时间、技能会留空。"}
+                          {streaming ? (
+                            <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-zinc-900 align-middle" />
+                          ) : null}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3">
@@ -1025,19 +946,15 @@ export function AiWriter({ resume, onChange }: Props) {
                   {confirmOverwrite ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
                       <p>
-                        {fullMode
-                          ? "整份生成会覆盖个人简介，并新增工作/项目条目；现有经历与项目不会被修改。"
-                          : section === "summary"
-                            ? "个人简介已有内容，采用后会覆盖原文。"
-                            : `该条${SECTION_LABELS[section]}已有描述，采用后会覆盖原文。`}
+                        {section === "summary"
+                          ? "个人简介已有内容，采用后会覆盖原文。"
+                          : `该条${SECTION_LABELS[section]}已有描述，采用后会覆盖原文。`}
                       </p>
                       <div className="mt-2 flex gap-2">
                         <Button
                           variant="primary"
                           size="sm"
-                          onClick={
-                            fullMode ? applyFullAdopt : applyAdopt
-                          }
+                          onClick={applyAdopt}
                         >
                           确认覆盖
                         </Button>
@@ -1057,9 +974,11 @@ export function AiWriter({ resume, onChange }: Props) {
 
             <footer className="border-t border-zinc-100 px-5 py-3">
               <p className="text-[11px] leading-4 text-zinc-400">
-                只发送本面板内容、当前板块文本
-                {jd.trim() ? "与参考 JD" : ""}
-                ，不发送姓名、电话、邮箱或整份简历。
+                {fullMode
+                  ? "只发送这段自述、目标岗位与参考 JD，不发送姓名、电话、邮箱或任何已有简历内容。"
+                  : `只发送本面板内容、当前板块文本${
+                      jd.trim() ? "与参考 JD" : ""
+                    }，不发送姓名、电话、邮箱或整份简历。`}
               </p>
               <div className="mt-2 flex items-center justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={closeDialog}>
@@ -1071,10 +990,10 @@ export function AiWriter({ resume, onChange }: Props) {
                     size="sm"
                     onClick={handleAdopt}
                     disabled={
-                      streaming || (fullMode ? !fullHasOutput : !output.trim())
+                      streaming || (fullMode ? !fullDraft : !output.trim())
                     }
                   >
-                    {fullMode ? "采用整份简历" : "采用到简历"}
+                    {fullMode ? "生成新简历" : "采用到简历"}
                   </Button>
                 ) : null}
               </div>
@@ -1083,5 +1002,157 @@ export function AiWriter({ resume, onChange }: Props) {
         </div>
       ) : null}
     </>
+  );
+}
+
+function joinMeta(parts: Array<string | false | undefined>): string {
+  return parts.filter(Boolean).join(" · ");
+}
+
+function dateRange(start: string, end: string): string {
+  return [start, end].filter(Boolean).join(" – ");
+}
+
+function PreviewCard({
+  title,
+  empty,
+  children,
+}: {
+  title: string;
+  empty: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3">
+      <p className="mb-1.5 text-[11px] text-zinc-400">
+        {title}
+        {empty ? " · 未提及" : ""}
+      </p>
+      <div className="space-y-1.5 text-[13px] leading-6 text-zinc-800">
+        {empty ? <span className="text-zinc-400">待补充</span> : children}
+      </div>
+    </div>
+  );
+}
+
+/** 整份生成的只读预览：按简历板块展示，缺失字段明确标为待补充。 */
+function FullResumePreview({
+  draft,
+  stats,
+}: {
+  draft: Resume;
+  stats: FullResumeStats | null;
+}) {
+  return (
+    <div className="space-y-2">
+      <PreviewCard title="个人简介" empty={!draft.basic.summary}>
+        <p className="whitespace-pre-wrap">{draft.basic.summary}</p>
+      </PreviewCard>
+
+      <PreviewCard
+        title={`教育经历 · ${draft.educations.length} 条`}
+        empty={draft.educations.length === 0}
+      >
+        {draft.educations.map((item) => (
+          <div key={item.id}>
+            <p className="font-medium">
+              {joinMeta([
+                item.school || "学校待补充",
+                item.major,
+                item.degree,
+              ])}
+            </p>
+            {dateRange(item.start, item.end) ? (
+              <p className="text-[11px] text-zinc-400">
+                {dateRange(item.start, item.end)}
+              </p>
+            ) : null}
+            {item.gpa || item.ranking ? (
+              <p className="text-[12px]">
+                {joinMeta([
+                  item.gpa && `GPA ${item.gpa}`,
+                  item.ranking && `排名 ${item.ranking}`,
+                ])}
+              </p>
+            ) : null}
+            {item.courses ? (
+              <p className="text-[12px]">主修：{item.courses}</p>
+            ) : null}
+            {item.honors ? (
+              <p className="text-[12px]">荣誉：{item.honors}</p>
+            ) : null}
+          </div>
+        ))}
+      </PreviewCard>
+
+      <PreviewCard
+        title={`工作经历 · ${draft.experiences.length} 条`}
+        empty={draft.experiences.length === 0}
+      >
+        {draft.experiences.map((item) => (
+          <div key={item.id}>
+            <p className="font-medium">
+              {joinMeta([item.company || "公司待补充", item.role])}
+            </p>
+            {dateRange(item.start, item.end) ? (
+              <p className="text-[11px] text-zinc-400">
+                {dateRange(item.start, item.end)}
+              </p>
+            ) : null}
+            {item.description ? (
+              <p className="whitespace-pre-wrap">{item.description}</p>
+            ) : (
+              <p className="text-[12px] text-zinc-400">工作内容待补充</p>
+            )}
+          </div>
+        ))}
+      </PreviewCard>
+
+      <PreviewCard
+        title={`项目经历 · ${draft.projects.length} 条`}
+        empty={draft.projects.length === 0}
+      >
+        {draft.projects.map((item) => (
+          <div key={item.id}>
+            <p className="font-medium">
+              {joinMeta([item.name || "项目名待补充", item.role])}
+            </p>
+            {dateRange(item.start, item.end) ? (
+              <p className="text-[11px] text-zinc-400">
+                {dateRange(item.start, item.end)}
+              </p>
+            ) : null}
+            {item.description ? (
+              <p className="whitespace-pre-wrap">{item.description}</p>
+            ) : (
+              <p className="text-[12px] text-zinc-400">项目内容待补充</p>
+            )}
+          </div>
+        ))}
+      </PreviewCard>
+
+      <PreviewCard
+        title={`技能 · ${draft.skills.length} 项`}
+        empty={draft.skills.length === 0}
+      >
+        <div className="flex flex-wrap gap-1">
+          {draft.skills.map((skill) => (
+            <span
+              key={skill}
+              className="rounded-full bg-white px-2 py-0.5 text-[11px] text-zinc-600 ring-1 ring-zinc-200"
+            >
+              {skill}
+            </span>
+          ))}
+        </div>
+      </PreviewCard>
+
+      {stats?.missing.length ? (
+        <p className="text-[10.5px] leading-4 text-amber-600">
+          自述里没提到、已留空：{stats.missing.join("、")}
+          。采用后可在表单里补充。
+        </p>
+      ) : null}
+    </div>
   );
 }

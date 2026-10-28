@@ -40,9 +40,13 @@ import { SectionCard } from "@/components/ui/SectionCard";
 type Props = {
   resume: Resume;
   onChange: Dispatch<SetStateAction<Resume>>;
+  /** AI 整份生成采用时新建一份简历；返回是否成功。 */
+  onCreateDocument: (resume: Resume, title: string) => boolean;
 };
 
-type SectionProps = Props & {
+type EditorProps = Pick<Props, "resume" | "onChange">;
+
+type SectionProps = EditorProps & {
   onDelete: (target: DeleteTarget) => void;
 };
 
@@ -714,7 +718,7 @@ function EducationSection({ resume, onChange, onDelete }: SectionProps) {
   );
 }
 
-function SkillsSection({ resume, onChange }: Props) {
+function SkillsSection({ resume, onChange }: EditorProps) {
   const [draft, setDraft] = useState("");
   const analysis = analyzeResume(resume);
 
@@ -814,7 +818,7 @@ function SkillsSection({ resume, onChange }: Props) {
 
 const UNDO_WINDOW_MS = 8000;
 
-export function ResumeForm({ resume, onChange }: Props) {
+export function ResumeForm({ resume, onChange, onCreateDocument }: Props) {
   const [deleted, setDeleted] = useState<DeleteTarget | null>(null);
   const undoTimer = useRef<number | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -998,7 +1002,11 @@ export function ResumeForm({ resume, onChange }: Props) {
 
   return (
     <div className="space-y-4">
-      <AiWriter resume={resume} onChange={onChange} />
+      <AiWriter
+        resume={resume}
+        onChange={onChange}
+        onCreateDocument={onCreateDocument}
+      />
 
       <SectionCard title="基本信息" description="让 HR 第一眼知道你是谁">
         <div className="mb-4 flex items-center gap-4 rounded-xl border border-zinc-100 bg-zinc-50/70 p-3">

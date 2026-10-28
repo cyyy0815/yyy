@@ -33,11 +33,12 @@
 | 15 | AI 功能完善（追加） | ✅ 完成（JD 定制 + 整份生成） |
 | 16 | P4 工程化与分发（追加） | ✅ 完成（单测 / CI / SEO / manifest / 清理） |
 | 17 | P2 收尾：可点击链接（追加） | ✅ 完成（安全 href + 五套模板） |
+| 18 | AI 整份简历结构化生成（追加） | ✅ 完成（自述 → 教育/工作/项目/技能，新建简历） |
 
-## 关机交接（2026-10-27）
+## 关机交接（2026-10-28）
 
-- 当前提交：`4dfa3d4`（`feat(resume): 网站与项目链接可点击并过滤危险协议`），工作区干净。
-- 阶段 0–17 全部完成；最新验证为 `tsc`、`lint`、`npm test`（49 passed）、`npm run qa`、`npm run build` 全部通过。
+- 当前提交：阶段 18 提交（`feat(ai): 支持一段自述生成整份结构化简历`），工作区干净。
+- 阶段 0–18 全部完成；最新验证为 `tsc`、`lint`、`npm test`（55 passed）、`npm run qa`、`npm run build` 全部通过。
 - 下次先读本文件的「当前进度 / 下次继续」与 `PLAN.md`，再运行：
 
   ```bash
@@ -272,10 +273,21 @@
 - [x] QA 新增：网站 / 项目 / 自定义安全链接可点击、`javascript:` 不渲染为链接、页面无控制台错误
 - [x] 验证：`tsc`、`npm run lint`、`npm test`（49 passed）、`npm run qa`、`npm run build` 通过
 
+### 阶段 18 — AI 整份简历结构化生成（追加）✅
+- [x] 新增 `src/lib/ai/fullResume.ts`：整份 JSON 提示词、payload、白名单字段解析、待补充项统计
+- [x] 新增 `/api/ai/full`：自述校验、限流、上游 SSE 转发；公共工具抽到 `src/lib/ai/http.ts`
+- [x] AI 弹窗「整份简历」改为一段自述一次生成，不再串行调用三次
+- [x] 生成结果覆盖简介、教育、工作、项目、技能；不生成姓名、联系方式与链接
+- [x] 缺失字段留空，预览按板块展示并列出「自述里没提到、已留空」的字段
+- [x] 采用时新建一份简历并切换过去，当前简历保留在顶部文档列表
+- [x] mock 上游返回整份 JSON；QA 覆盖结构化预览、写入新简历、旧简历保留与隐私字段
+- [x] 单测新增 6 个（共 55 个）：JSON 围栏、白名单过滤、缺失字段、空白条目、错误格式、payload
+- [x] 验证：`tsc`、`npm run lint`、`npm test`（55 passed）、`npm run qa`、`npm run build` 通过
+
 ## 当前进度
 
-- 最近更新：2026-10-27
-- 状态：**阶段 0–17 全部完成；P1–P4、AI 功能完善与可点击链接全部完成**
+- 最近更新：2026-10-28
+- 状态：**阶段 0–18 全部完成；P1–P4、AI 功能完善、可点击链接与整份结构化生成全部完成**
 - 代码状态：
   - M0：git 仓库、`.env.example`、`scripts/mock-deepseek.mjs` 完成
   - M1：`/api/ai/status`、`/api/ai/generate`、SSE 转换完成
@@ -284,13 +296,24 @@
   - M4：QA AI 检查、README、lint/build/qa、生产模式真实 Key 联调完成
 - P2 进度：3.1 证件照、3.2 自定义板块、3.3 项目起止时间、3.4 教育增强、3.5 多份简历全部完成
 - P3 进度：4.1 多标签页防覆盖、4.2 输入校验、4.3 保存时间与备份提醒、4.4 导入校验、4.5 错误边界、4.6 页码开关/打印对比度/可访问性、4.7 推荐门槛与 JD 缺口一键补、4.8 岗位库与城市覆盖全部完成
-- AI 增强：参考 JD 定制、优化模式空关键词、整份简历串行生成与整体撤销全部完成
+- AI 增强：参考 JD 定制、优化模式空关键词完成；原「串行生成三段文字」已由阶段 18 的结构化整份生成取代
 - P4 进度：Vitest 单元测试、GitHub Actions CI、SEO/OG、manifest 与图标、静态资源清理全部完成；离线缓存未实现
 - P2 收尾：网站 / GitHub / 项目 / 自定义板块链接在五套模板与 PDF 中可点击，危险协议降级为纯文本
-- 工程命令：`npm test` 运行单元测试（49 个）；CI 覆盖 lint + 类型检查 + 单测 + 构建
+- 阶段 18：AI 整份生成改为一段自述 → 结构化 JSON（教育/工作/项目/技能），采用时新建简历、旧简历保留
+- 工程命令：`npm test` 运行单元测试（55 个）；CI 覆盖 lint + 类型检查 + 单测 + 构建
 - 本地地址：http://localhost:3000 （推荐页 http://localhost:3000/#jobs）
 - 一键自检：先 `npm run dev`，再 `npm run qa`（截图输出到 `.screenshots/`）
 - 单一方案文档：**`PLAN.md`**
+
+### 本次会话日志（2026-10-28）
+
+- 阶段 18：新增 `src/lib/ai/fullResume.ts`，整份提示词要求 JSON、白名单解析、缺失字段统计
+- 阶段 18：新增 `/api/ai/full`，复用 SSE、限流与上游重试；公共响应工具抽到 `src/lib/ai/http.ts`
+- 阶段 18：AI 弹窗「整份简历」改为填写一段自述后一次生成，预览按简介 / 教育 / 工作 / 项目 / 技能展示
+- 阶段 18：采用时通过 `useResumeDocuments.createFromResume` 新建一份简历并切换，当前简历保留为快照
+- 阶段 18：不生成姓名、邮箱、电话与链接；未提及的字段留空并在预览里列出待补充项
+- 阶段 18：mock 上游与 QA 场景更新；新增 6 个单测（合计 55 passed）
+- 阶段 18 验证：`tsc`、`lint`、`npm test`（55 passed）、`npm run qa`、`npm run build` 全部通过
 
 ### 本次会话日志（2026-10-27）
 
@@ -392,7 +415,7 @@
 ### 下次继续
 
 1. 先读 `PLAN.md` 与 `PROGRESS.md`「当前进度」
-2. 阶段 0–17 全部完成；P1–P4、AI 增强与可点击链接均已完成
+2. 阶段 0–18 全部完成；P1–P4、AI 增强、可点击链接与整份结构化生成均已完成
 3. 可选后续：P2 剩余缺口（全局撤销、技能分组、双语）、AI 求职信 / 英文输出、离线缓存
 4. 每完成一项跑 `npm run lint`、`npm test`、`npm run build`、`npm run qa` 并更新本文件
 
@@ -406,13 +429,14 @@
 - [x] P1 数据安全与打印交付（侧栏跨页、保存失败、覆盖保护、PDF 文件名等；详见 `PLAN.md`）
 - [x] P4 工程化与分发（Vitest、CI、SEO/OG、manifest、图标清理；离线缓存未做）
 - [x] 简历链接可点击（网站 / GitHub / 项目 / 自定义板块；危险协议过滤）
+- [x] AI 整份简历结构化生成（一段自述 → 教育 / 工作 / 项目 / 技能；采用时新建简历）
 
 ## 如何继续
 
 1. 读「当前进度」和 `PLAN.md` 的「P0：AI 写简历」
 2. 确认 `.env.local` 里的 `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL`
 3. `npm run dev`
-4. AI（P0）、AI 增强、P1、P2（3.1–3.5 及阶段 17 可点击链接）、P3（4.1–4.8）与 P4 均已完成
+4. AI（P0）、AI 增强、P1、P2（3.1–3.5 及阶段 17 可点击链接）、P3（4.1–4.8）、P4 与阶段 18 整份生成均已完成
 5. 每完成一步更新本文件，尤其是「当前进度」「关机交接」与对应阶段勾选项
 
 ## 文件地图
@@ -420,6 +444,7 @@
 ```
 src/
   app/                  layout.tsx / page.tsx / error.tsx / global-error.tsx / not-found.tsx / globals.css（含打印样式）
+    api/ai/             status / generate / full Route Handlers
     manifest.ts         Web App Manifest
     opengraph-image.tsx 1200×630 分享卡片
     icon.svg / apple-icon.png / favicon.ico
@@ -449,7 +474,8 @@ src/
     links.ts            安全链接判断与展示用短链接
     jobBoards.ts        招聘站 URL 与城市编码
     theme.ts            主题色校验、可读性压暗与 CSS 变量
-    __tests__/          Vitest：storage / matching / jdMatch / validate / SSE
+    ai/                 types / config / prompt / fullResume / http / deepseek / client
+    __tests__/          Vitest：storage / matching / jdMatch / validate / SSE / 整份解析（55 个）
 public/
   icon-192.png / icon-512.png  安装清单图标
 scripts/qa.mjs          无头浏览器截图、溢出检查、分页与 PDF 页数自检
@@ -471,4 +497,14 @@ scripts/mock-deepseek.mjs          ✅ 本地 mock 上游
 .env.example                       ✅ 环境变量示例
 src/components/resume/AiWriter.tsx ✅ 单板块/整份生成、参考 JD、可编辑流式预览、撤销
 src/app/api/ai/models/route.ts     ⬜ 可选，暂不实现
+```
+
+### 阶段 18 新增文件
+
+```
+src/app/api/ai/full/route.ts       ✅ 自述校验、限流、整份 SSE 转发
+src/lib/ai/fullResume.ts           ✅ 整份提示词、JSON 白名单解析、待补充项统计
+src/lib/ai/http.ts                 ✅ SSE 编码、限流、错误响应
+src/lib/__tests__/fullResume.test.ts ✅ 6 个解析与 payload 用例
+scripts/qa.mjs                     ✅ 改为拦截 /api/ai/full，验证新建简历与旧简历保留
 ```

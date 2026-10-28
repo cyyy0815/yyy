@@ -7,6 +7,14 @@ import {
   parseSseStream,
   UpstreamError,
 } from "@/lib/ai/deepseek";
+import {
+  clientIp,
+  jsonByteLength,
+  jsonError,
+  MAX_BODY_BYTES,
+  sse,
+  takeRateLimit,
+} from "@/lib/ai/http";
 import { buildChatPayload } from "@/lib/ai/prompt";
 import {
   AI_MODES,
@@ -14,13 +22,11 @@ import {
   AI_TONES,
   type AiErrorCode,
   type AiGenerateRequest,
-  type AiStreamEvent,
   type AiUsage,
 } from "@/lib/ai/types";
 
 export const maxDuration = 60;
 
-const MAX_BODY_BYTES = 64 * 1024;
 const LIMITS = {
   keywords: 2000,
   current: 4000,
@@ -28,12 +34,6 @@ const LIMITS = {
   role: 80,
   years: 20,
 } as const;
-
-const RATE_LIMIT_MAX = 10;
-const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
-const rateBuckets = new Map<string, { count: number; resetAt: number }>();
-
-const encoder = new TextEncoder();
 
 class RequestError extends Error {
   status: number;
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     return jsonError(400, "invalid_request", "无法读取请求内容");
   }
 
-  if (encoder.encode(raw).length > MAX_BODY_BYTES) {
+  if (jsonByteLength(raw) > MAX_BODY_BYTES) {
     return jsonError(413, "payload_too_large", "请求内容过大");
   }
 
@@ -242,37 +242,3 @@ function readString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-function clientIp(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  return (
-    forwarded?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "local"
-  );
-}
-
-function takeRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const bucket = rateBuckets.get(ip);
-
-  if (!bucket || now >= bucket.resetAt) {
-    rateBuckets.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-
-  if (bucket.count >= RATE_LIMIT_MAX) return false;
-
-  bucket.count += 1;
-  return true;
-}
-
-function jsonError(status: number, code: AiErrorCode, message: string) {
-  return Response.json(
-    { code, message },
-    { status, headers: { "Cache-Control": "no-store" } },
-  );
-}
-
-function sse(event: AiStreamEvent["event"], data: unknown) {
-  return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-}

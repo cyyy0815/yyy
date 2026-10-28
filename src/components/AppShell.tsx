@@ -313,6 +313,24 @@ function ResumeWorkspace() {
     });
   };
 
+  /** AI 整份生成采用：新建一份简历并切换过去，当前简历作为快照保留。 */
+  const handleCreateGeneratedResume = (
+    generated: Resume,
+    baseTitle: string,
+  ): boolean => {
+    const title = documents.createFromResume(generated, baseTitle);
+    if (!title) {
+      setNotice({
+        type: "error",
+        message: "保存生成结果失败：浏览器存储不可用或空间已满",
+      });
+      return false;
+    }
+    setResumeVersion((value) => value + 1);
+    setNotice({ type: "ok", message: `已生成新简历「${title}」` });
+    return true;
+  };
+
   const handleDuplicateDocument = () => {
     if (documents.duplicateCurrent()) {
       setResumeVersion((value) => value + 1);
@@ -632,6 +650,7 @@ function ResumeWorkspace() {
                   key={resumeVersion}
                   resume={resume}
                   onChange={updateResume}
+                  onCreateDocument={handleCreateGeneratedResume}
                 />
                 <p className="mt-4 flex items-center gap-1.5 px-1 text-[11px] text-zinc-400">
                   <span

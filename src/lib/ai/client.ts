@@ -1,4 +1,8 @@
-import type { AiGenerateRequest, AiUsage } from "./types";
+import type {
+  AiFullResumeRequest,
+  AiGenerateRequest,
+  AiUsage,
+} from "./types";
 
 type Handlers = {
   onDelta: (text: string) => void;
@@ -21,15 +25,16 @@ function isAbortError(error: unknown): boolean {
   );
 }
 
-/** 读取 /api/ai/generate 的 SSE；abort 由调用方通过 signal 控制。 */
-export async function streamGenerate(
-  input: AiGenerateRequest,
+/** 读取一个 AI SSE 接口；abort 由调用方通过 signal 控制。 */
+async function streamAi(
+  path: string,
+  input: AiGenerateRequest | AiFullResumeRequest,
   signal: AbortSignal,
   handlers: Handlers,
 ): Promise<void> {
   let response: Response;
   try {
-    response = await fetch("/api/ai/generate", {
+    response = await fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
@@ -110,6 +115,22 @@ export async function streamGenerate(
   if (!settled) {
     handlers.onError("stream_error", "连接中断，请重试");
   }
+}
+
+export function streamGenerate(
+  input: AiGenerateRequest,
+  signal: AbortSignal,
+  handlers: Handlers,
+): Promise<void> {
+  return streamAi("/api/ai/generate", input, signal, handlers);
+}
+
+export function streamFullResume(
+  input: AiFullResumeRequest,
+  signal: AbortSignal,
+  handlers: Handlers,
+): Promise<void> {
+  return streamAi("/api/ai/full", input, signal, handlers);
 }
 
 function parseEventBlock(

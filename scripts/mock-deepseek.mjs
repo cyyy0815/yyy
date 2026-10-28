@@ -28,8 +28,54 @@ const SAMPLES = {
     "负责数据看板项目的前端架构与核心图表开发，支撑日均 20 万次访问。\n引入虚拟滚动与增量渲染，长列表滚动帧率稳定在 55fps 以上。\n沉淀图表配置协议，业务方接入成本从 2 天缩短到 2 小时。",
 };
 
+const FULL_RESUME = JSON.stringify({
+  headline: "前端工程师",
+  city: "上海",
+  summary:
+    "3 年前端开发经验，主导中后台平台重构，将首屏加载时间降低 40%。熟悉 React 与 TypeScript，能独立负责从需求评审到上线交付的完整流程。",
+  intent: {
+    targetRole: "前端工程师",
+    targetCity: "上海",
+    experience: "3-5 年",
+  },
+  educations: [
+    {
+      school: "示例大学",
+      major: "计算机科学与技术",
+      degree: "本科",
+      start: "2017.09",
+      end: "2021.06",
+      gpa: "",
+      ranking: "",
+      courses: "",
+      honors: "",
+    },
+  ],
+  experiences: [
+    {
+      company: "示例科技",
+      role: "前端工程师",
+      start: "2021.07",
+      end: "至今",
+      description: SAMPLES.experience,
+    },
+  ],
+  projects: [
+    {
+      name: "数据看板",
+      role: "前端负责人",
+      start: "2022.03",
+      end: "2023.06",
+      description: SAMPLES.project,
+      link: "",
+    },
+  ],
+  skills: ["React", "TypeScript", "Node.js"],
+});
+
 function pickSample(body) {
   const text = (body.messages ?? []).map((m) => m.content ?? "").join("\n");
+  if (text.includes("结构化中文简历")) return FULL_RESUME;
   if (text.includes("个人简介")) return SAMPLES.summary;
   if (text.includes("工作经历")) return SAMPLES.experience;
   if (text.includes("项目经历")) return SAMPLES.project;
