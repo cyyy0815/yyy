@@ -5,7 +5,8 @@ import {
   parseImportFile,
   parseResumeJSON,
 } from "../storage";
-import { createEmptyResume } from "../types";
+import { RESUME_SCHEMA_VERSION } from "../schema";
+import { createEmptyResume, DEFAULT_SECTION_ORDER } from "../types";
 
 describe("normalizeResume", () => {
   it("非对象输入返回空白简历与默认主题", () => {
@@ -90,6 +91,13 @@ describe("normalizeResume", () => {
     expect(resume.theme.accent).toBe("#be123c");
   });
 
+  it("旧数据没有版本号时补当前 schema 版本", () => {
+    expect(normalizeResume({ basic: { name: "林一" } }).schemaVersion).toBe(
+      RESUME_SCHEMA_VERSION,
+    );
+    expect(createEmptyResume().schemaVersion).toBe(RESUME_SCHEMA_VERSION);
+  });
+
   it("旧数据没有技能分组字段时补空，且不改变扁平技能", () => {
     const resume = normalizeResume({
       basic: { name: "林一" },
@@ -160,6 +168,28 @@ describe("normalizeResume", () => {
       false,
     ]);
   });
+
+  it("旧简历缺少 layout 时补齐默认顺序并显示全部板块", () => {
+    const resume = normalizeResume({ basic: { name: "林一" } });
+    expect(resume.layout.order).toEqual(DEFAULT_SECTION_ORDER);
+    expect(resume.layout.hidden).toEqual([]);
+  });
+
+  it("收敛板块布局中的未知、重复与缺失项", () => {
+    const resume = normalizeResume({
+      basic: { name: "林一" },
+      layout: {
+        order: ["skills", "bogus", "skills"],
+        hidden: ["projects", "nope", "projects"],
+      },
+    });
+    expect(resume.layout.order[0]).toBe("skills");
+    expect(new Set(resume.layout.order)).toEqual(
+      new Set(DEFAULT_SECTION_ORDER),
+    );
+    expect(resume.layout.order).toHaveLength(DEFAULT_SECTION_ORDER.length);
+    expect(resume.layout.hidden).toEqual(["projects"]);
+  });
 });
 
 describe("parseResumeJSON", () => {
@@ -218,8 +248,29 @@ describe("parseResumeJSON", () => {
       '{"basic":{"name":"x"},"skillMeta":{"React":{"group":1}}}',
     ],
     ["主题不是对象", '{"basic":{"name":"x"},"theme":"red"}'],
+    ["布局不是对象", '{"basic":{"name":"x"},"layout":[]}'],
+    [
+      "布局顺序不是数组",
+      '{"basic":{"name":"x"},"layout":{"order":"skills"}}',
+    ],
+    [
+      "布局包含未知板块",
+      '{"basic":{"name":"x"},"layout":{"hidden":["bogus"]}}',
+    ],
   ])("拒绝 %s", (_label, text) => {
     expect(parseResumeJSON(text).ok).toBe(false);
+  });
+
+  it("拒绝来自更新 schema 的简历文件", () => {
+    const result = parseResumeJSON(
+      JSON.stringify({
+        schemaVersion: RESUME_SCHEMA_VERSION + 1,
+        basic: { name: "未来数据" },
+      }),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toContain("数据版本");
   });
 
   it("拒绝超过 5MB 的文本", () => {
@@ -242,6 +293,34 @@ describe("parseImportFile", () => {
     if (result.kind !== "single") return;
     expect(result.resume.basic.name).toBe("林一");
     expect(result.template).toBe("classic");
+  });
+
+  it("解析单份导出文件并保留标题与模板", () => {
+    const result = parseImportFile(
+      JSON.stringify({
+        format: "resume-workshop-single",
+        version: 1,
+        title: "前端主简历",
+        template: "sidebar",
+        resume: {
+          basic: { name: "林一" },
+          skills: [" React "],
+        },
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "single") return;
+    expect(result.title).toBe("前端主简历");
+    expect(result.template).toBe("sidebar");
+    expect(result.resume.basic.name).toBe("林一");
+    expect(result.resume.skills).toEqual(["React"]);
+  });
+
+  it("单份导出文件缺少简历时给出明确错误", () => {
+    const result = parseImportFile(
+      JSON.stringify({ format: "resume-workshop-single", version: 1 }),
+    );
+    expect(result.ok).toBe(false);
   });
 
   it("解析全部简历备份并恢复当前文档", () => {
@@ -277,6 +356,100 @@ describe("parseImportFile", () => {
     });
     expect(result.documents[0].resume.skills).toEqual(["React"]);
     expect(result.documents[1].template).toBe("modern");
+    expect(result.applications).toEqual([]);
+  });
+
+  it("解析整库备份中的投递记录并收敛脏数据", () => {
+    const result = parseImportFile(
+      JSON.stringify({
+        format: "resume-workshop",
+        version: 3,
+        activeId: "a",
+        documents: [
+          {
+            id: "a",
+            title: "主简历",
+            template: "modern",
+            resume: { basic: { name: "林一" } },
+          },
+        ],
+        applications: [
+          {
+            id: "job-1",
+            company: " 某某科技 ",
+            role: "前端工程师",
+            status: "interview",
+            jd: "熟悉 React",
+            appliedAt: "2026-10-01",
+            updatedAt: 2000,
+          },
+          { company: "", role: "", jd: "", note: "" },
+        ],
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "library") return;
+    expect(result.applications).toHaveLength(1);
+    expect(result.applications[0]).toMatchObject({
+      id: "job-1",
+      company: "某某科技",
+      status: "interview",
+      appliedAt: "2026-10-01",
+    });
+  });
+
+  it("拒绝更新版本的整库备份与单份备份", () => {
+    const newer = RESUME_SCHEMA_VERSION + 1;
+    const archive = parseImportFile(
+      JSON.stringify({
+        format: "resume-workshop",
+        version: 3,
+        schemaVersion: newer,
+        documents: [
+          {
+            id: "a",
+            title: "未来备份",
+            template: "modern",
+            resume: { basic: { name: "林一" } },
+          },
+        ],
+      }),
+    );
+    expect(archive.ok).toBe(false);
+
+    const document = parseImportFile(
+      JSON.stringify({
+        format: "resume-workshop",
+        version: 3,
+        activeId: "a",
+        documents: [
+          {
+            id: "a",
+            title: "未来备份",
+            template: "modern",
+            resume: { schemaVersion: newer, basic: { name: "林一" } },
+          },
+        ],
+      }),
+    );
+    expect(document.ok).toBe(false);
+
+    const single = parseImportFile(
+      JSON.stringify({
+        format: "resume-workshop-single",
+        version: 1,
+        schemaVersion: newer,
+        title: "未来简历",
+        template: "modern",
+        resume: { basic: { name: "林一" } },
+      }),
+    );
+    expect(single.ok).toBe(false);
+
+    const archiveFormat = parseImportFile(
+      JSON.stringify({ format: "resume-workshop", version: 99, documents: [] }),
+    );
+    expect(archiveFormat.ok).toBe(false);
   });
 
   it("activeId 缺失时回退到第一份，重复 id 会重新生成", () => {

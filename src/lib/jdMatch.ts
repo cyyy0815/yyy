@@ -1,5 +1,6 @@
 import { JOB_PROFILES } from "./jobProfiles";
 import { resumeHasSkill, textHasSkill } from "./matching";
+import { canonicalSkillKey } from "./skillSynonyms";
 import type { Resume } from "./types";
 
 /** 岗位画像之外的常见技术/工具关键词 */
@@ -113,7 +114,8 @@ const DICTIONARY: string[] = (() => {
   ];
   const seen = new Set<string>();
   return all.filter((skill) => {
-    const key = skill.toLowerCase().replace(/\s+/g, "");
+    // 同义写法只保留第一个规范标签，避免 JS / JavaScript 在结果里重复出现。
+    const key = canonicalSkillKey(skill);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -177,9 +179,15 @@ export type JdAnalysis = {
   suggestions: string[];
 };
 
+/** 从 JD 中识别岗位画像与常见技能库里的关键词。 */
+export function extractJdKeywords(jd: string): string[] {
+  const text = jd.trim();
+  return text ? DICTIONARY.filter((skill) => textHasSkill(text, skill)) : [];
+}
+
 export function analyzeJd(jd: string, resume: Resume): JdAnalysis {
   const text = jd.trim();
-  const jdKeywords = text ? DICTIONARY.filter((skill) => textHasSkill(text, skill)) : [];
+  const jdKeywords = extractJdKeywords(text);
   const matched = jdKeywords.filter((skill) => resumeHasSkill(resume, skill));
   const missing = jdKeywords.filter((skill) => !matched.includes(skill));
   const keywordCount = jdKeywords.length;

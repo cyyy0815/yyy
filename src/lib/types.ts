@@ -1,3 +1,4 @@
+import { RESUME_SCHEMA_VERSION } from "./schema";
 import { DEFAULT_ACCENT } from "./theme";
 
 export type CustomItem = {
@@ -99,7 +100,31 @@ export type SkillMeta = {
   group: string;
 };
 
+export const RESUME_SECTION_KEYS = [
+  "summary",
+  "experience",
+  "projects",
+  "custom",
+  "education",
+  "skills",
+  "intent",
+] as const;
+
+export type ResumeSectionKey = (typeof RESUME_SECTION_KEYS)[number];
+
+/** 默认顺序接近经典模板；隐藏只影响预览 / 打印 / 导出，不删除数据。 */
+export const DEFAULT_SECTION_ORDER: ResumeSectionKey[] = [
+  ...RESUME_SECTION_KEYS,
+];
+
+export type ResumeLayout = {
+  order: ResumeSectionKey[];
+  hidden: ResumeSectionKey[];
+};
+
 export type Resume = {
+  /** 数据结构版本；旧数据读取时由 normalizeResume 补齐 */
+  schemaVersion: number;
   basic: BasicInfo;
   intent: JobIntent;
   educations: Education[];
@@ -112,6 +137,8 @@ export type Resume = {
   skillMeta: Record<string, SkillMeta>;
   /** 分组的展示顺序；空数组表示全部未分组 */
   skillGroups: string[];
+  /** 内置板块的显示顺序与隐藏状态；旧数据没有时按默认补齐 */
+  layout: ResumeLayout;
   theme: ResumeTheme;
 };
 
@@ -141,6 +168,7 @@ export function newId(): string {
 
 export function createEmptyResume(): Resume {
   return {
+    schemaVersion: RESUME_SCHEMA_VERSION,
     basic: {
       name: "",
       headline: "",
@@ -167,6 +195,7 @@ export function createEmptyResume(): Resume {
     skills: [],
     skillMeta: {},
     skillGroups: [],
+    layout: { order: [...DEFAULT_SECTION_ORDER], hidden: [] },
     theme: { accent: DEFAULT_ACCENT },
   };
 }

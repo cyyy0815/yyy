@@ -38,11 +38,21 @@
 | 20 | 全局撤销 / 重做 + 真实 Key 验证（追加） | ✅ 完成（撤销栈 + 快捷键 + `/api/ai/full` 实测） |
 | 21 | 技能分组与熟练度（追加） | ✅ 完成（分组增删改排序 + 熟练度 + 五套模板展示） |
 | 22 | AI 求职信（追加） | ✅ 完成（求职信生成 + 预览编辑 + 复制下载） |
+| 23 | 投递看板与多 JD 管理（追加） | ✅ 完成（状态看板 + 独立 JD + 整库备份） |
+| 24 | 单份导出与合并导入（追加） | ✅ 完成（单份分享文件 + 追加简历 / 投递记录） |
+| 25 | ATS 文本导出与关键词覆盖（追加） | ✅ 完成（纯文本 / Markdown + JD 覆盖率） |
+| 26 | AI 生成后的事实核对（追加） | ✅ 完成（数字 / 技能 / 名称 + 实时提示） |
+| 27 | 内置板块显隐 / 排序与一页适配（追加） | ✅ 完成（布局编辑 + 五套模板 + 页数实时适配） |
+| 28 | 统一 Dialog 与可访问性（追加） | ✅ 完成（焦点陷阱 / 焦点归还 + 滚动锁 + 跳转链接 / reduced motion） |
+| 29 | 数据版本与持久化历史（追加） | ✅ 完成（schemaVersion + 刷新后仍可撤销 / 重做） |
+| 30 | QA 进 CI 与组件测试（追加） | ✅ 完成（生产模式浏览器 QA + Dialog / 布局组件测试） |
+| 31 | 安全响应头（追加） | ✅ 完成（CSP + HSTS + COOP / CORP + 关闭 X-Powered-By） |
+| 32 | 岗位库与技能同义词（追加） | ✅ 完成（26 类画像 + JS/TS/K8s 等别名归一 + C 系边界） |
 
 ## 关机交接（2026-10-28）
 
-- 阶段 20–22 的代码（撤销 / 重做、技能分组、AI 求职信）已提交，代码提交为 `bff465b`；文档随本次提交更新。
-- 阶段 0–22 全部完成；最新验证为 `tsc`、`lint`、`npm test`（93 passed）、`npm run qa`、`npm run build` 全部通过。
+- 阶段 20–22 的代码（撤销 / 重做、技能分组、AI 求职信）已提交，代码提交为 `bff465b`；阶段 23–32（投递看板、单份导出 / 合并导入、ATS、事实核对、板块布局、Dialog / 可访问性、数据版本 / 持久化历史、QA 进 CI、安全响应头、岗位库 / 技能同义词）及文档已提交，提交为 `eaccbb5`，工作区干净。
+- 阶段 0–32 全部完成；最新验证为 `tsc`、`lint`、`npm test`（171 passed，18 个文件）、`npm run qa`（177 项检查，开发与生产模式均通过）、`npm run build` 全部通过。
 - `/api/ai/full` 已用 `.env.local` 中的真实 DeepSeek Key 验证：长自述返回合法 JSON，`response_format: json_object` 生效，`usage` 为 prompt 1489 / completion 2245，未触发 4000 token 上限，输出不含联系方式。
 - 下次先读本文件的「当前进度 / 下次继续」与 `PLAN.md`，再运行：
 
@@ -51,7 +61,7 @@
   ```
 
   打开 http://localhost:3000 ；AI 功能依赖 `.env.local` 中的 DeepSeek 配置，改动环境变量后需重启 dev server。
-- 尚未开始的可选项：双语简历、英文输出、离线缓存。开始前先确认需求。
+- 下一优先级：双语 / 英文输出 / 离线缓存等可选项；开始前先确认需求与范围。
 
 ## 阶段明细
 
@@ -339,10 +349,118 @@
 - [x] QA 新增 7 项：默认带入岗位 / 年限 / 素材 / 已存 JD、生成后可编辑与复制下载、请求仅含素材且不含姓名与联系方式、不写入简历、无配置时显示步骤
 - [x] 验证：`tsc`、`npm run lint`、`npm test`（93 passed）、`npm run qa`、`npm run build` 通过
 
+### 阶段 23 — 投递看板与多 JD 管理（追加）✅
+- [x] 新增 `src/lib/applications.ts`：投递记录类型、五种状态（想投 / 已投 / 面试中 / Offer / 未通过）、日期与字段收敛、本地存储读写
+- [x] 每条投递独立保存公司、岗位、城市、状态、JD、求职信、备注、关联简历、投递日期与下一步日期，彼此不覆盖
+- [x] 新增 `useApplications`：同标签页通过自定义事件同步，其他标签页通过 `storage` 事件同步；写入失败不假装成功
+- [x] 新增 `ApplicationBoard`：五列状态看板、新建 / 编辑 / 删除、状态下拉流转、展开查看 JD / 求职信 / 备注
+- [x] 新建投递默认带入当前 JD；任意一条记录的 JD 可「设为当前 JD」，之后 JD 匹配与 AI 求职信会使用它
+- [x] 整库备份升级到 `version: 3`，包含投递记录；旧版 `version: 2` 备份仍可导入，投递记录按空数组处理
+- [x] 单测新增 10 个（共 103 个）：字段收敛、状态回退、非法日期、空白记录、重复 id、排序、状态标签与空白工厂
+- [x] QA 新增 8 项：默认带入 JD、新建保存、状态流转、设为当前 JD、备份包含记录、刷新保留、390px 无溢出、无控制台错误，截图 `qa-applications.png`
+- [x] 验证：`tsc`、`npm run lint`、`npm test`（103 passed）、`npm run qa`、`npm run build` 通过
+
+### 阶段 24 — 单份导出与合并导入（追加）✅
+- [x] 新增单份导出格式 `resume-workshop-single` v1：只包含当前简历、标题与模板，文件名 `<标题>-简历.json`，不会带出其他简历或投递记录
+- [x] `parseImportFile` 识别单份导出文件，同时继续兼容旧版裸 JSON 与整库备份；缺少 `resume` 或结构非法时给出明确错误
+- [x] 简历栏新增「导出当前」与「合并导入」；顶栏「导入」仍为整库替换，两种入口通过导入模式区分
+- [x] 合并导入单份文件：作为新简历追加并切换过去，保留原简历；标题冲突自动变为「标题 2」「标题 3」
+- [x] 合并导入整库备份：追加全部简历与投递记录，不覆盖当前简历，也不切换当前文档
+- [x] 修复 `mergeLibrary` 把当前文档重复写入 `others` 的问题，合并后文档列表不再出现同标题副本
+- [x] 手机端简历栏放六个操作按钮时仍在视口内；QA 同步更新按钮清单并检查每个按钮的左右边界
+- [x] 单测新增 2 个（共 105 个）：单份导出文件保留标题与模板、缺少简历时报错
+- [x] QA 新增 4 项：单份文件字段与文件名、单份合并保留原简历、整库合并追加简历与投递记录、页面无控制台错误
+- [x] 验证：`tsc`、`npm run lint`、`npm test`（105 passed）、`npm run qa`、`npm run build` 通过
+
+### 阶段 25 — ATS 文本导出与关键词覆盖（追加）✅
+- [x] 新增 `src/lib/ats.ts`：把简历排成线性纯文本或 Markdown，包含联系方式、求职意向、简介、教育、工作、项目、自定义板块与分组技能
+- [x] 照片、主题色、分栏与技能熟练度不进入文本；隐藏的自定义板块与空板块不输出，保证 ATS 解析稳定
+- [x] 单行描述保留为段落，多行描述自动转为要点；项目与自定义条目保留链接，日期区间统一为 `开始 – 结束`
+- [x] 简历预览工具栏新增「ATS 文本」按钮；弹窗内切换纯文本 / Markdown、实时预览，并下载 `<标题>-ATS.txt` / `.md`（UTF-8）
+- [x] 弹窗自动读取职位推荐页保存的 JD，也可直接粘贴；实时显示关键词覆盖率、已覆盖与未覆盖关键词
+- [x] `jdMatch` 抽出 `extractJdKeywords`，JD 匹配与 ATS 覆盖检查共用同一关键词库，原有分析行为不变
+- [x] 覆盖检查只判断导出文本是否出现关键词，不推断真实技能水平；无 JD 或无关键词时给出明确提示
+- [x] 单测新增 6 个（共 111 个）：纯文本结构、空简历、Markdown 标题、空板块、覆盖率与零关键词
+- [x] QA 新增 8 项：纯文本内容、关键词缺口、桌面弹窗无溢出、txt 下载、Markdown 下载、390px 无溢出与两端无控制台错误，截图 `qa-ats.png`
+- [x] 验证：`tsc`、`npm run lint`、`npm test`（111 passed）、`npm run qa`、`npm run build` 通过
+
+### 阶段 26 — AI 生成后的事实核对（追加）✅
+- [x] 新增 `src/lib/ai/factCheck.ts`：对生成内容做字面核对，只提示、不自动改动，也不阻止采用
+- [x] 数字核对：提取普通数字、百分比与日期；允许日期格式差异（「2021 年」与「2021.06」），忽略「从 0 到 1」等惯用表述
+- [x] 技能核对：复用 JD 关键词库与大小写 / `.js` 别名规则，标出素材里没有的技能
+- [x] 整份简历额外核对学校、专业、公司与项目名；公司 / 学校允许省略「有限公司」「大学」等后缀
+- [x] 参考 JD 明确不作为事实来源：JD 里出现但用户素材没有的技能或数字仍会提示
+- [x] 单段 AI 写简历、AI 整份简历与 AI 求职信预览下均显示核对结果；无问题时显示绿色「未发现素材之外的内容」
+- [x] 弹窗输入变化时实时重算；结果按「数字 / 技能 / 名称」分类，最多展示 6 项并提示剩余数量
+- [x] 单测新增 7 个（共 118 个）：数字、技能、日期格式与「0 到 1」、空素材、整份结构化名称、公司后缀、空简历
+- [x] QA 新增 3 项：单段追加无依据内容后的实时提示、整份学校 / 专业 / 数字、求职信数字
+- [x] 验证：`tsc`、`npm run lint`、`npm test`（118 passed）、`npm run qa`、`npm run build` 通过
+
+### 阶段 27 — 内置板块显隐 / 排序与一页适配（追加）✅
+- [x] `Resume` 新增 `layout: { order, hidden }`：保存七个内置板块（简介 / 工作 / 项目 / 自定义 / 教育 / 技能 / 意向）的顺序与显隐
+- [x] `normalizeSectionLayout` 收敛旧数据：缺少 `layout` 时按默认顺序补齐，丢弃未知 / 重复板块；导入校验新增 layout 结构与板块名检查
+- [x] 新增 `SectionLayoutEditor`：逐板块上移 / 下移、隐藏 / 显示、恢复默认，并显示内容数量；隐藏只影响展示，不删除数据
+- [x] 五套模板统一遵守隐藏；单栏模板与主栏按保存顺序渲染，现代 / 侧栏的意向、技能、教育固定在侧栏
+- [x] ATS 纯文本 / Markdown 导出同步跳过隐藏板块，JSON 备份仍保留全部内容
+- [x] 新增 `OnePageFitDialog`：预览工具栏「一页适配」实时显示页数，可隐藏建议项（意向 / 自定义板块）、逐项开关、恢复打开时状态，并可一键换用紧凑模板
+- [x] `ResumePreview` 通过 `onPageCountChange` 上报页数，隐藏板块后弹窗内的页数即时更新；截图 `qa-layout.png` / `qa-fit.png`
+- [x] 单测新增 19 个（共 137 个）：布局收敛、排序、显隐、空内容、自定义板块、边界移动、适配建议、ATS 隐藏导出与旧 JSON 兼容
+- [x] QA 新增 17 项：七个板块、默认顺序、五套模板隐藏、恢复显示、板块上移、经典模板顺序、恢复默认、页数提示、建议项隐藏、单项恢复、适配回滚、弹窗关闭、桌面 / 390px 无溢出与无控制台错误
+- [x] 验证：`tsc`、`npm run lint`、`npm test`（137 passed）、`npm run qa`（160 项）、`npm run build` 通过
+
+### 阶段 28 — 统一 Dialog 与可访问性（追加）✅
+- [x] 新增 `src/components/ui/Dialog.tsx`：Portal 到 `document.body`，统一遮罩、标题 / 描述、滚动区与底部；支持 `sm` / `md` / `lg` / `xl` 尺寸
+- [x] 焦点管理：打开时焦点进入面板（保留表单自身的 `autoFocus`），`Tab` / `Shift+Tab` 在弹窗内循环，`focusin` 兜底拉回；关闭后焦点归还触发按钮
+- [x] 交互：`Escape` 关闭（忽略输入法组合）、点击遮罩关闭、锁定背景滚动并补偿滚动条宽度、`role="dialog"` / `aria-modal` / `aria-labelledby` / `aria-describedby`
+- [x] 五个弹窗迁移到统一组件：AI 单段 / 整份、AI 求职信、投递编辑、ATS 导出、一页适配；删除各自重复的 Escape 与滚动锁代码，保留原有 `data-qa` 选择器
+- [x] 全局 `:focus-visible` 键盘焦点环（按钮 / 链接 / tab 等，输入框保留自身 focus ring）；`prefers-reduced-motion` 下动画与过渡接近即时
+- [x] 顶栏新增「跳到主要内容」链接，`main#main-content` 可聚焦并带 `scroll-mt`；移动端编辑 / 预览切换与模板组补 `aria-label` / `aria-controls`
+- [x] QA 新增 7 项：模态语义与滚动锁、Tab / Shift+Tab 焦点陷阱、Escape 关闭并归还焦点、完成关闭归还焦点、跳转链接为首个焦点且可见、跳转后焦点落到 `main`、reduced motion 生效
+- [x] 验证：`tsc`、`npm run lint`、`npm test`（137 passed）、`npm run qa`（167 项）、`npm run build` 通过
+
+### 阶段 29 — 数据版本与持久化历史（追加）✅
+- [x] 新增 `src/lib/schema.ts`：`RESUME_SCHEMA_VERSION = 1`，缺失版本按 0 处理；`Resume` 增加 `schemaVersion`，旧数据由 `normalizeResume` 收敛后补齐，空白 / 示例简历同样带版本
+- [x] 单份与整库导出写入 `schemaVersion`；导入时兼容旧裸 JSON / 旧备份，遇到更高的 `schemaVersion` 或备份格式版本给出明确错误，避免旧程序静默丢字段
+- [x] 新增 `src/lib/historyStorage.ts`：撤销 / 重做栈写入 `sessionStorage`，最多 20 步、1.5MB 字符预算；超限时丢弃最旧步骤，配额不足时逐步缩小并重试
+- [x] `createHistory` 增加 `exportState` / `importState`；`useResume` 在启动时恢复历史、保存成功后同步持久化，切换 / 新建 / 导入简历时清除
+- [x] 刷新页面后撤销 / 重做仍可用；示例简历不读取旧历史，避免套用到别的文档
+- [x] 单测新增 12 个（共 149 个）：schema 版本补齐、未来版本拒绝、历史导出 / 恢复、载荷往返、条数与体积裁剪、损坏载荷与 sessionStorage 配额
+- [x] QA 新增 6 项：历史写入会话存储并带版本、刷新后撤销可用、空闲重做栈为空、刷新后撤销恢复、刷新后重做可用、刷新后重做恢复修改（合计 173 项）
+- [x] 验证：`tsc`、`npm run lint`、`npm test`（149 passed）、`npm run qa`（173 项）、`npm run build` 通过
+
+### 阶段 30 — QA 进 CI 与组件测试（追加）✅
+- [x] 接入组件测试底座：`vitest.config.mts`（React 插件、jsdom、tsconfig paths）、`src/test/setup.ts`（jest-dom 匹配器 + 每个用例后自动 cleanup），新增 Testing Library / user-event / jsdom 依赖
+- [x] 新增 `Dialog` 组件测试 4 个：模态语义 / 标题描述 / 初始焦点与滚动锁；Escape 忽略输入法组合、关闭后归还焦点并恢复滚动；遮罩 / 关闭按钮 / 面板内部点击；Tab 与 Shift+Tab 焦点循环
+- [x] 新增 `SectionLayoutEditor` 组件测试 3 个：七个板块与默认顺序 / 内容数量 / 边界按钮；隐藏不删除内容并可重新显示；上移改变顺序、恢复默认同时还原顺序与显隐
+- [x] `scripts/qa.mjs` 自动探测 Chrome：支持 `CHROME_PATH` / `PUPPETEER_EXECUTABLE_PATH`，并覆盖 Windows、macOS、Linux 常见安装路径；找不到时输出明确错误并非 0 退出
+- [x] CI 在构建后安装 `fonts-noto-cjk`、启动 `next start`，最多等待 60 秒，再执行完整 `npm run qa`；步骤退出时结束服务，失败时上传 `.screenshots`，job 超时放宽到 25 分钟
+- [x] 单测新增 7 个（共 156 个，16 个文件）；QA 检查数保持 173 项
+- [x] 验证：生产模式 `npm run build` + `npm run start` + `npm run qa` 通过；`npm run lint`、`npx tsc --noEmit`、`npm test`（156 passed）、`npm run build` 通过
+
+### 阶段 31 — 安全响应头（追加）✅
+- [x] 新增 `src/lib/securityHeaders.ts`：统一生成 `X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、严格 Referrer-Policy、Permissions-Policy、COOP / CORP、HSTS 与 CSP
+- [x] CSP：`default-src 'self'`；脚本 / 样式保留 inline 以兼容 Next 启动脚本与行内样式；图片允许 `data:` / `blob:`；`connect-src 'self'`；禁止 object / frame；限制 `base-uri` 与 `form-action`
+- [x] 开发模式额外放行 `unsafe-eval` 与 HMR WebSocket；生产模式不含 `unsafe-eval`
+- [x] `next.config.ts` 对 `/:path*` 应用全部响应头，并设置 `poweredByHeader: false` 隐藏 `X-Powered-By`
+- [x] 单测新增 3 个（共 159 个，17 个文件）：生产基础头与 CSP、开发放行 eval / WebSocket、响应头无重复
+- [x] QA 新增 2 项：安全响应头完整、未暴露 `X-Powered-By`（合计 175 项）
+- [x] 验证：开发与生产模式 `npm run qa` 均通过；`npx tsc --noEmit`、`npm run lint`、`npm test`（159 passed）、`npm run build` 通过
+- [x] 边界：CSP 未使用 nonce，避免把静态页面改为按请求动态渲染；严格 nonce CSP 留作后续部署增强
+
+### 阶段 32 — 岗位库与技能同义词（追加）✅
+- [x] 新增 `src/lib/skillSynonyms.ts`：JS / ECMAScript、TS、Node、ReactJS、VueJS、NextJS、K8s、Golang、Postgres / PG、SpringBoot、CPP / C/C++、CSharp / C Sharp、CICD / 持续集成、PowerBI、sklearn、REST、ABTest 等别名归一到规范写法
+- [x] 比较键保留 `+` 与 `#`，修复原来 `C` / `C++` / `C#` 被压成同一个键的问题；正文扫描对单字母 `C` 加后缀保护，避免命中 `C++` / `C#`
+- [x] `JS` 别名不匹配 `Node.js` / `Next.js` 等 `.js` 后缀，JD 关键词不会凭空多出一个 JavaScript
+- [x] `textHasSkill` / `resumeHasSkill` / `skillMatches` 全部走同义词；JD 词库按规范键去重，`K8s` / `Golang` / `Postgres` / `SpringBoot` 输出规范标签
+- [x] 岗位画像从 18 类扩到 26 类：Go 后端、数据工程、网络安全、售前 / 实施、供应链 / 采购、法务 / 合规、行政 / 助理、嵌入式；并为现有岗位补充 Spring Boot、K8s、大模型、财务分析等别名
+- [x] 单测新增 12 个（4 个同义词 + 8 个新画像参数化用例，合计 171 个，18 个文件）；QA 新增 2 项（网络安全画像、JD 同义词归一，合计 177 项）
+- [x] 验证：开发与生产模式 `npm run qa`（177 项）均通过；`npx tsc --noEmit`、`npm run lint`、`npm test`（171 passed）、`npm run build` 通过
+- [x] 边界：同义词只收录含义明确的写法，不合并 `Java` / `JavaScript`、`C` / `C++` / `C#`；岗位画像按目标岗位与技能命中挑选，不替代真实招聘数据
+
 ## 当前进度
 
 - 最近更新：2026-10-28
-- 状态：**阶段 0–22 全部完成；P1–P4、AI 功能完善、可点击链接、整份结构化生成、整库备份、全局撤销 / 重做、技能分组与 AI 求职信全部完成**
+- 状态：**阶段 0–32 全部完成；P1–P4、AI 功能完善、可点击链接、整份结构化生成、整库备份、全局撤销 / 重做、技能分组、AI 求职信、投递看板、单份导出 / 合并导入、ATS 文本导出、AI 事实核对、板块显隐 / 排序 / 一页适配、统一 Dialog / 可访问性、数据版本 / 持久化历史、QA 进 CI / 组件测试、安全响应头与岗位库 / 技能同义词全部完成**
 - 代码状态：
   - M0：git 仓库、`.env.example`、`scripts/mock-deepseek.mjs` 完成
   - M1：`/api/ai/status`、`/api/ai/generate`、SSE 转换完成
@@ -352,7 +470,7 @@
 - P2 进度：3.1 证件照、3.2 自定义板块、3.3 项目起止时间、3.4 教育增强、3.5 多份简历全部完成
 - P3 进度：4.1 多标签页防覆盖、4.2 输入校验、4.3 保存时间与备份提醒、4.4 导入校验、4.5 错误边界、4.6 页码开关/打印对比度/可访问性、4.7 推荐门槛与 JD 缺口一键补、4.8 岗位库与城市覆盖全部完成
 - AI 增强：参考 JD 定制、优化模式空关键词完成；原「串行生成三段文字」已由阶段 18 的结构化整份生成取代
-- P4 进度：Vitest 单元测试、GitHub Actions CI、SEO/OG、manifest 与图标、静态资源清理全部完成；离线缓存未实现
+- P4 进度：Vitest 单元 / 组件测试、GitHub Actions CI（含生产模式浏览器 QA）、SEO/OG、manifest 与图标、静态资源清理全部完成；离线缓存未实现
 - P2 收尾：网站 / GitHub / 项目 / 自定义板块链接在五套模板与 PDF 中可点击，危险协议降级为纯文本
 - 阶段 18：AI 整份生成改为一段自述 → 结构化 JSON（教育/工作/项目/技能），采用时新建简历、旧简历保留
 - 阶段 19：JSON 导出升级为整库备份（当前文档 + 其他快照 + activeId），导入兼容旧版单份文件；整库导入整体替换并恢复当前文档
@@ -360,7 +478,24 @@
 - 阶段 20：`/api/ai/full` 已用真实 DeepSeek Key 验证长自述生成合法 JSON（completion 2245 tokens，未触及上限）
 - 阶段 21：技能支持分组与熟练度；`skillMeta` / `skillGroups` 仅用于展示，扁平 `skills` 继续驱动匹配与 AI，旧 JSON 自动兼容
 - 阶段 22：推荐页新增 AI 求职信；复用 `/api/ai/generate` 的 `cover` 板块，生成后可编辑、复制或下载 `.txt`，不写入简历
-- 工程命令：`npm test` 运行单元测试（93 个）；CI 覆盖 lint + 类型检查 + 单测 + 构建
+- 阶段 23：推荐页新增投递看板；每条投递独立保存 JD 与求职信，整库备份升级到 `version: 3`
+- 阶段 24：简历栏新增「导出当前」与「合并导入」；单份文件只含当前简历，合并整库时追加简历与投递记录而不覆盖当前文档
+- 阶段 25：预览工具栏新增「ATS 文本」；导出线性纯文本 / Markdown，并按当前 JD 显示关键词覆盖与缺口
+- 阶段 26：AI 单段 / 整份 / 求职信预览下新增事实核对；提示素材里没有的数字、技能与学校 / 公司 / 项目名，JD 不作为事实来源
+- 阶段 27：编辑区新增「板块显示与排序」；`layout` 保存七个内置板块的顺序与隐藏项，五套模板与 ATS 导出同步遵守
+- 阶段 27：预览工具栏新增「一页适配」，可隐藏建议项并实时观察页数，支持恢复打开时状态与一键换用紧凑模板
+- 阶段 28：新增统一 `Dialog`，五个弹窗共享 Portal、焦点陷阱、焦点归还、Escape / 遮罩关闭与背景滚动锁
+- 阶段 28：补全模态 ARIA、全局键盘焦点环、跳转主内容链接、移动端切换分组语义与 reduced motion 降级
+- 阶段 29：`Resume` 与单份 / 整库备份增加 `schemaVersion`；旧数据自动补齐，更高版本的备份明确拒绝导入
+- 阶段 29：撤销 / 重做栈写入 sessionStorage（20 步 / 1.5MB 预算），刷新后仍可撤销与重做，切换简历时清除
+- 阶段 30：组件测试底座接入 jsdom + Testing Library，覆盖 Dialog 焦点 / 关闭与 SectionLayoutEditor 布局行为
+- 阶段 30：QA 自动探测本机 Chrome；CI 构建后启动 `next start` 跑完整 QA，失败上传截图
+- 阶段 31：全站增加 CSP、HSTS、nosniff、DENY frame、严格 Referrer-Policy、Permissions-Policy、COOP / CORP，并关闭 `X-Powered-By`
+- 阶段 31：CSP 开发模式放行 React 调试 eval 与 HMR WebSocket，生产不含 `unsafe-eval`；图片允许 data / blob
+- 阶段 32：新增技能同义词层；`JS` / `TS` / `K8s` / `Golang` / `Postgres` / `SpringBoot` 等归一到规范标签，并保留 `C` / `C++` / `C#` 与 `Java` / `JavaScript` 边界
+- 阶段 32：岗位画像扩到 26 类，新增 Go 后端、数据工程、网络安全、售前 / 实施、供应链 / 采购、法务 / 合规、行政 / 助理与嵌入式
+- 工程命令：`npm test` 运行单元 / 组件测试（171 个）；CI 覆盖 lint + 类型检查 + 单测 / 组件测试 + 构建 + 生产模式浏览器 QA
+- 自检：`npm run qa` 共 177 项，含安全响应头、新增岗位画像与 JD 同义词归一检查
 - 本地地址：http://localhost:3000 （推荐页 http://localhost:3000/#jobs）
 - 一键自检：先 `npm run dev`，再 `npm run qa`（截图输出到 `.screenshots/`）
 - 单一方案文档：**`PLAN.md`**
@@ -394,6 +529,54 @@
 - 阶段 22：姓名与联系方式不进入请求；QA 记录实际请求载荷并断言只含岗位、年限、素材与 JD
 - 阶段 22：新增 6 个单测（合计 93 passed）；QA 新增 7 项求职信检查，截图 `qa-cover-letter.png`
 - 阶段 22 验证：`tsc`、`lint`、`npm test`（93 passed）、`npm run qa`、`npm run build` 全部通过
+- 阶段 23：新增 `applications.ts`、`useApplications` 与 `ApplicationBoard`，推荐页加入五列投递看板
+- 阶段 23：每条投递独立保存 JD / 求职信 / 备注 / 日期；「设为当前 JD」可把任意记录接回 JD 匹配与 AI 求职信
+- 阶段 23：整库备份升级到 `version: 3` 并包含投递记录，旧版 `version: 2` 导入仍兼容
+- 阶段 23：新增 10 个单测（合计 103 passed）；QA 新增 8 项投递看板检查，截图 `qa-applications.png`
+- 阶段 23 验证：`tsc`、`lint`、`npm test`（103 passed）、`npm run qa`、`npm run build` 全部通过
+- 阶段 24：`storage.ts` 新增 `downloadSingleResume` 与 `resume-workshop-single` v1 解析，单份文件不包含文档列表与投递记录
+- 阶段 24：`useResumeDocuments.createFromResume` 支持传入模板；新增 `mergeLibrary` 追加简历并重映射 id、标题去重
+- 阶段 24：顶栏「导入」保持整库替换，简历栏「合并导入」走追加模式；整库合并同时追加投递记录
+- 阶段 24：修复 `mergeLibrary` 重复写入当前文档的问题；QA 文档栏按钮清单更新并新增按钮边界检查
+- 阶段 24：新增 2 个单测（合计 105 passed）；QA 新增 4 项单份导出 / 合并导入检查
+- 阶段 24 验证：`tsc`、`lint`、`npm test`（105 passed）、`npm run qa`、`npm run build` 全部通过
+- 阶段 25：`ats.ts` 生成线性纯文本 / Markdown，隐藏板块、照片、分栏与技能等级不导出；单行描述保留段落，多行转要点
+- 阶段 25：新增 `AtsExportDialog`，支持格式切换、实时预览、txt / md 下载，并自动读取已保存 JD 做关键词覆盖检查
+- 阶段 25：`jdMatch` 抽出 `extractJdKeywords`，JD 匹配与 ATS 覆盖共用关键词库；`safeFileName` 改为导出供 ATS 下载复用
+- 阶段 25：新增 6 个单测（合计 111 passed）；QA 新增 8 项 ATS 检查，截图 `qa-ats.png`
+- 阶段 25 验证：`tsc`、`lint`、`npm test`（111 passed）、`npm run qa`、`npm run build` 全部通过
+- 阶段 26：新增 `factCheck.ts` 与 `FactCheckPanel`；数字 / 技能 / 名称做字面比对，日期允许格式差异
+- 阶段 26：单段 AI 写简历、整份生成与求职信预览均接入；输入变化实时重算，参考 JD 不计入事实来源
+- 阶段 26：新增 7 个单测（合计 118 passed）；QA 新增 3 项事实核对检查
+- 阶段 26 验证：`tsc`、`lint`、`npm test`（118 passed）、`npm run qa`、`npm run build` 全部通过
+- 阶段 27：`types.ts` 新增 `ResumeLayout` / `ResumeSectionKey`，`layout.ts` 负责收敛、排序、显隐与适配建议
+- 阶段 27：`OrderedSections` 保留原有模板 JSX，仅按布局重排 / 过滤，不额外包 DOM，避免破坏侧栏间距与打印分页
+- 阶段 27：编辑区新增 `SectionLayoutEditor`；预览工具栏新增 `OnePageFitDialog`，页数由 `ResumePreview` 回调实时上报
+- 阶段 27：ATS 导出跳过隐藏板块；旧 JSON 缺少 layout 时自动补默认布局，导入校验拒绝未知板块
+- 阶段 27：新增 19 个单测（合计 137 passed）；QA 新增 17 项布局 / 适配检查，截图 `qa-layout.png` / `qa-fit.png`
+- 阶段 27 验证：`tsc`、`lint`、`npm test`（137 passed）、`npm run qa`（160 项）、`npm run build` 全部通过
+- 阶段 28：新增 `ui/Dialog.tsx`，Portal + 焦点陷阱 + 焦点归还 + 背景滚动锁；五个弹窗统一迁移，保留原 `data-qa`
+- 阶段 28：`globals.css` 增加 `:focus-visible` 焦点环与 `prefers-reduced-motion`；AppShell 增加跳转主内容链接、main 可聚焦、移动端分组与模板组语义
+- 阶段 28：QA 新增 7 项可访问性检查（模态语义、焦点陷阱、Escape / 完成归还焦点、跳转链接、reduced motion），合计 167 项
+- 阶段 28 验证：`tsc`、`lint`、`npm test`（137 passed）、`npm run qa`（167 项）、`npm run build` 全部通过
+- 阶段 29：新增 `schema.ts`，`Resume` 带 `schemaVersion`；旧裸 JSON 补齐版本，单份 / 整库导出写入版本，未来版本备份拒绝导入
+- 阶段 29：新增 `historyStorage.ts`；`History` 支持导出 / 恢复，`useResume` 在保存成功后写入 sessionStorage，刷新可继续撤销 / 重做
+- 阶段 29：历史按 20 步与 1.5MB 预算裁剪；配额不足时降级，切换 / 新建 / 导入简历清除历史
+- 阶段 29：新增 12 个单测（合计 149 passed）；QA 新增 6 项刷新后撤销 / 重做检查，合计 173 项
+- 阶段 29 验证：`tsc`、`lint`、`npm test`（149 passed）、`npm run qa`（173 项）、`npm run build` 全部通过
+- 阶段 30：`vitest.config.mts` 改用 jsdom + React 插件 + 原生 tsconfig paths，`src/test/setup.ts` 接入 jest-dom 与 cleanup
+- 阶段 30：新增 Dialog 4 个、SectionLayoutEditor 3 个组件测试（合计 156 passed，16 个文件）
+- 阶段 30：`qa.mjs` 自动探测 Windows / macOS / Linux Chrome，支持 `CHROME_PATH` / `PUPPETEER_EXECUTABLE_PATH`
+- 阶段 30：CI 在构建后安装 `fonts-noto-cjk`、启动 `next start` 并执行 `npm run qa`，失败时上传 `.screenshots`，job 超时 25 分钟
+- 阶段 30 验证：生产模式 `npm run build` + `npm run start` + `npm run qa`（173 项）通过；`lint`、`tsc`、`npm test`（156 passed）、`build` 通过
+- 阶段 31：新增 `securityHeaders.ts` 与 `next.config.ts` 的 `headers()`，关闭 `X-Powered-By`；CSP 按开发 / 生产区分 eval 与 WebSocket
+- 阶段 31：新增 3 个单测（合计 159 passed，17 个文件）与 2 项 QA 检查（合计 175 项）
+- 阶段 31 验证：开发与生产模式 `npm run qa`（175 项）均通过；`lint`、`tsc`、`npm test`（159 passed）、`npm run build` 通过
+- 阶段 32：新增 `skillSynonyms.ts`，统一同义词映射、规范键与别名组；`matching.ts` 的标签匹配与正文扫描全部改为别名感知
+- 阶段 32：比较键保留 `+` / `#`，修复 `C` / `C++` / `C#` 混淆；`JS` 不命中 `.js` 后缀，单字母 `C` 不命中 `C++` / `C#`
+- 阶段 32：`jdMatch.ts` 词库按规范键去重；岗位画像新增 8 类并补充现有别名，总数 26 类
+- 阶段 32：新增 12 个单测（合计 171 passed，18 个文件）与 2 项 QA（合计 177 项）
+- 阶段 32 验证：开发与生产模式 `npm run qa`（177 项）均通过；`lint`、`tsc`、`npm test`（171 passed）、`npm run build` 通过
 
 ### 本次会话日志（2026-10-27）
 
@@ -495,8 +678,8 @@
 ### 下次继续
 
 1. 先读 `PLAN.md` 与 `PROGRESS.md`「当前进度」
-2. 阶段 0–22 全部完成；P1–P4、AI 增强、可点击链接、整份结构化生成、整库备份、全局撤销 / 重做、技能分组与 AI 求职信均已完成
-3. 可选后续：P2 剩余缺口（双语）、英文输出、离线缓存
+2. 阶段 0–32 全部完成；P1–P4、AI 增强、可点击链接、整份结构化生成、整库备份、全局撤销 / 重做、技能分组、AI 求职信、投递看板、单份导出 / 合并导入、ATS 文本导出、AI 事实核对、板块显隐 / 排序 / 一页适配、统一 Dialog / 可访问性、数据版本 / 持久化历史、QA 进 CI / 组件测试、安全响应头与岗位库 / 技能同义词均已完成
+3. 后续可选：双语、英文输出、离线缓存；开始前先确认需求与范围
 4. 每完成一项跑 `npm run lint`、`npm test`、`npm run build`、`npm run qa` 并更新本文件
 
 ## 可选后续
@@ -514,13 +697,21 @@
 - [x] 真实 DeepSeek Key 验证 `/api/ai/full`（JSON 输出与长文本 token 上限）
 - [x] 技能分组与熟练度（分组增删改排序、逐技能熟练度、五套模板展示、旧 JSON 兼容）
 - [x] AI 求职信（素材 / 岗位 / JD → 中文求职信，可编辑、复制与下载，不写入简历）
+- [x] 投递看板与多 JD（五种状态、独立 JD / 求职信 / 备注、设为当前 JD、整库备份）
+- [x] 单份简历导出与合并导入（单份分享文件不含其他简历 / 投递记录；整库合并追加而非覆盖）
+- [x] ATS 文本导出与关键词覆盖（纯文本 / Markdown 下载；读取当前 JD 显示覆盖率与缺口）
+- [x] 内置板块显隐 / 排序与一页适配（布局编辑、五套模板与 ATS 同步、页数实时提示）
+- [x] 统一 Dialog 与可访问性（焦点陷阱 / 焦点归还、滚动锁、模态 ARIA、跳转主内容、键盘焦点环、reduced motion）
+- [x] QA 进 CI 与组件测试（生产模式启动后跑完整 QA，失败上传截图；jsdom + Testing Library 覆盖 Dialog 与板块布局）
+- [x] 安全响应头（CSP、HSTS、COOP / CORP、Permissions-Policy、Referrer-Policy、nosniff、DENY frame；关闭 X-Powered-By）
+- [x] 岗位库与技能同义词（26 类画像；JS/TS、K8s、Golang、Postgres、SpringBoot 等别名归一；保留 C 系与 Java / JavaScript 边界）
 
 ## 如何继续
 
 1. 读「当前进度」和 `PLAN.md` 的「P0：AI 写简历」
 2. 确认 `.env.local` 里的 `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL`
 3. `npm run dev`
-4. AI（P0）、AI 增强、P1、P2（3.1–3.5、阶段 17 可点击链接、阶段 20 全局撤销、阶段 21 技能分组）、P3（4.1–4.8）、P4、阶段 18 整份生成、阶段 19 整库备份与阶段 22 AI 求职信均已完成
+4. AI（P0）、AI 增强、P1、P2（3.1–3.5、阶段 17 可点击链接、阶段 20 全局撤销、阶段 21 技能分组）、P3（4.1–4.8）、P4、阶段 18 整份生成、阶段 19 整库备份、阶段 22 AI 求职信、阶段 23 投递看板、阶段 24 单份导出 / 合并导入、阶段 25 ATS 文本导出、阶段 26 AI 事实核对、阶段 27 板块显隐 / 排序 / 一页适配、阶段 28 统一 Dialog / 可访问性、阶段 29 数据版本 / 持久化历史、阶段 30 QA 进 CI / 组件测试、阶段 31 安全响应头与阶段 32 岗位库 / 技能同义词均已完成
 5. 每完成一步更新本文件，尤其是「当前进度」「关机交接」与对应阶段勾选项
 
 ## 文件地图
@@ -536,37 +727,56 @@ src/
     AppShell.tsx        顶栏、标签页、导入导出、打印、客户端挂载门控
     resume/
       ResumeForm.tsx    编辑表单与重复条目
-      ResumePreview.tsx A4 容器与自动缩放、分页估算
+      ResumeDocumentsBar.tsx 多份简历切换、导出当前与合并导入
+      AtsExportDialog.tsx ATS 纯文本 / Markdown 预览、下载与 JD 覆盖检查
+      SectionLayoutEditor.tsx 内置板块显隐、排序与恢复默认
+      OnePageFitDialog.tsx 一页适配：隐藏建议项、实时页数与回滚
+      ResumePreview.tsx A4 容器与自动缩放、分页估算、页数上报
       ThemePicker.tsx   主题色预设与自定义取色
       templates.tsx     现代 / 经典 / 紧凑 / 侧栏 / 时间轴
     jobs/
       JobsPanel.tsx     匹配结果、建议、招聘站入口
       JdMatcher.tsx     粘贴 JD 测匹配度
       CoverLetterWriter.tsx AI 求职信生成、编辑、复制与下载
+      ApplicationBoard.tsx 投递看板、状态流转与多 JD 管理
       SkillChip.tsx     技能标签
-    ui/                 Field / Button / SectionCard
-  hooks/useResume.ts    初始化、自动保存、清空、示例、撤销 / 重做
+    ui/                 Field / Button / SectionCard / Dialog（Portal、焦点陷阱、焦点归还与滚动锁）
+  hooks/useResume.ts    初始化、自动保存、清空、示例、撤销 / 重做与会话恢复
+  hooks/useResumeDocuments.ts 多份简历快照、切换、合并导入与删除
+  hooks/useApplications.ts 投递记录状态、跨标签页同步
   lib/
-    types.ts            类型与空白工厂
+    types.ts            类型、板块 key 与空白工厂
+    schema.ts           简历 schema 版本与未来版本判断
+    securityHeaders.ts  全站安全响应头、CSP 开发 / 生产差异
+    historyStorage.ts   撤销 / 重做栈的会话持久化、裁剪与配额兜底
+    layout.ts           板块布局收敛、排序、显隐与一页适配建议
     defaultResume.ts    示例数据
-    storage.ts          localStorage、JSON 导入导出与校验
+    storage.ts          localStorage、整库 / 单份导出、导入解析与校验
     backupReminder.ts   备份提醒状态（7 天 / 暂停 3 天）
     history.ts          通用撤销 / 重做栈（合并窗口、上限、reset）
+    applications.ts     投递记录类型、状态、日期收敛与本地存储
+    ats.ts              ATS 纯文本 / Markdown 生成、关键词覆盖与下载
     skills.ts           技能分组视图、熟练度格式化与旧排版判断
     validate.ts         邮箱、手机、链接、薪资与起止时间校验
     jobProfiles.ts      岗位画像库
     matching.ts         技能匹配、评分、建议
+    skillSynonyms.ts    技能同义词归一与规范标签
     jdMatch.ts          JD 关键词识别、覆盖率、年限/学历核验
     jdStorage.ts        JD 本地保存与 AI 参考 JD 读取
     links.ts            安全链接判断与展示用短链接
     jobBoards.ts        招聘站 URL 与城市编码
     theme.ts            主题色校验、可读性压暗与 CSS 变量
-    ai/                 types / config / prompt / fullResume / http / deepseek / client
-    __tests__/          Vitest：storage / matching / jdMatch / validate / links / SSE / 整份解析 / 撤销栈 / 技能分组 / 提示词（93 个）
+    ai/                 types / config / prompt / fullResume / factCheck / http / deepseek / client
+    __tests__/          Vitest：storage / matching / skillSynonyms / jdMatch / validate / links / SSE / 整份解析 / 撤销栈与会话持久化 / 技能分组 / 提示词 / 投递 / ATS / 事实核对 / 板块布局 / 安全响应头（171 个）
+  components/resume/__tests__/  SectionLayoutEditor 隐藏 / 排序 / 恢复默认
+  components/ui/__tests__/      Dialog 模态语义 / 焦点陷阱 / 关闭与焦点归还
+  test/setup.ts         jest-dom 匹配器与每例 cleanup
 public/
   icon-192.png / icon-512.png  安装清单图标
-scripts/qa.mjs          无头浏览器截图、溢出检查、分页与 PDF 页数自检
-.github/workflows/ci.yml lint + 类型检查 + 单测 + 构建
+next.config.ts          全站 headers、关闭 X-Powered-By、Turbopack / Cache Components
+scripts/qa.mjs          无头浏览器截图、溢出检查、分页 / PDF 页数、弹窗焦点、安全响应头与可访问性自检
+.github/workflows/ci.yml lint + 类型检查 + 单测 / 组件测试 + 构建 + 生产模式浏览器 QA
+vitest.config.mts       jsdom + React 插件 + tsconfig paths
 PLAN.md                单一优化方案（AI 为 P0；数据安全、内容能力、路线图）
 ```
 

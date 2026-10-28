@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { analyzeResume, resumeHasSkill, skillMatches, textHasSkill } from "../matching";
 import { analyzeJd } from "../jdMatch";
+import { JOB_PROFILES } from "../jobProfiles";
 import { createEmptyResume, type Education, type Experience } from "../types";
 
 function education(degree: string): Education {
@@ -130,6 +131,30 @@ describe("analyzeResume", () => {
     expect(result.missingCore).toContain("JavaScript");
     expect(result.missingCore).toContain("CSS");
     expect(result.suggestions.join(" ")).toContain("还没有体现");
+  });
+
+  it.each([
+    "go-backend",
+    "data-engineering",
+    "security",
+    "presales",
+    "procurement",
+    "legal",
+    "admin",
+    "embedded",
+  ])("按目标岗位识别新增画像 %s", (id) => {
+    const profile = JOB_PROFILES.find((item) => item.id === id);
+    expect(profile).toBeDefined();
+    if (!profile) return;
+
+    const resume = createEmptyResume();
+    resume.intent.targetRole = profile.title;
+    resume.skills = [...profile.core];
+
+    const result = analyzeResume(resume);
+
+    expect(result.profile?.id).toBe(id);
+    expect(result.missingCore).toEqual([]);
   });
 });
 

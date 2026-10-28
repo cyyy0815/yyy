@@ -6,10 +6,12 @@ import {
   skillGroupKey,
   skillMetaOf,
 } from "../skills";
-import type { Resume } from "../types";
+import { RESUME_SCHEMA_VERSION } from "../schema";
+import { DEFAULT_SECTION_ORDER, type Resume } from "../types";
 
 function makeResume(patch: Partial<Resume> = {}): Resume {
   return {
+    schemaVersion: RESUME_SCHEMA_VERSION,
     basic: {
       name: "",
       headline: "",
@@ -36,6 +38,7 @@ function makeResume(patch: Partial<Resume> = {}): Resume {
     skills: [],
     skillMeta: {},
     skillGroups: [],
+    layout: { order: [...DEFAULT_SECTION_ORDER], hidden: [] },
     theme: { accent: "#1d4ed8" },
     ...patch,
   };

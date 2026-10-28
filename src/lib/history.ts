@@ -16,6 +16,11 @@ type HistoryOptions = {
   mergeWindowMs?: number;
 };
 
+export type HistoryState<T> = {
+  past: T[];
+  future: T[];
+};
+
 export type History<T> = {
   /** 记录「修改前」的快照；mergeable 为 true 时允许与上一段连续输入合并。 */
   record: (previous: T, mergeable: boolean, now?: number) => void;
@@ -24,6 +29,10 @@ export type History<T> = {
   /** 重做：返回下一份快照，并把当前状态压回撤销栈；无可重做时返回 null。 */
   redo: (current: T) => T | null;
   reset: () => void;
+  /** 导出两份栈的副本，供会话存储序列化。 */
+  exportState: () => HistoryState<T>;
+  /** 从会话存储恢复栈；恢复后连续输入不会与旧步骤合并。 */
+  importState: (state: HistoryState<T>) => void;
   canUndo: () => boolean;
   canRedo: () => boolean;
   size: () => number;
@@ -85,11 +94,26 @@ export function createHistory<T>(options: HistoryOptions = {}): History<T> {
     lastMergeable = false;
   }
 
+  function exportState(): HistoryState<T> {
+    return { past: [...past], future: [...future] };
+  }
+
+  function importState(state: HistoryState<T>) {
+    past.length = 0;
+    future.length = 0;
+    past.push(...state.past.slice(-limit));
+    future.push(...state.future.slice(-limit));
+    lastRecordedAt = 0;
+    lastMergeable = false;
+  }
+
   return {
     record,
     undo,
     redo,
     reset,
+    exportState,
+    importState,
     canUndo: () => past.length > 0,
     canRedo: () => future.length > 0,
     size: () => past.length,

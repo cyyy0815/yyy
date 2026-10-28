@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
+import { FactCheckPanel } from "@/components/ui/FactCheckPanel";
 import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { streamGenerate } from "@/lib/ai/client";
+import { checkGeneratedText } from "@/lib/ai/factCheck";
 import { cleanAiText } from "@/lib/ai/prompt";
 import type { AiStatus, AiTone } from "@/lib/ai/types";
 import { JD_MAX_LENGTH, readSavedJd } from "@/lib/jdStorage";
@@ -102,23 +105,6 @@ export function CoverLetterWriter({ resume }: { resume: Resume }) {
     setOpen(false);
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeDialog();
-    };
-    document.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open, closeDialog]);
-
   useEffect(() => () => abortRef.current?.abort(), []);
 
   useEffect(
@@ -204,6 +190,15 @@ export function CoverLetterWriter({ resume }: { resume: Resume }) {
 
   const letter = output.trim();
 
+  // 参考 JD 只用于定向，不作为事实来源；JD 里的技能不能算用户已有经历。
+  const factWarnings = useMemo(
+    () =>
+      letter && !streaming
+        ? checkGeneratedText(letter, [role, years, material].join("\n"))
+        : [],
+    [letter, streaming, role, years, material],
+  );
+
   const handleCopy = async () => {
     if (!letter) return;
     const ok = await copyText(letter);
@@ -260,41 +255,49 @@ export function CoverLetterWriter({ resume }: { resume: Resume }) {
       </section>
 
       {open ? (
-        <div
-          className="print-hide fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/40 backdrop-blur-sm sm:items-center sm:p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) closeDialog();
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="cover-letter-title"
-            className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
-          >
-            <header className="flex items-start justify-between gap-3 border-b border-zinc-100 px-5 py-4">
-              <div>
-                <h2
-                  id="cover-letter-title"
-                  className="text-[15px] font-semibold text-zinc-900"
-                >
-                  AI 求职信
-                </h2>
-                <p className="mt-0.5 text-[11.5px] text-zinc-500">
-                  中文求职信 · 内容会发送到 DeepSeek
-                </p>
+        <Dialog
+          title="AI 求职信"
+          description="中文求职信 · 内容会发送到 DeepSeek"
+          size="lg"
+          dataQa="cover-dialog"
+          closeDataQa="cover-close"
+          onClose={closeDialog}
+          footer={
+            <>
+              <p className="text-[11px] leading-4 text-zinc-400">
+                只发送本面板中的目标岗位、工作年限、个人素材与参考 JD；姓名、邮箱、电话和链接不会发送（服务端也会再次过滤）。个人素材可自行删改。
+              </p>
+              <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+                {letter && !streaming ? (
+                  <>
+                    <span className="mr-auto text-[10.5px] text-zinc-400">
+                      可直接粘贴到邮件或招聘平台
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      data-qa="cover-copy"
+                      onClick={() => void handleCopy()}
+                    >
+                      {copied ? "已复制" : "复制全文"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      data-qa="cover-download"
+                      onClick={handleDownload}
+                    >
+                      下载 .txt
+                    </Button>
+                  </>
+                ) : null}
+                <Button variant="ghost" size="sm" onClick={closeDialog}>
+                  关闭
+                </Button>
               </div>
-              <button
-                type="button"
-                onClick={closeDialog}
-                aria-label="关闭"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[16px] leading-none text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
-              >
-                ×
-              </button>
-            </header>
-
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            </>
+          }
+        >
               {statusLoading || (!status && !statusError) ? (
                 <p className="py-8 text-center text-[12.5px] text-zinc-400">
                   正在检查 AI 配置…
@@ -471,6 +474,10 @@ export function CoverLetterWriter({ resume }: { resume: Resume }) {
                     )}
                   </div>
 
+                  {letter && !streaming ? (
+                    <FactCheckPanel warnings={factWarnings} />
+                  ) : null}
+
                   {error ? (
                     <p role="alert" className="text-[12px] text-red-600">
                       {error}
@@ -478,43 +485,7 @@ export function CoverLetterWriter({ resume }: { resume: Resume }) {
                   ) : null}
                 </div>
               )}
-            </div>
-
-            <footer className="border-t border-zinc-100 px-5 py-3">
-              <p className="text-[11px] leading-4 text-zinc-400">
-                只发送本面板中的目标岗位、工作年限、个人素材与参考 JD；姓名、邮箱、电话和链接不会发送（服务端也会再次过滤）。个人素材可自行删改。
-              </p>
-              <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-                {letter && !streaming ? (
-                  <>
-                    <span className="mr-auto text-[10.5px] text-zinc-400">
-                      可直接粘贴到邮件或招聘平台
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      data-qa="cover-copy"
-                      onClick={() => void handleCopy()}
-                    >
-                      {copied ? "已复制" : "复制全文"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      data-qa="cover-download"
-                      onClick={handleDownload}
-                    >
-                      下载 .txt
-                    </Button>
-                  </>
-                ) : null}
-                <Button variant="ghost" size="sm" onClick={closeDialog}>
-                  关闭
-                </Button>
-              </div>
-            </footer>
-          </div>
-        </div>
+        </Dialog>
       ) : null}
     </>
   );

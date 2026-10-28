@@ -12,6 +12,8 @@ type Props = {
   onDuplicate: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onExportCurrent: () => void;
+  onMergeImport: () => void;
 };
 
 export function ResumeDocumentsBar({
@@ -23,6 +25,8 @@ export function ResumeDocumentsBar({
   onDuplicate,
   onRename,
   onDelete,
+  onExportCurrent,
+  onMergeImport,
 }: Props) {
   return (
     <div
@@ -58,6 +62,24 @@ export function ResumeDocumentsBar({
         </Button>
         <Button variant="ghost" size="sm" onClick={onRename}>
           重命名
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          data-qa="export-current"
+          onClick={onExportCurrent}
+          title="只导出当前这份简历，便于单独分享"
+        >
+          导出当前
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          data-qa="merge-import"
+          onClick={onMergeImport}
+          title="从 JSON 追加简历，不覆盖现有简历"
+        >
+          合并导入
         </Button>
         <Button
           variant="danger"

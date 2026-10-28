@@ -11,6 +11,11 @@ import {
 import { createSampleResume } from "@/lib/defaultResume";
 import { createHistory, type History } from "@/lib/history";
 import {
+  clearResumeHistory,
+  loadResumeHistory,
+  saveResumeHistory,
+} from "@/lib/historyStorage";
+import {
   clearResume,
   loadResume,
   readLastSavedAt,
@@ -76,16 +81,22 @@ export function useResume(): UseResume {
   }, [isSample]);
 
   // 撤销栈保存简历快照（按引用），切换 / 导入简历时整体清空。
-  const historyRef = useRef<History<HistorySnapshot> | null>(null);
-  if (historyRef.current === null) {
-    historyRef.current = createHistory<HistorySnapshot>();
-  }
-  const history = historyRef.current;
-  // 撤销栈本身不是渲染数据，只把按钮需要的两个布尔值同步到 state。
-  const [historyFlags, setHistoryFlags] = useState({
-    canUndo: false,
-    canRedo: false,
+  // 刷新后从 sessionStorage 恢复；示例简历不读取，避免套用别的文档的历史。
+  const [history] = useState<History<HistorySnapshot>>(() => {
+    const created = createHistory<HistorySnapshot>();
+    if (initial.isSample) {
+      clearResumeHistory();
+    } else {
+      const persisted = loadResumeHistory();
+      if (persisted) created.importState(persisted);
+    }
+    return created;
   });
+  // 撤销栈本身不是渲染数据，只把按钮需要的两个布尔值同步到 state。
+  const [historyFlags, setHistoryFlags] = useState(() => ({
+    canUndo: history.canUndo(),
+    canRedo: history.canRedo(),
+  }));
   const syncHistoryFlags = useCallback(() => {
     setHistoryFlags((previous) => {
       const next = {
@@ -123,12 +134,14 @@ export function useResume(): UseResume {
         lastWrittenRef.current = next;
         setLastSavedAt(Date.now());
         setSaveState("saved");
+        // 只持久化与已保存内容对应的历史，避免刷新后撤销到未落盘的状态。
+        saveResumeHistory(history.exportState());
       } else {
         setSaveState("error");
       }
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [resume, isSample, hasConflict]);
+  }, [resume, isSample, hasConflict, history]);
 
   // storage 事件只在其他标签页写入时触发；本页写入不会触发自己。
   useEffect(() => {
@@ -212,6 +225,7 @@ export function useResume(): UseResume {
     (next: Resume) => {
       // 切换 / 导入简历是文档级操作，不进入当前文档的撤销栈。
       history.reset();
+      clearResumeHistory();
       syncHistoryFlags();
       // 多份简历切换 / 导入会先写 storage 或即将写入；以当前 storage 为新基线，
       // 这样随后由本 hook 触发的自动保存不会被误判成跨标签页冲突。

@@ -28,9 +28,11 @@ function paginate(height: number, forcedBreaks = 0) {
 export function ResumePreview({
   resume,
   template,
+  onPageCountChange,
 }: {
   resume: Resume;
   template: TemplateId;
+  onPageCountChange?: (pages: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const paperRef = useRef<HTMLDivElement>(null);
@@ -76,6 +78,10 @@ export function ResumePreview({
     return () => observer.disconnect();
   }, [template, forcedBreaks]);
 
+  useEffect(() => {
+    onPageCountChange?.(layout.pages);
+  }, [layout.pages, onPageCountChange]);
+
   return (
     <div ref={containerRef} className="w-full">
       <div className="flex justify-center">
@@ -110,6 +116,8 @@ export function ResumePreview({
       </div>
       <div className="print-hide mt-2 flex justify-center">
         <span
+          data-qa="preview-pages"
+          data-pages={layout.pages}
           className={`rounded-full px-2.5 py-1 text-[10.5px] ${
             layout.pages > 1
               ? "bg-amber-100 text-amber-700"

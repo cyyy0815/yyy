@@ -160,10 +160,11 @@ export function useResumeDocuments({
     return true;
   };
 
-  /** 用外部生成的内容新建一份简历，当前简历作为快照保留；返回新简历标题。 */
+  /** 用外部生成 / 导入的内容新建一份简历，当前简历作为快照保留；返回新简历标题。 */
   const createFromResume = (
     nextResume: Resume,
     baseTitle: string,
+    nextTemplate: TemplateId = template,
   ): string | null => {
     if (!saveResume(nextResume)) return null;
 
@@ -181,8 +182,28 @@ export function useResumeDocuments({
 
     setState({ library, activeTitle: title });
     replaceResume(nextResume);
-    setTemplate(template);
+    setTemplate(nextTemplate);
     return title;
+  };
+
+  /** 合并导入：保留当前简历与已有文档，把备份中的简历追加为副本。 */
+  const mergeLibrary = (imported: StoredDocument[]): boolean => {
+    if (imported.length === 0) return false;
+    const usedTitles = [...titles];
+    const remapped = imported.map((document) => {
+      const title = uniqueTitle(document.title, usedTitles);
+      usedTitles.push(title);
+      return { ...document, id: newId(), title };
+    });
+    // 当前文档仍是 active，不该再写进 others，否则标题会重复出现。
+    const library: ResumeLibrary = {
+      activeId,
+      activeTitle: currentTitle,
+      others: [...others, ...remapped],
+    };
+    if (!saveResumeLibrary(library)) return false;
+    setState({ library, activeTitle: currentTitle });
+    return true;
   };
 
   /** 当前文档 + 其他快照，用于整库导出。 */
@@ -271,5 +292,6 @@ export function useResumeDocuments({
     renameActive,
     collectAll,
     importLibrary,
+    mergeLibrary,
   };
 }

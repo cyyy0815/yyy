@@ -4,6 +4,7 @@ import { analyzeResume } from "@/lib/matching";
 import { buildJobBoardUrl, JOB_BOARDS } from "@/lib/jobBoards";
 import type { Resume } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
+import { ApplicationBoard } from "./ApplicationBoard";
 import { CoverLetterWriter } from "./CoverLetterWriter";
 import { JdMatcher } from "./JdMatcher";
 import { SkillChip } from "./SkillChip";
@@ -125,10 +126,12 @@ function hasJobInputs(resume: Resume): boolean {
 
 export function JobsPanel({
   resume,
+  resumeTitle,
   onGoEdit,
   onAddSkill,
 }: {
   resume: Resume;
+  resumeTitle: string;
   onGoEdit: () => void;
   onAddSkill: (skill: string) => void;
 }) {
@@ -331,6 +334,8 @@ export function JobsPanel({
       <JdMatcher resume={resume} onAddSkill={onAddSkill} />
 
       <CoverLetterWriter resume={resume} />
+
+      <ApplicationBoard resumeTitle={resumeTitle} />
 
       <section className="rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
         <div className="flex flex-wrap items-center justify-between gap-3">

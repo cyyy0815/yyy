@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { JobsPanel } from "@/components/jobs/JobsPanel";
+import { AtsExportDialog } from "@/components/resume/AtsExportDialog";
+import { OnePageFitDialog } from "@/components/resume/OnePageFitDialog";
 import { ResumeDocumentsBar } from "@/components/resume/ResumeDocumentsBar";
 import { ResumeForm } from "@/components/resume/ResumeForm";
 import { ResumePreview } from "@/components/resume/ResumePreview";
@@ -16,12 +18,20 @@ import {
 } from "@/lib/backupReminder";
 import {
   downloadResumeArchive,
+  downloadSingleResume,
   MAX_IMPORT_BYTES,
   parseImportFile,
   recordExport,
   snoozeBackupReminder,
 } from "@/lib/storage";
-import { isTemplateId, type Resume, type TemplateId } from "@/lib/types";
+import { readApplications, saveApplications } from "@/lib/applications";
+import { resolveSectionLayout } from "@/lib/layout";
+import {
+  isTemplateId,
+  type Resume,
+  type ResumeSectionKey,
+  type TemplateId,
+} from "@/lib/types";
 
 const TEMPLATES: { id: TemplateId; label: string }[] = [
   { id: "modern", label: "现代" },
@@ -134,12 +144,16 @@ function ResumeWorkspace() {
     useState(readShowPageNumbers);
   const [notice, setNotice] = useState<Notice>(null);
   const [resumeVersion, setResumeVersion] = useState(0);
+  const [atsOpen, setAtsOpen] = useState(false);
+  const [fitOpen, setFitOpen] = useState(false);
+  const [previewPages, setPreviewPages] = useState(1);
   const backupDue = useSyncExternalStore(
     subscribeBackupReminder,
     getBackupReminderSnapshot,
     () => false,
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importModeRef = useRef<"replace" | "merge">("replace");
   const documents = useResumeDocuments({
     resume,
     template,
@@ -248,9 +262,21 @@ function ResumeWorkspace() {
       snapshot.documents,
       snapshot.activeId,
       documents.currentTitle,
+      readApplications(),
     );
     recordExport();
     refreshBackupReminder();
+  };
+
+  /** 只导出当前简历，方便单独分享；不计入整库备份提醒。 */
+  const handleExportSingle = () => {
+    downloadSingleResume({
+      id: documents.activeId,
+      title: documents.currentTitle,
+      template,
+      resume,
+    });
+    setNotice({ type: "ok", message: "已导出当前简历" });
   };
 
   const handleSnoozeBackup = () => {
@@ -259,6 +285,8 @@ function ResumeWorkspace() {
   };
 
   const handleImport = async (file: File) => {
+    const mode = importModeRef.current;
+    importModeRef.current = "replace";
     if (file.size > MAX_IMPORT_BYTES) {
       setNotice({
         type: "error",
@@ -279,6 +307,26 @@ function ResumeWorkspace() {
       return;
     }
     if (result.kind === "library") {
+      if (mode === "merge") {
+        if (!documents.mergeLibrary(result.documents)) {
+          setNotice({
+            type: "error",
+            message: "合并失败：浏览器存储不可用或空间已满",
+          });
+          return;
+        }
+        const applicationsSaved = saveApplications([
+          ...readApplications(),
+          ...result.applications,
+        ]);
+        setNotice({
+          type: applicationsSaved ? "ok" : "error",
+          message: applicationsSaved
+            ? `已合并 ${result.documents.length} 份简历与 ${result.applications.length} 条投递记录`
+            : `已合并 ${result.documents.length} 份简历，但投递记录保存失败`,
+        });
+        return;
+      }
       if (
         !window.confirm(
           `导入会替换当前全部简历（共 ${result.documents.length} 份），建议先导出 JSON 备份。确定继续吗？`,
@@ -294,11 +342,31 @@ function ResumeWorkspace() {
         });
         return;
       }
+      const applicationsSaved = saveApplications(result.applications);
       setResumeVersion((value) => value + 1);
       setNotice({
-        type: "ok",
-        message: `已导入 ${result.documents.length} 份简历`,
+        type: applicationsSaved ? "ok" : "error",
+        message: applicationsSaved
+          ? `已导入 ${result.documents.length} 份简历与 ${result.applications.length} 条投递记录`
+          : `已导入 ${result.documents.length} 份简历，但投递记录保存失败`,
       });
+      return;
+    }
+    if (mode === "merge") {
+      const title = documents.createFromResume(
+        result.resume,
+        result.title || "导入简历",
+        result.template ?? template,
+      );
+      if (!title) {
+        setNotice({
+          type: "error",
+          message: "导入失败：浏览器存储不可用或空间已满",
+        });
+        return;
+      }
+      setResumeVersion((value) => value + 1);
+      setNotice({ type: "ok", message: `已作为新简历「${title}」导入` });
       return;
     }
     if (
@@ -319,6 +387,13 @@ function ResumeWorkspace() {
 
   const handleAccent = (accent: string) => {
     updateResume((prev) => ({ ...prev, theme: { accent } }));
+  };
+
+  const handleFitHiddenChange = (hidden: ResumeSectionKey[]) => {
+    updateResume((prev) => ({
+      ...prev,
+      layout: { ...resolveSectionLayout(prev), hidden },
+    }));
   };
 
   const handleConflictReload = () => {
@@ -502,6 +577,12 @@ function ResumeWorkspace() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <a
+        href="#main-content"
+        className="print-hide fixed left-4 top-4 z-[70] -translate-y-24 rounded-lg bg-white px-4 py-2 text-[13px] font-medium text-zinc-900 shadow-lg transition focus:translate-y-0"
+      >
+        跳到主要内容
+      </a>
       <header className="print-hide sticky top-0 z-30 border-b border-zinc-200/70 bg-[#faf9f7]/85 backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center justify-between gap-2 px-3 sm:gap-3 sm:px-4 lg:px-6">
           <button
@@ -569,7 +650,10 @@ function ResumeWorkspace() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                importModeRef.current = "replace";
+                fileInputRef.current?.click();
+              }}
               aria-label="导入 JSON 简历"
             >
               导入
@@ -585,14 +669,23 @@ function ResumeWorkspace() {
         </div>
       </header>
 
-      <main className="print-root mx-auto w-full max-w-[1500px] flex-1 px-4 py-6 lg:px-6">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="print-root mx-auto w-full max-w-[1500px] flex-1 scroll-mt-20 px-4 py-6 outline-none lg:px-6"
+      >
         {tab === "edit" ? (
           <>
-            <div className="print-hide mb-4 flex rounded-xl border border-zinc-200 bg-white p-1 lg:hidden">
+            <div
+              role="group"
+              aria-label="编辑与预览切换"
+              className="print-hide mb-4 flex rounded-xl border border-zinc-200 bg-white p-1 lg:hidden"
+            >
               <button
                 type="button"
                 onClick={() => setMobilePane("form")}
                 aria-pressed={mobilePane === "form"}
+                aria-controls="resume-form-pane"
                 className={`flex-1 rounded-lg py-2 text-[12.5px] font-medium transition ${
                   mobilePane === "form"
                     ? "bg-zinc-900 text-white"
@@ -605,6 +698,7 @@ function ResumeWorkspace() {
                 type="button"
                 onClick={() => setMobilePane("preview")}
                 aria-pressed={mobilePane === "preview"}
+                aria-controls="resume-preview-pane"
                 className={`flex-1 rounded-lg py-2 text-[12.5px] font-medium transition ${
                   mobilePane === "preview"
                     ? "bg-zinc-900 text-white"
@@ -624,6 +718,11 @@ function ResumeWorkspace() {
               onDuplicate={handleDuplicateDocument}
               onRename={handleRenameDocument}
               onDelete={handleDeleteDocument}
+              onExportCurrent={handleExportSingle}
+              onMergeImport={() => {
+                importModeRef.current = "merge";
+                fileInputRef.current?.click();
+              }}
             />
 
             {isSample ? (
@@ -702,6 +801,7 @@ function ResumeWorkspace() {
 
             <div className="resume-grid grid gap-6 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)]">
               <div
+                id="resume-form-pane"
                 className={`print-hide ${
                   mobilePane === "form" ? "block" : "hidden"
                 } lg:block`}
@@ -774,13 +874,18 @@ function ResumeWorkspace() {
               </div>
 
               <div
+                id="resume-preview-pane"
                 className={`print:block ${
                   mobilePane === "preview" ? "block" : "hidden"
                 } lg:block`}
               >
                 <div className="print-hide mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center rounded-lg border border-zinc-200 bg-white p-0.5">
+                    <div
+                      role="group"
+                      aria-label="简历模板"
+                      className="flex items-center rounded-lg border border-zinc-200 bg-white p-0.5"
+                    >
                       {TEMPLATES.map((item) => (
                         <button
                           key={item.id}
@@ -819,7 +924,25 @@ function ResumeWorkspace() {
                       页码 {showPageNumbers ? "开" : "关"}
                     </button>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      data-qa="fit-open"
+                      onClick={() => setFitOpen(true)}
+                      title="查看页数，隐藏可选板块压缩到一页"
+                    >
+                      一页适配
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      data-qa="ats-export"
+                      onClick={() => setAtsOpen(true)}
+                      title="导出 ATS 纯文本 / Markdown，并检查 JD 关键词覆盖"
+                    >
+                      ATS 文本
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -834,7 +957,11 @@ function ResumeWorkspace() {
                 </div>
 
                 <div className="resume-scroll rounded-2xl border border-zinc-200/80 bg-[#eceae7] p-4 lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-112px)] lg:overflow-auto">
-                  <ResumePreview resume={resume} template={template} />
+                  <ResumePreview
+                    resume={resume}
+                    template={template}
+                    onPageCountChange={setPreviewPages}
+                  />
                 </div>
               </div>
             </div>
@@ -842,6 +969,7 @@ function ResumeWorkspace() {
         ) : (
           <JobsPanel
             resume={resume}
+            resumeTitle={documents.currentTitle}
             onGoEdit={() => setTab("edit")}
             onAddSkill={handleAddSkill}
           />
@@ -851,6 +979,25 @@ function ResumeWorkspace() {
       <footer className="print-hide mx-auto w-full max-w-[1500px] px-4 pb-8 text-[11px] text-zinc-400 lg:px-6">
         数据仅保存在本机浏览器 · 导出 JSON 可备份或迁移 · 求职推荐基于本地岗位画像
       </footer>
+
+      {atsOpen ? (
+        <AtsExportDialog
+          onClose={() => setAtsOpen(false)}
+          title={documents.currentTitle}
+          resume={resume}
+        />
+      ) : null}
+
+      {fitOpen ? (
+        <OnePageFitDialog
+          resume={resume}
+          pageCount={previewPages}
+          template={template}
+          onHiddenChange={handleFitHiddenChange}
+          onTemplateChange={setTemplate}
+          onClose={() => setFitOpen(false)}
+        />
+      ) : null}
 
       {notice ? (
         <div

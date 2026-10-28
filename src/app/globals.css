@@ -32,6 +32,32 @@ body {
   color: #111827;
 }
 
+/* 键盘焦点：只在键盘导航时显示，输入框保留各自的 focus ring */
+:where(
+  button,
+  a,
+  summary,
+  [role="button"],
+  [role="switch"],
+  [role="tab"],
+  [role="checkbox"],
+  [role="radio"]
+):focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* 细滚动条，避免编辑器出现厚重的原生滚动条 */
 .resume-scroll::-webkit-scrollbar {
   width: 10px;

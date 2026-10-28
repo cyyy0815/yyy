@@ -1,12 +1,28 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import puppeteer from "puppeteer-core";
 
-const CHROME =
-  process.env.CHROME_PATH ??
-  "C:/Program Files/Google/Chrome/Application/chrome.exe";
+const CHROME_CANDIDATES = [
+  process.env.CHROME_PATH,
+  process.env.PUPPETEER_EXECUTABLE_PATH,
+  "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+  "/usr/bin/google-chrome",
+  "/usr/bin/google-chrome-stable",
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+].filter(Boolean);
+const CHROME = CHROME_CANDIDATES.find((candidate) => existsSync(candidate));
 const BASE = process.env.QA_BASE ?? "http://localhost:3000";
+
+if (!CHROME) {
+  console.error(
+    "未找到 Chrome。请安装 Chrome，或通过 CHROME_PATH 指定可执行文件。",
+  );
+  process.exit(1);
+}
 const OUT = path.join(process.cwd(), ".screenshots");
 const failures = [];
 
@@ -427,6 +443,59 @@ if (aiDialog) {
   await aiDialog.screenshot({ path: `${OUT}/qa-ai-dialog.png` });
 }
 
+// 事实核对：追加素材之外的技能/数字应实时提示，随后还原预览再采用
+await aiPage.waitForSelector('[data-qa="fact-check"]', { timeout: 5000 });
+await aiPage.$eval('[aria-label="生成预览，可直接修改"]', (element) => {
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLTextAreaElement.prototype,
+    "value",
+  )?.set;
+  setter?.call(element, `${element.value}\n使用 Kubernetes 将吞吐量提升 99%。`);
+  element.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await aiPage.waitForFunction(
+  () => {
+    const panel = document.querySelector('[data-qa="fact-check"]');
+    const text = panel?.textContent ?? "";
+    return (
+      Number(panel?.getAttribute("data-warning-count") ?? 0) >= 2 &&
+      text.includes("Kubernetes") &&
+      text.includes("99%")
+    );
+  },
+  { timeout: 5000 },
+);
+const aiFact = await aiPage.$eval('[data-qa="fact-check"]', (element) => ({
+  count: Number(element.getAttribute("data-warning-count")),
+  text: element.textContent ?? "",
+}));
+expect(
+  "单段事实核对实时标出素材之外的技能与数字",
+  aiFact.count >= 2 &&
+    aiFact.text.includes("Kubernetes") &&
+    aiFact.text.includes("99%"),
+  JSON.stringify(aiFact),
+);
+await aiPage.$eval(
+  '[aria-label="生成预览，可直接修改"]',
+  (element, text) => {
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "value",
+    )?.set;
+    setter?.call(element, text);
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+  },
+  AI_TEXT,
+);
+await aiPage.waitForFunction(
+  (text) =>
+    document.querySelector('[aria-label="生成预览，可直接修改"]')?.value ===
+    text,
+  { timeout: 5000 },
+  AI_TEXT,
+);
+
 await clickText(aiPage, "采用到简历", '[role="dialog"]');
 await pause(300);
 const confirmShown = await aiPage.evaluate(() =>
@@ -708,6 +777,21 @@ expect(
   ),
   fullPreviewText.slice(0, 120),
 );
+const fullFact = await aiFullPage.$eval(
+  '[data-qa="ai-full-preview"] [data-qa="fact-check"]',
+  (element) => ({
+    count: Number(element.getAttribute("data-warning-count")),
+    text: element.textContent ?? "",
+  }),
+);
+expect(
+  "整份事实核对标出自述之外的学校、专业与数字",
+  fullFact.count >= 3 &&
+    fullFact.text.includes("华东师范大学") &&
+    fullFact.text.includes("信息管理与信息系统") &&
+    fullFact.text.includes("30%"),
+  JSON.stringify({ count: fullFact.count, text: fullFact.text.slice(0, 200) }),
+);
 
 await clickText(aiFullPage, "生成新简历", '[role="dialog"]');
 await aiFullPage.waitForFunction(
@@ -887,6 +971,20 @@ const coverResult = await coverPage.evaluate(() => {
     hasDownload: Boolean(document.querySelector('[data-qa="cover-download"]')),
   };
 });
+const coverFact = await coverPage.$eval(
+  '[role="dialog"] [data-qa="fact-check"]',
+  (element) => ({
+    count: Number(element.getAttribute("data-warning-count")),
+    text: element.textContent ?? "",
+  }),
+);
+expect(
+  "求职信事实核对标出素材之外的数字",
+  coverFact.count >= 2 &&
+    coverFact.text.includes("12") &&
+    coverFact.text.includes("30%"),
+  JSON.stringify({ count: coverFact.count, text: coverFact.text.slice(0, 200) }),
+);
 expect(
   "求职信可预览、编辑，并提供复制与下载",
   coverResult.text.includes("此致") &&
@@ -2442,7 +2540,7 @@ const libraryArchive = await multiPage.evaluate(async () => {
 expect(
   "导出备份包含全部简历",
   libraryArchive.format === "resume-workshop" &&
-    libraryArchive.version === 2 &&
+    libraryArchive.version === 3 &&
     libraryArchive.documents.length === 2 &&
     libraryArchive.downloadName === "主简历-全部简历.json" &&
     libraryArchive.documents.some(
@@ -2479,6 +2577,12 @@ const documentsMobile = await multiPage.evaluate(() => {
     actions: [...(bar?.querySelectorAll("button") ?? [])].map((button) =>
       button.textContent?.trim(),
     ),
+    buttonsInViewport: [...(bar?.querySelectorAll("button") ?? [])].every(
+      (button) => {
+        const rect = button.getBoundingClientRect();
+        return rect.left >= 0 && rect.right <= window.innerWidth;
+      },
+    ),
     bar: Boolean(bar),
   };
 });
@@ -2486,7 +2590,9 @@ expect(
   "手机端多简历栏无横向溢出",
   documentsMobile.bar &&
     documentsMobile.count === 2 &&
-    documentsMobile.actions.join(",") === "新建,复制,重命名,删除" &&
+    documentsMobile.actions.join(",") ===
+      "新建,复制,重命名,导出当前,合并导入,删除" &&
+    documentsMobile.buttonsInViewport &&
     documentsMobile.scrollWidth <= documentsMobile.viewport,
   JSON.stringify(documentsMobile),
 );
@@ -2570,6 +2676,175 @@ await archivePage.evaluate(() => {
   localStorage.setItem("resume-workshop:template", "modern");
 });
 await archivePage.close();
+
+// 单份导出与合并导入：单份文件不带其他简历 / 投递记录，合并时不覆盖现有数据
+const singlePage = await open({ width: 1440, height: 1000 });
+await singlePage.goto(BASE, { waitUntil: "networkidle0" });
+await singlePage.evaluate(() => {
+  localStorage.clear();
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: { name: "单份导出", summary: "只导出这一份" },
+      skills: ["React"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.setItem("resume-workshop:template", "classic");
+  localStorage.setItem(
+    "resume-workshop:applications:v1",
+    JSON.stringify([
+      {
+        company: "本地公司",
+        role: "前端",
+        status: "applied",
+        jd: "本地 JD",
+        updatedAt: 1000,
+      },
+    ]),
+  );
+});
+await singlePage.reload({ waitUntil: "networkidle0" });
+await pause(600);
+await singlePage.evaluate(() => {
+  window.__qaSingleBlob = null;
+  window.__qaSingleName = "";
+  const original = URL.createObjectURL;
+  URL.createObjectURL = (blob) => {
+    window.__qaSingleBlob = blob;
+    return original.call(URL, blob);
+  };
+  HTMLAnchorElement.prototype.click = function () {
+    window.__qaSingleName = this.download;
+  };
+});
+await clickText(singlePage, "导出当前");
+await singlePage.waitForFunction(() => Boolean(window.__qaSingleBlob), {
+  timeout: 5000,
+});
+const singleExport = await singlePage.evaluate(async () => {
+  const text = await window.__qaSingleBlob.text();
+  const payload = JSON.parse(text);
+  return {
+    text,
+    format: payload.format,
+    version: payload.version,
+    title: payload.title,
+    template: payload.template,
+    hasDocuments: Array.isArray(payload.documents),
+    hasApplications: Array.isArray(payload.applications),
+    name: payload.resume?.basic?.name,
+    downloadName: window.__qaSingleName,
+  };
+});
+expect(
+  "单份导出只包含当前简历且文件名正确",
+  singleExport.format === "resume-workshop-single" &&
+    singleExport.version === 1 &&
+    singleExport.title === "单份导出" &&
+    singleExport.template === "classic" &&
+    singleExport.name === "单份导出" &&
+    !singleExport.hasDocuments &&
+    !singleExport.hasApplications &&
+    singleExport.downloadName.endsWith("-简历.json") &&
+    !singleExport.downloadName.includes("全部简历"),
+  JSON.stringify({ ...singleExport, text: undefined }),
+);
+const singlePath = path.join(OUT, "qa-single-resume.json");
+await writeFile(singlePath, singleExport.text, "utf8");
+
+const singleInput = await singlePage.$('input[type="file"][accept*="json"]');
+await singlePage.click('[data-qa="merge-import"]');
+await singleInput.uploadFile(singlePath);
+await singlePage.waitForFunction(
+  () => document.body.innerText.includes("已作为新简历"),
+  { timeout: 5000 },
+);
+const afterSingleMerge = await singlePage.evaluate(() => {
+  const select = document.querySelector('select[aria-label="切换简历"]');
+  const library = JSON.parse(
+    localStorage.getItem("resume-workshop:library:v1") ?? "null",
+  );
+  return {
+    count: select?.options.length,
+    selected: select?.selectedOptions[0]?.textContent,
+    others: (library?.others ?? []).map((document) => document.title),
+  };
+});
+expect(
+  "合并导入单份简历会新增副本且保留原简历",
+  afterSingleMerge.count === 2 &&
+    afterSingleMerge.selected === "单份导出 2" &&
+    afterSingleMerge.others.includes("单份导出"),
+  JSON.stringify(afterSingleMerge),
+);
+
+const mergeArchivePath = path.join(OUT, "qa-merge-library.json");
+await writeFile(
+  mergeArchivePath,
+  JSON.stringify({
+    format: "resume-workshop",
+    version: 3,
+    activeId: "merge-doc",
+    documents: [
+      {
+        id: "merge-doc",
+        title: "合并简历",
+        template: "compact",
+        resume: { basic: { name: "合并简历" } },
+      },
+    ],
+    applications: [
+      {
+        id: "merge-app",
+        company: "合并公司",
+        role: "后端",
+        status: "interview",
+        jd: "合并 JD",
+        updatedAt: 2000,
+      },
+    ],
+  }),
+  "utf8",
+);
+await singlePage.click('[data-qa="merge-import"]');
+await singleInput.uploadFile(mergeArchivePath);
+await singlePage.waitForFunction(
+  () => document.body.innerText.includes("已合并 1 份简历"),
+  { timeout: 5000 },
+);
+const afterLibraryMerge = await singlePage.evaluate(() => {
+  const select = document.querySelector('select[aria-label="切换简历"]');
+  const library = JSON.parse(
+    localStorage.getItem("resume-workshop:library:v1") ?? "null",
+  );
+  const applications = JSON.parse(
+    localStorage.getItem("resume-workshop:applications:v1") ?? "[]",
+  );
+  return {
+    count: select?.options.length,
+    selected: select?.selectedOptions[0]?.textContent,
+    activeTitle: library?.activeTitle,
+    others: (library?.others ?? []).map((document) => document.title),
+    companies: applications.map((application) => application.company),
+  };
+});
+expect(
+  "整库合并导入追加简历与投递记录且不覆盖当前简历",
+  afterLibraryMerge.count === 3 &&
+    afterLibraryMerge.selected === "单份导出 2" &&
+    afterLibraryMerge.activeTitle === "单份导出 2" &&
+    afterLibraryMerge.others.includes("合并简历") &&
+    afterLibraryMerge.companies.includes("本地公司") &&
+    afterLibraryMerge.companies.includes("合并公司"),
+  JSON.stringify(afterLibraryMerge),
+);
+expect(
+  "单份导出与合并导入页面无控制台错误",
+  singlePage.qaErrors.length === 0,
+  singlePage.qaErrors.join(" | "),
+);
+await singlePage.close();
 
 // P3 输入校验：格式提示只在失焦后出现，不阻止保存
 const validationPage = await open({ width: 1440, height: 1000 });
@@ -2964,7 +3239,7 @@ const exported = await pdfNamePage.evaluate(async () => {
 expect(
   "导出全部简历且文件名正确",
   exported.format === "resume-workshop" &&
-    exported.version === 2 &&
+    exported.version === 3 &&
     exported.count === 1 &&
     exported.template === "modern" &&
     exported.name === "林一" &&
@@ -3401,6 +3676,74 @@ expect(
 );
 
 await jobsP3Page.evaluate(() => {
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: { name: "林一", headline: "网络安全工程师" },
+      intent: { targetRole: "网络安全工程师", targetCity: "上海" },
+      educations: [],
+      experiences: [],
+      projects: [],
+      skills: [
+        "网络安全",
+        "渗透测试",
+        "漏洞挖掘",
+        "等保",
+        "Linux",
+        "Python",
+        "Web安全",
+        "JavaScript",
+        "TypeScript",
+        "Kubernetes",
+        "Go",
+        "PostgreSQL",
+        "Spring Boot",
+        "CI/CD",
+      ],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.removeItem("resume-workshop:jd");
+});
+await jobsP3Page.reload({ waitUntil: "networkidle0" });
+await pause(800);
+const securityJobs = await jobsP3Page.evaluate(() => {
+  const text = document.body.innerText;
+  return {
+    hasProfile: text.includes("命中核心技能"),
+    unknownProfile: text.includes("岗位画像未收录"),
+    role: text.includes("网络安全工程师"),
+  };
+});
+expect(
+  "新增网络安全岗位画像可用",
+  securityJobs.hasProfile &&
+    !securityJobs.unknownProfile &&
+    securityJobs.role,
+  JSON.stringify(securityJobs),
+);
+
+await jobsP3Page.type(
+  "textarea",
+  "熟悉 JS/TS、K8s、Golang、Postgres 与 SpringBoot，了解 CI/CD。",
+);
+await clickText(jobsP3Page, "分析匹配度");
+await pause(600);
+const aliasJd = await jobsP3Page.evaluate(() => {
+  const text = document.body.innerText;
+  return {
+    summary: (text.match(/JD 关键词[^\n]*/) ?? [])[0] ?? "",
+    covered: text.includes("全部覆盖"),
+  };
+});
+expect(
+  "JD 同义词归一到规范技能名",
+  aliasJd.summary.includes("JD 关键词 7 个 · 已覆盖 7 个") &&
+    aliasJd.covered,
+  JSON.stringify(aliasJd),
+);
+
+await jobsP3Page.evaluate(() => {
   localStorage.removeItem("resume-workshop:v1");
   localStorage.removeItem("resume-workshop:jd");
   localStorage.removeItem("resume-workshop:last-saved-at");
@@ -3432,6 +3775,35 @@ const [homeResponse, manifestResponse, iconResponse, ogResponse] =
   ]);
 const homeHtml = await homeResponse.text();
 const manifest = await manifestResponse.json();
+const securityCsp =
+  homeResponse.headers.get("content-security-policy") ?? "";
+expect(
+  "安全响应头完整",
+  homeResponse.headers.get("x-content-type-options") === "nosniff" &&
+    homeResponse.headers.get("x-frame-options") === "DENY" &&
+    homeResponse.headers.get("referrer-policy") ===
+      "strict-origin-when-cross-origin" &&
+    homeResponse.headers.get("cross-origin-opener-policy") === "same-origin" &&
+    homeResponse.headers.get("cross-origin-resource-policy") === "same-origin" &&
+    homeResponse.headers.get("strict-transport-security") ===
+      "max-age=31536000" &&
+    (homeResponse.headers.get("permissions-policy") ?? "").includes(
+      "camera=()",
+    ) &&
+    securityCsp.includes("default-src 'self'") &&
+    securityCsp.includes("frame-ancestors 'none'") &&
+    securityCsp.includes("object-src 'none'") &&
+    securityCsp.includes("form-action 'self'"),
+  JSON.stringify({
+    csp: securityCsp,
+    headers: Object.fromEntries(homeResponse.headers),
+  }),
+);
+expect(
+  "未暴露 X-Powered-By",
+  !homeResponse.headers.has("x-powered-by"),
+  homeResponse.headers.get("x-powered-by") ?? "",
+);
 expect(
   "首页包含 OG / Twitter / manifest / 图标元数据",
   homeResponse.ok &&
@@ -3706,6 +4078,79 @@ expect(
   JSON.stringify({ savedHistoryName }),
 );
 
+// 刷新后仍能撤销 / 重做：历史写入 sessionStorage，且只对应当前已保存内容
+await setFieldByLabel(historyPage, "姓名", "刷新前");
+await pause(1000);
+const persistedHistory = await historyPage.evaluate(() => {
+  try {
+    const data = JSON.parse(
+      sessionStorage.getItem("resume-workshop:history:v1") ?? "null",
+    );
+    return data
+      ? {
+          version: data.version,
+          schemaVersion: data.schemaVersion,
+          past: Array.isArray(data.past) ? data.past.length : 0,
+          future: Array.isArray(data.future) ? data.future.length : 0,
+        }
+      : null;
+  } catch {
+    return null;
+  }
+});
+expect(
+  "撤销历史写入会话存储并带数据版本",
+  persistedHistory?.version === 1 &&
+    persistedHistory.schemaVersion >= 1 &&
+    persistedHistory.past > 0,
+  JSON.stringify(persistedHistory),
+);
+
+await historyPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+const reloadedHistoryButtons = await historyButtonStates();
+expect(
+  "刷新后撤销历史仍可用",
+  reloadedHistoryButtons.find((button) => button.label === "撤销")?.disabled ===
+    false,
+  JSON.stringify(reloadedHistoryButtons),
+);
+expect(
+  "刷新后空闲的重做栈保持为空",
+  reloadedHistoryButtons.find((button) => button.label === "重做")?.disabled ===
+    true,
+  JSON.stringify(reloadedHistoryButtons),
+);
+
+await clickHistoryButton("撤销");
+await pause(300);
+const reloadUndoName = await readHistoryName();
+expect(
+  "刷新后撤销恢复到上次保存前的状态",
+  reloadUndoName === "新名字",
+  JSON.stringify({ reloadUndoName }),
+);
+
+await pause(900);
+await historyPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+const afterUndoReloadButtons = await historyButtonStates();
+expect(
+  "刷新后重做历史仍可用",
+  afterUndoReloadButtons.find((button) => button.label === "重做")?.disabled ===
+    false,
+  JSON.stringify(afterUndoReloadButtons),
+);
+await clickHistoryButton("重做");
+await pause(300);
+const reloadRedoName = await readHistoryName();
+expect(
+  "刷新后重做恢复修改",
+  reloadRedoName === "刷新前",
+  JSON.stringify({ reloadRedoName }),
+);
+await pause(900);
+
 const countHistoryExperiences = () =>
   historyPage.evaluate(
     () => document.querySelectorAll('[aria-label="删除"]').length,
@@ -3884,6 +4329,994 @@ expect(
   skillPage.qaErrors.join("; "),
 );
 await skillPage.close();
+
+// 投递看板：新建、状态流转、多 JD、导出与刷新保留
+const applicationPage = await open({ width: 1440, height: 1000 });
+await applicationPage.goto(`${BASE}/#jobs`, { waitUntil: "networkidle0" });
+await applicationPage.evaluate((resume) => {
+  localStorage.clear();
+  localStorage.setItem("resume-workshop:v1", JSON.stringify(resume));
+  localStorage.setItem("resume-workshop:template", "modern");
+  localStorage.setItem(
+    "resume-workshop:jd",
+    "任职要求：熟悉 React 与 TypeScript，有中后台经验。",
+  );
+}, coverResume);
+await applicationPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+await applicationPage.waitForSelector('[data-qa="application-board"]', {
+  timeout: 15000,
+});
+await applicationPage.click('[data-qa="application-create"]');
+await applicationPage.waitForSelector('[data-qa="application-form"]', {
+  timeout: 15000,
+});
+const applicationPrefillJd = await applicationPage.$eval(
+  '[data-qa="application-jd"]',
+  (element) => element.value,
+);
+expect(
+  "新建投递默认带入当前 JD",
+  applicationPrefillJd.includes("任职要求"),
+  applicationPrefillJd.slice(0, 80),
+);
+
+const APPLICATION_JD =
+  "岗位 JD：负责 React 中后台开发，要求 TypeScript 与性能优化经验。";
+await setQaValue(applicationPage, '[data-qa="application-company"]', "星野科技");
+await setQaValue(applicationPage, '[data-qa="application-role"]', "前端工程师");
+await setQaValue(applicationPage, '[data-qa="application-city"]', "上海");
+await selectByOptionText(applicationPage, "已投", '[data-qa="application-form"]');
+await setQaValue(
+  applicationPage,
+  '[data-qa="application-applied-at"]',
+  "2026-10-20",
+);
+await setQaValue(
+  applicationPage,
+  '[data-qa="application-next-action"]',
+  "2026-10-27",
+);
+await setQaValue(applicationPage, '[data-qa="application-jd"]', APPLICATION_JD);
+await setQaValue(
+  applicationPage,
+  '[data-qa="application-cover-letter"]',
+  "尊敬的招聘负责人：\n\n我有 4 年前端经验。\n\n此致\n敬礼",
+);
+await setQaValue(
+  applicationPage,
+  '[data-qa="application-note"]',
+  "周三上午一面",
+);
+await applicationPage.click('[data-qa="application-save"]');
+await applicationPage.waitForFunction(
+  () => Boolean(document.querySelector('[data-qa="application-card"]')),
+  { timeout: 10000 },
+);
+await pause(300);
+
+const savedApplication = await applicationPage.evaluate(() => {
+  try {
+    const list = JSON.parse(
+      localStorage.getItem("resume-workshop:applications:v1") ?? "[]",
+    );
+    return list[0] ?? null;
+  } catch {
+    return null;
+  }
+});
+expect(
+  "新建投递保存公司、岗位、状态、日期与 JD",
+  savedApplication?.company === "星野科技" &&
+    savedApplication?.role === "前端工程师" &&
+    savedApplication?.status === "applied" &&
+    savedApplication?.appliedAt === "2026-10-20" &&
+    savedApplication?.nextActionAt === "2026-10-27" &&
+    savedApplication?.jd === APPLICATION_JD &&
+    savedApplication?.note === "周三上午一面" &&
+    savedApplication?.coverLetter.includes("此致"),
+  JSON.stringify(savedApplication),
+);
+
+await selectByOptionText(
+  applicationPage,
+  "面试中",
+  '[data-qa="application-column-applied"]',
+);
+await pause(400);
+const movedStatus = await applicationPage.evaluate(() => {
+  try {
+    return JSON.parse(
+      localStorage.getItem("resume-workshop:applications:v1") ?? "[]",
+    )[0]?.status;
+  } catch {
+    return null;
+  }
+});
+expect("投递状态可流转并立即保存", movedStatus === "interview", String(movedStatus));
+
+await applicationPage.click('[data-qa="application-details"]');
+await applicationPage.waitForSelector('[data-qa="application-use-jd"]', {
+  timeout: 5000,
+});
+await applicationPage.click('[data-qa="application-use-jd"]');
+await pause(300);
+const activeJd = await applicationPage.evaluate(
+  () => localStorage.getItem("resume-workshop:jd") ?? "",
+);
+expect(
+  "可把某条投递的 JD 设为当前 JD",
+  activeJd === APPLICATION_JD,
+  activeJd.slice(0, 80),
+);
+
+await applicationPage.evaluate(() => {
+  window.__qaExportedBlob = null;
+  window.__qaDownloadName = "";
+  const original = URL.createObjectURL;
+  URL.createObjectURL = (blob) => {
+    window.__qaExportedBlob = blob;
+    return original.call(URL, blob);
+  };
+  HTMLAnchorElement.prototype.click = function () {
+    window.__qaDownloadName = this.download;
+  };
+});
+await clickText(applicationPage, "导出");
+await applicationPage.waitForFunction(
+  () => Boolean(window.__qaExportedBlob),
+  { timeout: 5000 },
+);
+const applicationArchive = await applicationPage.evaluate(async () => {
+  const payload = JSON.parse(await window.__qaExportedBlob.text());
+  return {
+    version: payload.version,
+    applications: payload.applications ?? [],
+    downloadName: window.__qaDownloadName,
+  };
+});
+expect(
+  "整库备份包含投递记录且版本升级",
+  applicationArchive.version === 3 &&
+    applicationArchive.applications.length === 1 &&
+    applicationArchive.applications[0]?.company === "星野科技" &&
+    applicationArchive.applications[0]?.jd === APPLICATION_JD,
+  JSON.stringify({
+    version: applicationArchive.version,
+    count: applicationArchive.applications.length,
+  }),
+);
+
+await applicationPage.reload({ waitUntil: "networkidle0" });
+await pause(600);
+const applicationAfterReload = await applicationPage.evaluate(() => ({
+  cards: document.querySelectorAll('[data-qa="application-card"]').length,
+  company:
+    document.querySelector('[data-qa="application-card"] h4')?.textContent ??
+    "",
+  notice: document.querySelector('[data-qa="application-board"]')
+    ?.textContent ?? "",
+}));
+expect(
+  "刷新后投递记录仍保留",
+  applicationAfterReload.cards === 1 &&
+    applicationAfterReload.company.includes("星野科技") &&
+    applicationAfterReload.notice.includes("1 条记录"),
+  JSON.stringify({
+    cards: applicationAfterReload.cards,
+    company: applicationAfterReload.company,
+  }),
+);
+
+await applicationPage.setViewport({
+  width: 390,
+  height: 844,
+  deviceScaleFactor: 1,
+  isMobile: true,
+  hasTouch: true,
+});
+await applicationPage.reload({ waitUntil: "networkidle0" });
+await pause(600);
+const applicationMobile = await applicationPage.evaluate(() => ({
+  viewport: window.innerWidth,
+  pageWidth: document.documentElement.scrollWidth,
+  boardWidth:
+    document.querySelector('[data-qa="application-board"]')?.scrollWidth ?? 0,
+}));
+expect(
+  "投递看板在 390px 无横向溢出",
+  applicationMobile.pageWidth <= applicationMobile.viewport &&
+    applicationMobile.boardWidth <= applicationMobile.viewport,
+  JSON.stringify(applicationMobile),
+);
+
+await applicationPage.setViewport({
+  width: 1440,
+  height: 1000,
+  deviceScaleFactor: 1,
+  isMobile: false,
+  hasTouch: false,
+});
+await applicationPage.reload({ waitUntil: "networkidle0" });
+await pause(600);
+const applicationBoardElement = await applicationPage.$(
+  '[data-qa="application-board"]',
+);
+if (applicationBoardElement) {
+  await applicationBoardElement.screenshot({
+    path: `${OUT}/qa-applications.png`,
+  });
+}
+expect(
+  "投递看板页面无控制台错误",
+  applicationPage.qaErrors.length === 0,
+  applicationPage.qaErrors.join(" | "),
+);
+await applicationPage.close();
+
+// ATS 纯文本 / Markdown 导出与 JD 关键词覆盖
+const atsPage = await open({ width: 1440, height: 1000 });
+await atsPage.goto(BASE, { waitUntil: "networkidle0" });
+await atsPage.evaluate(() => {
+  localStorage.clear();
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: {
+        name: "ATS测试",
+        headline: "前端工程师",
+        email: "ats@example.com",
+        phone: "13800138000",
+        city: "上海",
+        website: "https://ats.example.com",
+        github: "https://github.com/ats",
+        summary: "5 年前端经验，负责 React 项目。",
+      },
+      intent: {
+        targetRole: "前端工程师",
+        targetCity: "上海",
+        salaryMin: "20",
+        salaryMax: "30",
+        jobType: "全职",
+        experience: "3-5年",
+      },
+      educations: [
+        {
+          school: "某大学",
+          major: "计算机",
+          degree: "本科",
+          start: "2018",
+          end: "2022",
+          gpa: "3.8",
+          ranking: "前 10%",
+          courses: "数据结构",
+          honors: "一等奖学金",
+        },
+      ],
+      experiences: [
+        {
+          company: "某公司",
+          role: "前端工程师",
+          start: "2022",
+          end: "至今",
+          description: "负责 React 与 TypeScript 开发\n首屏性能优化 30%",
+        },
+      ],
+      projects: [
+        {
+          name: "开源项目",
+          role: "作者",
+          start: "2023",
+          end: "2024",
+          description: "使用 Vite 构建",
+          link: "https://github.com/example/project",
+        },
+      ],
+      customSections: [
+        {
+          title: "证书",
+          visible: true,
+          items: [
+            {
+              title: "CET-6",
+              subtitle: "教育部",
+              date: "2021",
+              description: "",
+              link: "",
+            },
+          ],
+        },
+      ],
+      skills: ["React", "TypeScript", "Docker"],
+      skillGroups: ["前端"],
+      skillMeta: {
+        React: { level: "精通", group: "前端" },
+        TypeScript: { level: "熟练", group: "前端" },
+        Docker: { level: "熟练", group: "" },
+      },
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.setItem("resume-workshop:template", "classic");
+  localStorage.setItem(
+    "resume-workshop:jd",
+    "熟悉 React、TypeScript 与 Kubernetes，了解 Docker",
+  );
+});
+await atsPage.reload({ waitUntil: "networkidle0" });
+await pause(600);
+await atsPage.click('[data-qa="ats-export"]');
+await atsPage.waitForSelector('[data-qa="ats-dialog"]', { timeout: 5000 });
+await pause(200);
+const atsState = await atsPage.evaluate(() => {
+  const preview = document.querySelector('[data-qa="ats-preview"]');
+  const coverage = document.querySelector('[data-qa="ats-coverage"]');
+  const missing = document.querySelector('[data-qa="ats-missing"]');
+  const dialog = document.querySelector('[data-qa="ats-dialog"]');
+  const rect = dialog?.getBoundingClientRect();
+  return {
+    text: preview?.textContent ?? "",
+    score: Number(coverage?.getAttribute("data-score") ?? "-1"),
+    missing: missing?.textContent ?? "",
+    dialogInViewport: rect
+      ? rect.left >= 0 && rect.right <= window.innerWidth
+      : false,
+    viewport: window.innerWidth,
+    pageWidth: document.documentElement.scrollWidth,
+  };
+});
+expect(
+  "ATS 纯文本包含线性简历信息且不输出分栏与技能等级",
+  atsState.text.includes("ATS测试\n前端工程师") &&
+    atsState.text.includes(
+      "ats@example.com · 13800138000 · 上海",
+    ) &&
+    atsState.text.includes(
+      "工作经历\n某公司 | 前端工程师 | 2022 – 至今\n- 负责 React 与 TypeScript 开发\n- 首屏性能优化 30%",
+    ) &&
+    atsState.text.includes(
+      "项目经历\n开源项目 | 作者 | 2023 – 2024\n链接：https://github.com/example/project\n使用 Vite 构建",
+    ) &&
+    atsState.text.includes("证书\nCET-6 | 教育部 | 2021") &&
+    atsState.text.includes("技能\n前端：React、TypeScript\n其他：Docker") &&
+    !atsState.text.includes("React（精通）") &&
+    !atsState.text.includes("undefined"),
+  JSON.stringify({
+    length: atsState.text.length,
+    head: atsState.text.slice(0, 120),
+  }),
+);
+expect(
+  "ATS 关键词覆盖按 JD 统计缺口",
+  atsState.score === 75 && atsState.missing.includes("Kubernetes"),
+  JSON.stringify({ score: atsState.score, missing: atsState.missing }),
+);
+expect(
+  "ATS 弹窗在桌面视口内且页面无横向溢出",
+  atsState.dialogInViewport && atsState.pageWidth <= atsState.viewport,
+  JSON.stringify({
+    dialogInViewport: atsState.dialogInViewport,
+    viewport: atsState.viewport,
+    pageWidth: atsState.pageWidth,
+  }),
+);
+
+await atsPage.evaluate(() => {
+  window.__qaAtsBlob = null;
+  window.__qaAtsName = "";
+  const original = URL.createObjectURL;
+  URL.createObjectURL = (blob) => {
+    window.__qaAtsBlob = blob;
+    return original.call(URL, blob);
+  };
+  HTMLAnchorElement.prototype.click = function () {
+    window.__qaAtsName = this.download;
+  };
+});
+await atsPage.click('[data-qa="ats-download"]');
+await atsPage.waitForFunction(() => Boolean(window.__qaAtsBlob), {
+  timeout: 5000,
+});
+const atsTextExport = await atsPage.evaluate(async () => ({
+  text: await window.__qaAtsBlob.text(),
+  downloadName: window.__qaAtsName,
+}));
+expect(
+  "ATS 纯文本下载文件名与内容正确",
+  atsTextExport.downloadName === "ATS测试-ATS.txt" &&
+    atsTextExport.text === atsState.text,
+  JSON.stringify({
+    downloadName: atsTextExport.downloadName,
+    sameContent: atsTextExport.text === atsState.text,
+  }),
+);
+
+await atsPage.click('[data-qa="ats-format-markdown"]');
+await atsPage.waitForFunction(
+  () =>
+    document
+      .querySelector('[data-qa="ats-preview"]')
+      ?.textContent?.startsWith("# ATS测试"),
+  { timeout: 5000 },
+);
+const atsMarkdown = await atsPage.evaluate(
+  () => document.querySelector('[data-qa="ats-preview"]')?.textContent ?? "",
+);
+await atsPage.click('[data-qa="ats-download"]');
+await atsPage.waitForFunction(
+  () => window.__qaAtsName === "ATS测试-ATS.md",
+  { timeout: 5000 },
+);
+const atsMarkdownExport = await atsPage.evaluate(async () => ({
+  text: await window.__qaAtsBlob.text(),
+  downloadName: window.__qaAtsName,
+}));
+expect(
+  "ATS Markdown 使用标题层级并可下载 .md",
+  atsMarkdown.startsWith("# ATS测试") &&
+    atsMarkdown.includes(
+      "## 工作经历\n\n### 某公司 | 前端工程师 | 2022 – 至今",
+    ) &&
+    atsMarkdown.includes("## 技能") &&
+    atsMarkdownExport.downloadName === "ATS测试-ATS.md" &&
+    atsMarkdownExport.text === atsMarkdown,
+  JSON.stringify({
+    downloadName: atsMarkdownExport.downloadName,
+    hasHeading: atsMarkdown.includes("## 工作经历"),
+  }),
+);
+
+expect(
+  "ATS 导出页面无控制台错误",
+  atsPage.qaErrors.length === 0,
+  atsPage.qaErrors.join(" | "),
+);
+await atsPage.close();
+
+const atsMobilePage = await open({ width: 390, height: 844, mobile: true });
+await atsMobilePage.goto(BASE, { waitUntil: "networkidle0" });
+await pause(600);
+await clickText(atsMobilePage, "预览");
+await pause(250);
+await atsMobilePage.click('[data-qa="ats-export"]');
+await atsMobilePage.waitForSelector('[data-qa="ats-dialog"]', {
+  timeout: 5000,
+});
+await pause(250);
+const atsMobile = await atsMobilePage.evaluate(() => {
+  const dialog = document.querySelector('[data-qa="ats-dialog"]');
+  const rect = dialog?.getBoundingClientRect();
+  const download = document
+    .querySelector('[data-qa="ats-download"]')
+    ?.getBoundingClientRect();
+  return {
+    viewport: window.innerWidth,
+    pageWidth: document.documentElement.scrollWidth,
+    dialogWidth: rect?.width ?? 0,
+    downloadInViewport: download
+      ? download.left >= 0 && download.right <= window.innerWidth
+      : false,
+  };
+});
+expect(
+  "ATS 导出在 390px 无横向溢出",
+  atsMobile.pageWidth <= atsMobile.viewport &&
+    atsMobile.dialogWidth <= atsMobile.viewport &&
+    atsMobile.downloadInViewport,
+  JSON.stringify(atsMobile),
+);
+const atsDialogElement = await atsMobilePage.$('[data-qa="ats-dialog"]');
+if (atsDialogElement) {
+  await atsDialogElement.screenshot({ path: `${OUT}/qa-ats.png` });
+}
+expect(
+  "ATS 导出页面在手机端无控制台错误",
+  atsMobilePage.qaErrors.length === 0,
+  atsMobilePage.qaErrors.join(" | "),
+);
+await atsMobilePage.close();
+
+// 内置板块显隐 / 排序与一页适配
+const layoutPage = await open({ width: 1440, height: 1000 });
+await layoutPage.goto(BASE, { waitUntil: "networkidle0" });
+await layoutPage.evaluate(() => {
+  localStorage.clear();
+  const experiences = Array.from({ length: 8 }, (_, index) => ({
+    id: `layout-exp-${index}`,
+    company: `公司${index + 1}`,
+    role: "前端工程师",
+    start: `202${index % 4}`,
+    end: "至今",
+    description: [
+      "负责后台系统前端架构与核心页面开发，推动组件复用。",
+      "主导性能优化，首屏加载时间下降 30%，并建立监控看板。",
+      "与产品、设计、后端协作交付多个版本，覆盖 10 万用户。",
+      "沉淀工程规范与自动化测试，减少线上回归问题。",
+    ].join("\n"),
+  }));
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: {
+        name: "布局测试",
+        headline: "前端工程师",
+        email: "layout@example.com",
+        phone: "13800138000",
+        city: "上海",
+        website: "",
+        github: "",
+        summary: "5 年前端开发经验，负责复杂后台系统。",
+      },
+      intent: {
+        targetRole: "前端工程师",
+        targetCity: "上海",
+        salaryMin: "20",
+        salaryMax: "30",
+        jobType: "全职",
+        experience: "3-5年",
+      },
+      educations: [
+        {
+          id: "layout-edu",
+          school: "某大学",
+          major: "计算机",
+          degree: "本科",
+          start: "2018",
+          end: "2022",
+          gpa: "",
+          ranking: "",
+          courses: "",
+          honors: "",
+        },
+      ],
+      experiences,
+      projects: [
+        {
+          id: "layout-proj",
+          name: "布局项目",
+          role: "作者",
+          start: "2023",
+          end: "2024",
+          description: "使用 React 构建。",
+          link: "",
+        },
+      ],
+      customSections: [
+        {
+          id: "layout-custom",
+          title: "证书",
+          visible: true,
+          items: [
+            {
+              id: "layout-cert",
+              title: "CET-6",
+              subtitle: "教育部",
+              date: "2021",
+              description: "",
+              link: "",
+            },
+          ],
+        },
+      ],
+      skills: ["React", "TypeScript", "Node.js"],
+    }),
+  );
+});
+await layoutPage.reload({ waitUntil: "networkidle0" });
+await pause(800);
+
+const layoutInitial = await layoutPage.evaluate(() => {
+  const paper = document.querySelector(".resume-paper");
+  const rows = [...document.querySelectorAll("[data-qa^='layout-row-']")];
+  return {
+    rows: rows.length,
+    hasCard: Boolean(document.querySelector('[data-qa="section-layout"]')),
+    text: paper?.textContent ?? "",
+    pages: Number(
+      document
+        .querySelector('[data-qa="preview-pages"]')
+        ?.getAttribute("data-pages") ?? 0,
+    ),
+  };
+});
+expect(
+  "板块布局编辑器展示全部七个内置板块",
+  layoutInitial.hasCard && layoutInitial.rows === 7,
+  JSON.stringify({ rows: layoutInitial.rows, hasCard: layoutInitial.hasCard }),
+);
+expect(
+  "默认布局按简介、工作、项目、自定义顺序渲染",
+  layoutInitial.text.indexOf("个人简介") <
+    layoutInitial.text.indexOf("工作经历") &&
+    layoutInitial.text.indexOf("工作经历") <
+      layoutInitial.text.indexOf("项目经历") &&
+    layoutInitial.text.indexOf("项目经历") < layoutInitial.text.indexOf("证书"),
+  `pages=${layoutInitial.pages}`,
+);
+
+await layoutPage.click('[data-qa="layout-toggle-experience"]');
+await pause(300);
+const hiddenAcrossTemplates = [];
+for (const label of ["现代", "经典", "紧凑", "侧栏", "时间轴"]) {
+  await clickText(layoutPage, label);
+  await pause(250);
+  const paperText = await layoutPage.evaluate(
+    () => document.querySelector(".resume-paper")?.textContent ?? "",
+  );
+  if (paperText.includes("公司1")) hiddenAcrossTemplates.push(label);
+}
+await clickText(layoutPage, "现代");
+await pause(200);
+expect(
+  "五种模板都遵守板块隐藏",
+  hiddenAcrossTemplates.length === 0,
+  hiddenAcrossTemplates.join("、"),
+);
+await layoutPage.click('[data-qa="layout-toggle-experience"]');
+await pause(300);
+const experienceBack = await layoutPage.evaluate(() =>
+  (document.querySelector(".resume-paper")?.textContent ?? "").includes(
+    "公司1",
+  ),
+);
+expect("重新显示工作经历后恢复条目", experienceBack, "公司1 未恢复");
+
+await layoutPage.click('[data-qa="layout-toggle-intent"]');
+await pause(700);
+const hiddenIntent = await layoutPage.evaluate(() => ({
+  hasIntent: (document.querySelector(".resume-paper")?.textContent ?? "").includes(
+    "求职意向",
+  ),
+  rowHidden: document
+    .querySelector('[data-qa="layout-row-intent"]')
+    ?.getAttribute("data-hidden"),
+  stored:
+    JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}").layout
+      ?.hidden ?? [],
+}));
+expect(
+  "隐藏求职意向会立即从预览移除并保存",
+  !hiddenIntent.hasIntent &&
+    hiddenIntent.rowHidden === "true" &&
+    hiddenIntent.stored.includes("intent"),
+  JSON.stringify(hiddenIntent),
+);
+
+await layoutPage.click('[data-qa="layout-toggle-intent"]');
+await pause(300);
+const shownIntent = await layoutPage.evaluate(() =>
+  (document.querySelector(".resume-paper")?.textContent ?? "").includes(
+    "求职意向",
+  ),
+);
+expect("再次点击显示可恢复求职意向", shownIntent, "求职意向未恢复");
+
+await layoutPage.click('[data-qa="layout-up-projects"]');
+await pause(300);
+const movedText =
+  (await layoutPage.evaluate(
+    () => document.querySelector(".resume-paper")?.textContent ?? "",
+  )) ?? "";
+expect(
+  "板块上移会改变预览顺序",
+  movedText.indexOf("项目经历") >= 0 &&
+    movedText.indexOf("项目经历") < movedText.indexOf("工作经历"),
+  `project=${movedText.indexOf("项目经历")} work=${movedText.indexOf("工作经历")}`,
+);
+
+await clickText(layoutPage, "经典");
+await pause(250);
+const classicOrderText = await layoutPage.evaluate(
+  () => document.querySelector(".resume-paper")?.textContent ?? "",
+);
+expect(
+  "经典模板同样遵守板块顺序",
+  classicOrderText.indexOf("项目经历") >= 0 &&
+    classicOrderText.indexOf("项目经历") <
+      classicOrderText.indexOf("工作经历"),
+  `project=${classicOrderText.indexOf("项目经历")} work=${classicOrderText.indexOf("工作经历")}`,
+);
+await clickText(layoutPage, "现代");
+await pause(200);
+
+await layoutPage.click('[data-qa="layout-reset"]');
+await pause(300);
+const resetState = await layoutPage.evaluate(() => {
+  const paper = document.querySelector(".resume-paper")?.textContent ?? "";
+  return {
+    order:
+      paper.indexOf("工作经历") < paper.indexOf("项目经历") &&
+      paper.indexOf("个人简介") < paper.indexOf("工作经历"),
+    intent: paper.includes("求职意向"),
+  };
+});
+expect(
+  "恢复默认会还原顺序与显隐",
+  resetState.order && resetState.intent,
+  JSON.stringify(resetState),
+);
+
+const layoutCard = await layoutPage.$('[data-qa="section-layout"]');
+if (layoutCard) {
+  await layoutCard.screenshot({ path: `${OUT}/qa-layout.png` });
+}
+
+await layoutPage.click('[data-qa="fit-open"]');
+await layoutPage.waitForSelector('[data-qa="fit-dialog"]', { timeout: 5000 });
+await pause(300);
+const fitInitial = await layoutPage.evaluate(() => {
+  const dialog = document.querySelector('[data-qa="fit-dialog"]');
+  return {
+    pages: Number(dialog?.getAttribute("data-pages") ?? 0),
+    status: document.querySelector('[data-qa="fit-status"]')?.textContent ?? "",
+    resetDisabled: Boolean(
+      document.querySelector('[data-qa="fit-reset"]')?.hasAttribute("disabled"),
+    ),
+  };
+});
+expect(
+  "一页适配显示当前页数并提示精简",
+  fitInitial.pages >= 2 && fitInitial.status.includes("建议精简到 1 页"),
+  JSON.stringify(fitInitial),
+);
+
+const fitA11y = await layoutPage.evaluate(() => {
+  const dialog = document.querySelector('[data-qa="fit-dialog"]');
+  const labelledBy = dialog?.getAttribute("aria-labelledby") ?? "";
+  const describedBy = dialog?.getAttribute("aria-describedby") ?? "";
+  return {
+    modal: dialog?.getAttribute("aria-modal"),
+    labelled: labelledBy
+      ? (document.getElementById(labelledBy)?.textContent ?? "")
+      : "",
+    described: describedBy
+      ? (document.getElementById(describedBy)?.textContent ?? "")
+      : "",
+    focusInside: Boolean(dialog?.contains(document.activeElement)),
+    bodyOverflow: document.body.style.overflow,
+  };
+});
+expect(
+  "弹窗具备模态语义、标题描述，并锁定背景滚动且焦点进入面板",
+  fitA11y.modal === "true" &&
+    fitA11y.labelled.includes("一页适配") &&
+    fitA11y.described.includes("隐藏暂时用不到的板块") &&
+    fitA11y.focusInside &&
+    fitA11y.bodyOverflow === "hidden",
+  JSON.stringify(fitA11y),
+);
+
+let fitFocusTrapped = true;
+for (let i = 0; i < 20; i += 1) {
+  await layoutPage.keyboard.press("Tab");
+  const inside = await layoutPage.evaluate(() =>
+    Boolean(
+      document
+        .querySelector('[data-qa="fit-dialog"]')
+        ?.contains(document.activeElement),
+    ),
+  );
+  if (!inside) {
+    fitFocusTrapped = false;
+    break;
+  }
+}
+for (let i = 0; i < 5 && fitFocusTrapped; i += 1) {
+  await layoutPage.keyboard.down("Shift");
+  await layoutPage.keyboard.press("Tab");
+  await layoutPage.keyboard.up("Shift");
+  const inside = await layoutPage.evaluate(() =>
+    Boolean(
+      document
+        .querySelector('[data-qa="fit-dialog"]')
+        ?.contains(document.activeElement),
+    ),
+  );
+  if (!inside) {
+    fitFocusTrapped = false;
+  }
+}
+expect(
+  "Tab / Shift+Tab 焦点被限制在弹窗内",
+  fitFocusTrapped,
+  "焦点逃出了弹窗",
+);
+
+await layoutPage.click('[data-qa="fit-suggest"]');
+await pause(500);
+const fitSuggested = await layoutPage.evaluate(() => {
+  const paper = document.querySelector(".resume-paper")?.textContent ?? "";
+  const checked = (key) =>
+    document
+      .querySelector(`[data-qa="fit-toggle-${key}"]`)
+      ?.getAttribute("aria-checked");
+  return {
+    intent: paper.includes("求职意向"),
+    custom: paper.includes("CET-6"),
+    intentChecked: checked("intent"),
+    customChecked: checked("custom"),
+  };
+});
+expect(
+  "一页适配可隐藏建议项并实时更新预览",
+  !fitSuggested.intent &&
+    !fitSuggested.custom &&
+    fitSuggested.intentChecked === "false" &&
+    fitSuggested.customChecked === "false",
+  JSON.stringify(fitSuggested),
+);
+
+const fitDialog = await layoutPage.$('[data-qa="fit-dialog"]');
+if (fitDialog) {
+  await fitDialog.screenshot({ path: `${OUT}/qa-fit.png` });
+}
+
+await layoutPage.click('[data-qa="fit-toggle-intent"]');
+await pause(400);
+const fitIntentBack = await layoutPage.evaluate(
+  () =>
+    (document.querySelector(".resume-paper")?.textContent ?? "").includes(
+      "求职意向",
+    ),
+);
+expect("一页适配中重新打开板块会立即恢复", fitIntentBack, "求职意向未恢复");
+
+await layoutPage.click('[data-qa="fit-reset"]');
+await pause(400);
+const fitReset = await layoutPage.evaluate(() => {
+  const paper = document.querySelector(".resume-paper")?.textContent ?? "";
+  return {
+    intent: paper.includes("求职意向"),
+    custom: paper.includes("CET-6"),
+    resetDisabled: Boolean(
+      document.querySelector('[data-qa="fit-reset"]')?.hasAttribute("disabled"),
+    ),
+  };
+});
+expect(
+  "一页适配可恢复到打开时的显隐状态",
+  fitReset.intent && fitReset.custom && fitReset.resetDisabled,
+  JSON.stringify(fitReset),
+);
+
+await layoutPage.keyboard.press("Escape");
+await layoutPage.waitForFunction(
+  () => !document.querySelector('[data-qa="fit-dialog"]'),
+  { timeout: 3000 },
+);
+await pause(150);
+const fitEscaped = await layoutPage.evaluate(() => ({
+  closed: !document.querySelector('[data-qa="fit-dialog"]'),
+  focus: document.activeElement?.getAttribute("data-qa"),
+  bodyOverflow: document.body.style.overflow,
+}));
+expect(
+  "Escape 关闭弹窗、解除滚动锁并把焦点还给触发按钮",
+  fitEscaped.closed &&
+    fitEscaped.focus === "fit-open" &&
+    fitEscaped.bodyOverflow !== "hidden",
+  JSON.stringify(fitEscaped),
+);
+
+await layoutPage.click('[data-qa="fit-open"]');
+await layoutPage.waitForSelector('[data-qa="fit-dialog"]', { timeout: 5000 });
+await pause(200);
+await layoutPage.click('[data-qa="fit-done"]');
+await pause(200);
+const fitClosed = await layoutPage.evaluate(() => ({
+  closed: !document.querySelector('[data-qa="fit-dialog"]'),
+  focus: document.activeElement?.getAttribute("data-qa"),
+  bodyOverflow: document.body.style.overflow,
+}));
+expect(
+  "关闭一页适配后回到预览并把焦点还给触发按钮",
+  fitClosed.closed &&
+    fitClosed.focus === "fit-open" &&
+    fitClosed.bodyOverflow !== "hidden",
+  JSON.stringify(fitClosed),
+);
+
+expect(
+  "板块布局与一页适配页面无控制台错误",
+  layoutPage.qaErrors.length === 0,
+  layoutPage.qaErrors.join(" | "),
+);
+await layoutPage.close();
+
+const layoutMobilePage = await open({ width: 390, height: 844, mobile: true });
+await layoutMobilePage.goto(BASE, { waitUntil: "networkidle0" });
+await pause(600);
+await clickText(layoutMobilePage, "预览");
+await pause(250);
+await layoutMobilePage.click('[data-qa="fit-open"]');
+await layoutMobilePage.waitForSelector('[data-qa="fit-dialog"]', {
+  timeout: 5000,
+});
+await pause(300);
+const fitMobile = await layoutMobilePage.evaluate(() => {
+  const dialog = document.querySelector('[data-qa="fit-dialog"]');
+  const rect = dialog?.getBoundingClientRect();
+  const done = document
+    .querySelector('[data-qa="fit-done"]')
+    ?.getBoundingClientRect();
+  return {
+    viewport: window.innerWidth,
+    pageWidth: document.documentElement.scrollWidth,
+    dialogWidth: rect?.width ?? 0,
+    doneInViewport: done
+      ? done.left >= 0 && done.right <= window.innerWidth
+      : false,
+  };
+});
+expect(
+  "一页适配在 390px 无横向溢出",
+  fitMobile.pageWidth <= fitMobile.viewport &&
+    fitMobile.dialogWidth <= fitMobile.viewport &&
+    fitMobile.doneInViewport,
+  JSON.stringify(fitMobile),
+);
+expect(
+  "一页适配手机端无控制台错误",
+  layoutMobilePage.qaErrors.length === 0,
+  layoutMobilePage.qaErrors.join(" | "),
+);
+await layoutMobilePage.close();
+
+const a11yPage = await open({ width: 1440, height: 1000 });
+await a11yPage.goto(BASE, { waitUntil: "networkidle0" });
+await pause(500);
+await a11yPage.keyboard.press("Tab");
+await pause(300);
+const skipLink = await a11yPage.evaluate(() => {
+  const element = document.activeElement;
+  const rect = element?.getBoundingClientRect();
+  const style = element ? getComputedStyle(element) : null;
+  return {
+    text: element?.textContent?.trim() ?? "",
+    href: element?.getAttribute("href"),
+    top: rect?.top ?? -1,
+    outline: style ? `${style.outlineStyle} ${style.outlineWidth}` : "",
+  };
+});
+expect(
+  "跳转主内容链接是首个 Tab 焦点、可见且有焦点环",
+  skipLink.text === "跳到主要内容" &&
+    skipLink.href === "#main-content" &&
+    skipLink.top >= 0 &&
+    skipLink.outline.includes("solid") &&
+    skipLink.outline.includes("2px"),
+  JSON.stringify(skipLink),
+);
+
+await a11yPage.keyboard.press("Enter");
+await pause(300);
+const skipTarget = await a11yPage.evaluate(() => ({
+  hash: location.hash,
+  activeId: document.activeElement?.id,
+}));
+expect(
+  "跳转链接把焦点移到主内容",
+  skipTarget.hash === "#main-content" && skipTarget.activeId === "main-content",
+  JSON.stringify(skipTarget),
+);
+
+await a11yPage.emulateMediaFeatures([
+  { name: "prefers-reduced-motion", value: "reduce" },
+]);
+const reducedMotion = await a11yPage.evaluate(() => {
+  const element = document.querySelector("header nav button");
+  const style = element ? getComputedStyle(element) : null;
+  return {
+    transition: Number.parseFloat(style?.transitionDuration ?? "1"),
+    animation: Number.parseFloat(style?.animationDuration ?? "1"),
+  };
+});
+expect(
+  "reduced motion 下过渡与动画接近即时",
+  reducedMotion.transition <= 0.01 && reducedMotion.animation <= 0.01,
+  JSON.stringify(reducedMotion),
+);
+await a11yPage.close();
 
 await browser.close();
 if (failures.length > 0) {

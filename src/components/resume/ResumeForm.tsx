@@ -33,6 +33,7 @@ import {
 import { groupSkills } from "@/lib/skills";
 import { AiWriter } from "@/components/resume/AiWriter";
 import { CustomSectionsEditor } from "@/components/resume/CustomSectionsEditor";
+import { SectionLayoutEditor } from "@/components/resume/SectionLayoutEditor";
 import {
   deleteTargetLabel,
   type DeleteTarget,
@@ -1541,6 +1542,8 @@ export function ResumeForm({ resume, onChange, onCreateDocument }: Props) {
           </Field>
         </div>
       </SectionCard>
+
+      <SectionLayoutEditor resume={resume} onChange={onChange} />
 
       <ExperienceSection
         resume={resume}

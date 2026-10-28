@@ -1,3 +1,16 @@
+import {
+  Children,
+  Fragment,
+  isValidElement,
+  type ReactNode,
+} from "react";
+import {
+  customItemHasContent,
+  hasVisibleSection,
+  isResumeSectionKey,
+  isSectionVisible,
+  resolveSectionLayout,
+} from "@/lib/layout";
 import { displayUrl, toSafeHref } from "@/lib/links";
 import {
   formatSkill,
@@ -7,12 +20,71 @@ import {
 } from "@/lib/skills";
 import { accentStyle } from "@/lib/theme";
 import type {
-  CustomItem,
   CustomSection,
   Education,
   Resume,
+  ResumeSectionKey,
   TemplateId,
 } from "@/lib/types";
+
+const FLOW_KEYS = ["summary", "experience", "projects", "custom"] as const;
+const CLASSIC_KEYS = [
+  "summary",
+  "experience",
+  "projects",
+  "custom",
+  "education",
+  "skills",
+] as const;
+const ASIDE_KEYS = ["intent", "skills", "education"] as const;
+const FOOTER_KEYS = ["education", "skills"] as const;
+
+type SectionEntry = {
+  node: React.ReactElement<{ "data-section"?: unknown }>;
+  key: ResumeSectionKey;
+  index: number;
+  rank: number;
+};
+
+/**
+ * 保留各模板原有的 JSX 分块，只按布局重排与隐藏。
+ * 返回 Fragment 而不是新容器，避免破坏 aside 的 space-y 与打印分页。
+ */
+function OrderedSections({
+  resume,
+  keys,
+  children,
+}: {
+  resume: Resume;
+  keys: readonly ResumeSectionKey[];
+  children: ReactNode;
+}) {
+  const layout = resolveSectionLayout(resume);
+  const entries: SectionEntry[] = [];
+  Children.toArray(children).forEach((node, index) => {
+    if (!isValidElement<{ "data-section"?: unknown }>(node)) return;
+    const key = node.props["data-section"];
+    if (!isResumeSectionKey(key) || !keys.includes(key)) return;
+    if (layout.hidden.includes(key)) return;
+    const found = layout.order.indexOf(key);
+    entries.push({
+      node,
+      key,
+      index,
+      rank: found < 0 ? layout.order.length : found,
+    });
+  });
+  entries.sort((a, b) => a.rank - b.rank || a.index - b.index);
+  return (
+    <>
+      {entries.map((entry) => (
+        <Fragment key={`${entry.key}-${entry.index}`}>
+          {entry.node}
+        </Fragment>
+      ))}
+    </>
+  );
+}
 
 function range(start: string, end: string): string {
   return [start, end].filter(Boolean).join(" – ");
@@ -167,20 +239,10 @@ function EducationDetails({
   );
 }
 
-function hasCustomItemContent(item: CustomItem): boolean {
-  return Boolean(
-    item.title.trim() ||
-      item.subtitle.trim() ||
-      item.date.trim() ||
-      item.description.trim() ||
-      item.link.trim(),
-  );
-}
-
 /** 只渲染显示中且有内容的板块，空条目留给表单继续编辑。 */
 function visibleCustomSections(resume: Resume): CustomSection[] {
   return resume.customSections.filter(
-    (section) => section.visible && section.items.some(hasCustomItemContent),
+    (section) => section.visible && section.items.some(customItemHasContent),
   );
 }
 
@@ -205,7 +267,7 @@ function CustomItems({
   linkClassName: string;
   gapClassName?: string;
 }) {
-  const items = section.items.filter(hasCustomItemContent);
+  const items = section.items.filter(customItemHasContent);
   if (items.length === 0) return null;
 
   return (
@@ -367,11 +429,7 @@ function AccentSectionTitle({
 
 function ModernTemplate({ resume }: { resume: Resume }) {
   const customSections = visibleCustomSections(resume);
-  const hasAside =
-    resume.skills.length > 0 ||
-    resume.educations.length > 0 ||
-    resume.intent.targetRole ||
-    resume.intent.targetCity;
+  const hasAside = hasVisibleSection(resume, ASIDE_KEYS);
 
   return (
     <article
@@ -409,8 +467,9 @@ function ModernTemplate({ resume }: { resume: Resume }) {
         }`}
       >
         <div className="resume-main min-w-0">
+          <OrderedSections resume={resume} keys={FLOW_KEYS}>
           {resume.basic.summary ? (
-            <section className="mb-5">
+            <section data-section="summary" className="mb-5">
               <AccentSectionTitle>个人简介</AccentSectionTitle>
               <p className="text-[11.5px] leading-[1.75] text-zinc-600">
                 {resume.basic.summary}
@@ -419,7 +478,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
           ) : null}
 
           {resume.experiences.length > 0 ? (
-            <section className="mb-5">
+            <section data-section="experience" className="mb-5">
               <AccentSectionTitle>工作经历</AccentSectionTitle>
               <div className="space-y-3.5">
                 {resume.experiences.map((item, index) => (
@@ -454,7 +513,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
           ) : null}
 
           {resume.projects.length > 0 ? (
-            <section className="mb-5">
+            <section data-section="projects" className="mb-5">
               <AccentSectionTitle>项目经历</AccentSectionTitle>
               <div className="space-y-3">
                 {resume.projects.map((item, index) => (
@@ -499,7 +558,11 @@ function ModernTemplate({ resume }: { resume: Resume }) {
           ) : null}
 
           {customSections.map((section) => (
-            <section key={section.id} className="mb-5">
+            <section
+              key={section.id}
+              data-section="custom"
+              className="mb-5"
+            >
               <AccentSectionTitle>
                 {customSectionTitle(section)}
               </AccentSectionTitle>
@@ -513,11 +576,9 @@ function ModernTemplate({ resume }: { resume: Resume }) {
               />
             </section>
           ))}
+          </OrderedSections>
 
-          {!resume.basic.summary &&
-          resume.experiences.length === 0 &&
-          resume.projects.length === 0 &&
-          customSections.length === 0 ? (
+          {!hasVisibleSection(resume, FLOW_KEYS) ? (
             <p className="py-10 text-center text-[12px] text-zinc-300">
               在左侧填写内容，这里会实时预览
             </p>
@@ -526,7 +587,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
 
         {hasAside ? (
           <aside className="space-y-5 border-l border-zinc-200 pl-6">
-            {resume.intent.targetRole || resume.intent.targetCity ? (
+            {isSectionVisible(resume, "intent") ? (
               <section>
                 <AccentSectionTitle>求职意向</AccentSectionTitle>
                 <div className="space-y-1 text-[10.5px] leading-[1.6] text-zinc-600">
@@ -549,7 +610,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
               </section>
             ) : null}
 
-            {resume.skills.length > 0 ? (
+            {isSectionVisible(resume, "skills") ? (
               <section>
                 <AccentSectionTitle>技能</AccentSectionTitle>
                 <SkillChips
@@ -560,7 +621,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
               </section>
             ) : null}
 
-            {resume.educations.length > 0 ? (
+            {isSectionVisible(resume, "education") ? (
               <section>
                 <AccentSectionTitle>教育经历</AccentSectionTitle>
                 <div className="space-y-2.5">
@@ -649,8 +710,9 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
         </div>
       </header>
 
+      <OrderedSections resume={resume} keys={CLASSIC_KEYS}>
       {resume.basic.summary ? (
-        <section className="mt-5">
+        <section data-section="summary" className="mt-5">
           <ClassicSectionTitle>个人简介</ClassicSectionTitle>
           <p className="text-[11px] leading-[1.8] text-zinc-600">
             {resume.basic.summary}
@@ -659,7 +721,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
       ) : null}
 
       {resume.experiences.length > 0 ? (
-        <section className="mt-5">
+        <section data-section="experience" className="mt-5">
           <ClassicSectionTitle>工作经历</ClassicSectionTitle>
           <div className="space-y-4">
             {resume.experiences.map((item, index) => (
@@ -694,7 +756,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
       ) : null}
 
       {resume.projects.length > 0 ? (
-        <section className="mt-5">
+        <section data-section="projects" className="mt-5">
           <ClassicSectionTitle>项目经历</ClassicSectionTitle>
           <div className="space-y-3.5">
             {resume.projects.map((item, index) => (
@@ -739,7 +801,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
       ) : null}
 
       {customSections.map((section) => (
-        <section key={section.id} className="mt-5">
+        <section key={section.id} data-section="custom" className="mt-5">
           <ClassicSectionTitle>
             {customSectionTitle(section)}
           </ClassicSectionTitle>
@@ -756,7 +818,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
       ))}
 
       {resume.educations.length > 0 ? (
-        <section className="mt-5">
+        <section data-section="education" className="mt-5">
           <ClassicSectionTitle>教育经历</ClassicSectionTitle>
           <div className="space-y-2">
             {resume.educations.map((item) => (
@@ -787,7 +849,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
       ) : null}
 
       {resume.skills.length > 0 ? (
-        <section className="mt-5">
+        <section data-section="skills" className="mt-5">
           <ClassicSectionTitle>专业技能</ClassicSectionTitle>
           <SkillText
             resume={resume}
@@ -797,6 +859,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
           />
         </section>
       ) : null}
+      </OrderedSections>
     </article>
   );
 }
@@ -853,8 +916,9 @@ function CompactTemplate({ resume }: { resume: Resume }) {
         </div>
       </header>
 
+      <OrderedSections resume={resume} keys={FLOW_KEYS}>
       {resume.basic.summary ? (
-        <section className="mt-3">
+        <section data-section="summary" className="mt-3">
           <CompactSectionTitle>个人简介</CompactSectionTitle>
           <p className="text-[10px] leading-[1.65] text-zinc-600">
             {resume.basic.summary}
@@ -863,7 +927,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
       ) : null}
 
       {resume.experiences.length > 0 ? (
-        <section className="mt-3">
+        <section data-section="experience" className="mt-3">
           <CompactSectionTitle>工作经历</CompactSectionTitle>
           <div className="space-y-2.5">
             {resume.experiences.map((item, index) => (
@@ -898,7 +962,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
       ) : null}
 
       {resume.projects.length > 0 ? (
-        <section className="mt-3">
+        <section data-section="projects" className="mt-3">
           <CompactSectionTitle>项目经历</CompactSectionTitle>
           <div className="space-y-2">
             {resume.projects.map((item, index) => (
@@ -943,7 +1007,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
       ) : null}
 
       {customSections.map((section) => (
-        <section key={section.id} className="mt-3">
+        <section key={section.id} data-section="custom" className="mt-3">
           <CompactSectionTitle>
             {customSectionTitle(section)}
           </CompactSectionTitle>
@@ -958,10 +1022,14 @@ function CompactTemplate({ resume }: { resume: Resume }) {
           />
         </section>
       ))}
+      </OrderedSections>
 
+      {isSectionVisible(resume, "education") ||
+      isSectionVisible(resume, "skills") ? (
       <div className="mt-3 grid grid-cols-[1fr_1fr] gap-x-6">
+        <OrderedSections resume={resume} keys={FOOTER_KEYS}>
         {resume.educations.length > 0 ? (
-          <section>
+          <section data-section="education">
             <CompactSectionTitle>教育经历</CompactSectionTitle>
             <div className="space-y-1">
               {resume.educations.map((item) => (
@@ -986,7 +1054,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
         ) : null}
 
         {resume.skills.length > 0 ? (
-          <section>
+          <section data-section="skills">
             <CompactSectionTitle>专业技能</CompactSectionTitle>
             <SkillText
               resume={resume}
@@ -996,7 +1064,9 @@ function CompactTemplate({ resume }: { resume: Resume }) {
             />
           </section>
         ) : null}
+        </OrderedSections>
       </div>
+      ) : null}
     </article>
   );
 }
@@ -1052,7 +1122,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
           </section>
         ) : null}
 
-        {resume.intent.targetRole || resume.intent.targetCity ? (
+        {isSectionVisible(resume, "intent") ? (
           <section className="mt-5">
             <SidebarHeading>求职意向</SidebarHeading>
             <div className="space-y-1 text-[9.5px] leading-[1.6] text-white/75">
@@ -1080,7 +1150,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
           </section>
         ) : null}
 
-        {resume.skills.length > 0 ? (
+        {isSectionVisible(resume, "skills") ? (
           <section className="mt-5">
             <SidebarHeading>技能</SidebarHeading>
             <SkillChips
@@ -1091,7 +1161,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
           </section>
         ) : null}
 
-        {resume.educations.length > 0 ? (
+        {isSectionVisible(resume, "education") ? (
           <section className="mt-5">
             <SidebarHeading>教育经历</SidebarHeading>
             <div className="space-y-2.5">
@@ -1118,8 +1188,9 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
       </aside>
 
       <div className="min-w-0 flex-1 px-[10mm] py-[12mm]">
+        <OrderedSections resume={resume} keys={FLOW_KEYS}>
         {resume.basic.summary ? (
-          <section className="mb-5">
+          <section data-section="summary" className="mb-5">
             <AccentSectionTitle>个人简介</AccentSectionTitle>
             <p className="text-[11.5px] leading-[1.75] text-zinc-600">
               {resume.basic.summary}
@@ -1128,7 +1199,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
         ) : null}
 
         {resume.experiences.length > 0 ? (
-          <section className="mb-5">
+          <section data-section="experience" className="mb-5">
             <AccentSectionTitle>工作经历</AccentSectionTitle>
             <div className="space-y-3.5">
               {resume.experiences.map((item, index) => (
@@ -1163,7 +1234,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
         ) : null}
 
         {resume.projects.length > 0 ? (
-          <section className="mb-5">
+          <section data-section="projects" className="mb-5">
             <AccentSectionTitle>项目经历</AccentSectionTitle>
             <div className="space-y-3">
               {resume.projects.map((item, index) => (
@@ -1208,7 +1279,11 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
         ) : null}
 
         {customSections.map((section) => (
-          <section key={section.id} className="mb-5">
+          <section
+            key={section.id}
+            data-section="custom"
+            className="mb-5"
+          >
             <AccentSectionTitle>
               {customSectionTitle(section)}
             </AccentSectionTitle>
@@ -1222,11 +1297,9 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
             />
           </section>
         ))}
+        </OrderedSections>
 
-        {!resume.basic.summary &&
-        resume.experiences.length === 0 &&
-        resume.projects.length === 0 &&
-        customSections.length === 0 ? (
+        {!hasVisibleSection(resume, FLOW_KEYS) ? (
           <p className="py-10 text-center text-[12px] text-zinc-300">
             在左侧填写内容，这里会实时预览
           </p>
@@ -1276,8 +1349,9 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
         </div>
       </header>
 
+      <OrderedSections resume={resume} keys={FLOW_KEYS}>
       {resume.basic.summary ? (
-        <section className="mt-5">
+        <section data-section="summary" className="mt-5">
           <AccentSectionTitle>个人简介</AccentSectionTitle>
           <p className="text-[11.5px] leading-[1.75] text-zinc-600">
             {resume.basic.summary}
@@ -1286,7 +1360,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
       ) : null}
 
       {resume.experiences.length > 0 ? (
-        <section className="mt-5">
+        <section data-section="experience" className="mt-5">
           <AccentSectionTitle className="mb-2.5">工作经历</AccentSectionTitle>
           <div className="space-y-3.5">
             {resume.experiences.map((item, index) => (
@@ -1325,7 +1399,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
       ) : null}
 
       {resume.projects.length > 0 ? (
-        <section className="mt-5">
+        <section data-section="projects" className="mt-5">
           <AccentSectionTitle className="mb-2.5">项目经历</AccentSectionTitle>
           <div className="space-y-3">
             {resume.projects.map((item, index) => (
@@ -1374,7 +1448,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
       ) : null}
 
       {customSections.map((section) => (
-        <section key={section.id} className="mt-5">
+        <section key={section.id} data-section="custom" className="mt-5">
           <AccentSectionTitle className="mb-2.5">
             {customSectionTitle(section)}
           </AccentSectionTitle>
@@ -1388,11 +1462,14 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
           />
         </section>
       ))}
+      </OrderedSections>
 
-      {resume.educations.length > 0 || resume.skills.length > 0 ? (
+      {isSectionVisible(resume, "education") ||
+      isSectionVisible(resume, "skills") ? (
         <div className="mt-5 grid grid-cols-[1.35fr_1fr] gap-x-8">
+          <OrderedSections resume={resume} keys={FOOTER_KEYS}>
           {resume.educations.length > 0 ? (
-            <section>
+            <section data-section="education">
               <AccentSectionTitle>教育经历</AccentSectionTitle>
               <div className="space-y-2">
                 {resume.educations.map((item) => (
@@ -1422,7 +1499,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
           ) : null}
 
           {resume.skills.length > 0 ? (
-            <section>
+            <section data-section="skills">
               <AccentSectionTitle>专业技能</AccentSectionTitle>
               <SkillChips
                 resume={resume}
@@ -1431,6 +1508,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
               />
             </section>
           ) : null}
+          </OrderedSections>
         </div>
       ) : null}
     </article>

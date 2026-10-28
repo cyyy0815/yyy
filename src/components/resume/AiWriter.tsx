@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -10,8 +11,14 @@ import {
   type SetStateAction,
 } from "react";
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
+import { FactCheckPanel } from "@/components/ui/FactCheckPanel";
 import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { streamFullResume, streamGenerate } from "@/lib/ai/client";
+import {
+  checkFullResumeFacts,
+  checkGeneratedText,
+} from "@/lib/ai/factCheck";
 import {
   parseFullResumeOutput,
   type FullResumeStats,
@@ -134,6 +141,23 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
     : Boolean(keywords.trim()) ||
       (mode === "polish" && Boolean(currentText.trim()));
 
+  // JD 是岗位要求，不是求职者的事实，因此不进入事实核对来源。
+  const singleWarnings = useMemo(() => {
+    if (!output.trim() || streaming) return [];
+    return checkGeneratedText(cleanAiText(output, section), [
+      role,
+      years,
+      keywords,
+      currentText,
+    ].join("\n"));
+  }, [output, streaming, section, role, years, keywords, currentText]);
+
+  const fullWarnings = useMemo(
+    () =>
+      fullDraft && !streaming ? checkFullResumeFacts(fullDraft, brief) : [],
+    [fullDraft, streaming, brief],
+  );
+
   const checkStatus = useCallback(async () => {
     setStatusLoading(true);
     setStatusError(null);
@@ -155,23 +179,6 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
     setConfirmOverwrite(false);
     setOpen(false);
   }, []);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeDialog();
-    };
-    document.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open, closeDialog]);
 
   useEffect(() => {
     if (!undo) return;
@@ -587,41 +594,42 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
       ) : null}
 
       {open ? (
-        <div
-          className="print-hide fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/40 backdrop-blur-sm sm:items-center sm:p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) closeDialog();
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="ai-writer-title"
-            className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
-          >
-            <header className="flex items-start justify-between gap-3 border-b border-zinc-100 px-5 py-4">
-              <div>
-                <h2
-                  id="ai-writer-title"
-                  className="text-[15px] font-semibold text-zinc-900"
-                >
-                  AI 帮我写
-                </h2>
-                <p className="mt-0.5 text-[11.5px] text-zinc-500">
-                  {fullMode ? "整份简历" : SECTION_LABELS[section]} · 内容会发送到 DeepSeek
-                </p>
+        <Dialog
+          title="AI 帮我写"
+          description={`${fullMode ? "整份简历" : SECTION_LABELS[section]} · 内容会发送到 DeepSeek`}
+          size="md"
+          dataQa="ai-writer-dialog"
+          closeDataQa="ai-writer-close"
+          onClose={closeDialog}
+          footer={
+            <>
+              <p className="text-[11px] leading-4 text-zinc-400">
+                {fullMode
+                  ? "只发送这段自述、目标岗位与参考 JD，不发送姓名、电话、邮箱或任何已有简历内容。"
+                  : `只发送本面板内容、当前板块文本${
+                      jd.trim() ? "与参考 JD" : ""
+                    }，不发送姓名、电话、邮箱或整份简历。`}
+              </p>
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={closeDialog}>
+                  取消
+                </Button>
+                {status?.configured ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleAdopt}
+                    disabled={
+                      streaming || (fullMode ? !fullDraft : !output.trim())
+                    }
+                  >
+                    {fullMode ? "生成新简历" : "采用到简历"}
+                  </Button>
+                ) : null}
               </div>
-              <button
-                type="button"
-                onClick={closeDialog}
-                aria-label="关闭"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[16px] leading-none text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
-              >
-                ×
-              </button>
-            </header>
-
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            </>
+          }
+        >
               {statusLoading || (!status && !statusError) ? (
                 <p className="py-8 text-center text-[12.5px] text-zinc-400">
                   正在检查 AI 配置…
@@ -894,6 +902,10 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
                             draft={fullDraft}
                             stats={fullStats}
                           />
+                          <FactCheckPanel
+                            warnings={fullWarnings}
+                            sourceLabel="自述"
+                          />
                           <p className="text-[10.5px] leading-4 text-zinc-400">
                             采用后会新建一份简历并切换过去，当前简历保留在顶部列表里。
                           </p>
@@ -941,6 +953,10 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
                     </div>
                   )}
 
+                  {!fullMode && output && !streaming ? (
+                    <FactCheckPanel warnings={singleWarnings} />
+                  ) : null}
+
                   {error ? (
                     <p role="alert" className="text-[12px] text-red-600">
                       {error}
@@ -974,36 +990,7 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
                   ) : null}
                 </div>
               )}
-            </div>
-
-            <footer className="border-t border-zinc-100 px-5 py-3">
-              <p className="text-[11px] leading-4 text-zinc-400">
-                {fullMode
-                  ? "只发送这段自述、目标岗位与参考 JD，不发送姓名、电话、邮箱或任何已有简历内容。"
-                  : `只发送本面板内容、当前板块文本${
-                      jd.trim() ? "与参考 JD" : ""
-                    }，不发送姓名、电话、邮箱或整份简历。`}
-              </p>
-              <div className="mt-2 flex items-center justify-end gap-2">
-                <Button variant="ghost" size="sm" onClick={closeDialog}>
-                  取消
-                </Button>
-                {status?.configured ? (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleAdopt}
-                    disabled={
-                      streaming || (fullMode ? !fullDraft : !output.trim())
-                    }
-                  >
-                    {fullMode ? "生成新简历" : "采用到简历"}
-                  </Button>
-                ) : null}
-              </div>
-            </footer>
-          </div>
-        </div>
+        </Dialog>
       ) : null}
     </>
   );

@@ -1,4 +1,14 @@
+import { normalizeApplications, type JobApplication } from "./applications";
+import {
+  isResumeSectionKey,
+  normalizeSectionLayout,
+} from "./layout";
 import { isPhotoDataUrl } from "./photo";
+import {
+  isNewerResumeSchema,
+  readResumeSchemaVersion,
+  RESUME_SCHEMA_VERSION,
+} from "./schema";
 import { normalizeAccent } from "./theme";
 import {
   createEmptyResume,
@@ -95,6 +105,7 @@ export function normalizeResume(input: unknown): Resume {
   );
 
   return {
+    schemaVersion: RESUME_SCHEMA_VERSION,
     basic: {
       name: asString(basic.name),
       headline: asString(basic.headline),
@@ -163,6 +174,7 @@ export function normalizeResume(input: unknown): Resume {
     skills,
     skillMeta,
     skillGroups,
+    layout: normalizeSectionLayout(raw.layout),
     theme: { accent: normalizeAccent(theme.accent) },
   };
 }
@@ -267,16 +279,22 @@ export type ArchiveDocument = {
 
 export type ResumeArchive = {
   format: "resume-workshop";
-  version: 2;
+  version: 3;
+  /** 简历内容的数据版本；旧备份没有这个字段 */
+  schemaVersion: number;
   exportedAt: string;
   activeId: string;
   documents: ArchiveDocument[];
+  /** 投递看板记录；旧版备份没有这个字段，导入时按空数组处理。 */
+  applications: JobApplication[];
 };
 
 const ARCHIVE_FORMAT = "resume-workshop";
-const ARCHIVE_VERSION = 2;
+const ARCHIVE_VERSION = 3;
+const SINGLE_FORMAT = "resume-workshop-single";
+const SINGLE_VERSION = 1;
 
-function safeFileName(name: string): string {
+export function safeFileName(name: string): string {
   const cleaned = name
     .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ")
     .replace(/\s+/g, " ")
@@ -290,13 +308,16 @@ export function downloadResumeArchive(
   documents: ArchiveDocument[],
   activeId: string,
   currentTitle: string,
+  applications: JobApplication[] = [],
 ): void {
   const payload: ResumeArchive = {
     format: ARCHIVE_FORMAT,
     version: ARCHIVE_VERSION,
+    schemaVersion: RESUME_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
     activeId,
     documents,
+    applications: normalizeApplications(applications),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
@@ -309,19 +330,59 @@ export function downloadResumeArchive(
   URL.revokeObjectURL(url);
 }
 
+export type SingleResumeExport = {
+  format: "resume-workshop-single";
+  version: 1;
+  /** 简历内容的数据版本；旧备份没有这个字段 */
+  schemaVersion: number;
+  exportedAt: string;
+  title: string;
+  template: TemplateId;
+  resume: Resume;
+};
+
 export type ImportResult =
   | { ok: true; resume: Resume; template?: TemplateId }
   | { ok: false; error: string };
 
 export type ImportFileResult =
-  | { ok: true; kind: "single"; resume: Resume; template?: TemplateId }
+  | {
+      ok: true;
+      kind: "single";
+      resume: Resume;
+      template?: TemplateId;
+      title?: string;
+    }
   | {
       ok: true;
       kind: "library";
       documents: ArchiveDocument[];
       activeId: string;
+      applications: JobApplication[];
     }
   | { ok: false; error: string };
+
+/** 只导出当前简历，便于单独分享，不会带出其他简历或投递记录。 */
+export function downloadSingleResume(entry: ArchiveDocument): void {
+  const payload: SingleResumeExport = {
+    format: SINGLE_FORMAT,
+    version: SINGLE_VERSION,
+    schemaVersion: RESUME_SCHEMA_VERSION,
+    exportedAt: new Date().toISOString(),
+    title: entry.title,
+    template: entry.template,
+    resume: entry.resume,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${safeFileName(entry.title)}-简历.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
 const BASIC_KEYS = [
   "name",
@@ -392,6 +453,17 @@ function checkImportShape(data: unknown): string | null {
   if (data.theme !== undefined && !isRecord(data.theme)) {
     return "主题色（theme）必须是对象";
   }
+  if (data.layout !== undefined) {
+    if (!isRecord(data.layout)) return "板块布局（layout）必须是对象";
+    for (const key of ["order", "hidden"] as const) {
+      const value = data.layout[key];
+      if (value === undefined) continue;
+      if (!Array.isArray(value)) return `板块布局（layout.${key}）必须是数组`;
+      if (value.some((item) => !isResumeSectionKey(item))) {
+        return `板块布局（layout.${key}）中存在未知板块`;
+      }
+    }
+  }
   return null;
 }
 
@@ -408,7 +480,27 @@ function parseJson(
   }
 }
 
+/** 旧版程序不认识更新的数据字段，宁可拒绝也不要静默丢内容。 */
+function schemaVersionError(value: unknown, subject: string): string | null {
+  if (!isNewerResumeSchema(value)) return null;
+  const version = readResumeSchemaVersion(value);
+  return `${subject}的数据版本（${version}）高于当前支持的版本（${RESUME_SCHEMA_VERSION}），请升级后再导入`;
+}
+
+function formatVersionError(
+  value: unknown,
+  current: number,
+  subject: string,
+): string | null {
+  if (typeof value !== "number" || !Number.isInteger(value)) return null;
+  return value > current
+    ? `${subject}来自更新版本的简历工坊，请升级后再导入`
+    : null;
+}
+
 function toSingleImport(data: unknown): ImportResult {
+  const versionError = schemaVersionError(data, "这份简历");
+  if (versionError) return { ok: false, error: versionError };
   const shapeError = checkImportShape(data);
   if (shapeError) return { ok: false, error: shapeError };
   const template = (data as { template?: unknown }).template;
@@ -427,6 +519,14 @@ export function parseResumeJSON(text: string): ImportResult {
 }
 
 function parseArchive(data: Record<string, unknown>): ImportFileResult {
+  const formatError = formatVersionError(
+    data.version,
+    ARCHIVE_VERSION,
+    "这份整库备份",
+  );
+  if (formatError) return { ok: false, error: formatError };
+  const versionError = schemaVersionError(data, "这份整库备份");
+  if (versionError) return { ok: false, error: versionError };
   const rawDocuments = Array.isArray(data.documents) ? data.documents : [];
   if (rawDocuments.length === 0) {
     return { ok: false, error: "备份文件里没有任何简历" };
@@ -438,6 +538,11 @@ function parseArchive(data: Record<string, unknown>): ImportFileResult {
     if (!isRecord(item)) {
       return { ok: false, error: `第 ${index + 1} 份简历格式不正确` };
     }
+    const itemVersionError = schemaVersionError(
+      item.resume,
+      `第 ${index + 1} 份简历`,
+    );
+    if (itemVersionError) return { ok: false, error: itemVersionError };
     const shapeError = checkImportShape(item.resume);
     if (shapeError) {
       return { ok: false, error: `第 ${index + 1} 份简历：${shapeError}` };
@@ -461,6 +566,7 @@ function parseArchive(data: Record<string, unknown>): ImportFileResult {
     activeId: documents.some((document) => document.id === requested)
       ? requested
       : documents[0].id,
+    applications: normalizeApplications(data.applications),
   };
 }
 
@@ -469,6 +575,32 @@ export function parseImportFile(text: string): ImportFileResult {
   const parsed = parseJson(text);
   if (!parsed.ok) return parsed;
   const data = parsed.data;
+  if (isRecord(data) && data.format === SINGLE_FORMAT) {
+    const formatError = formatVersionError(
+      data.version,
+      SINGLE_VERSION,
+      "这份单份简历备份",
+    );
+    if (formatError) return { ok: false, error: formatError };
+    const envelopeVersionError = schemaVersionError(data, "这份单份简历备份");
+    if (envelopeVersionError) {
+      return { ok: false, error: envelopeVersionError };
+    }
+    const resumeVersionError = schemaVersionError(data.resume, "这份简历");
+    if (resumeVersionError) {
+      return { ok: false, error: resumeVersionError };
+    }
+    const shapeError = checkImportShape(data.resume);
+    if (shapeError) return { ok: false, error: shapeError };
+    const title = asString(data.title).trim().slice(0, 60);
+    return {
+      ok: true,
+      kind: "single",
+      resume: normalizeResume(data.resume),
+      ...(isTemplateId(data.template) ? { template: data.template } : {}),
+      ...(title ? { title } : {}),
+    };
+  }
   if (isRecord(data) && Array.isArray(data.documents)) {
     return parseArchive(data);
   }

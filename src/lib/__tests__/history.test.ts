@@ -79,4 +79,28 @@ describe("createHistory", () => {
     expect(history.canUndo()).toBe(false);
     expect(history.canRedo()).toBe(false);
   });
+
+  it("导出的是栈副本，修改副本不影响原历史", () => {
+    const history = createHistory<number>();
+    history.record(0, false, 0);
+    const state = history.exportState();
+    state.past.push(99);
+    expect(history.size()).toBe(1);
+    expect(history.undo(1)).toBe(0);
+  });
+
+  it("可以从导出状态恢复，且恢复后的输入不会与旧步骤合并", () => {
+    const history = createHistory<number>({ mergeWindowMs: 700 });
+    history.record(0, false, 0);
+    const state = history.exportState();
+    const restored = createHistory<number>({ mergeWindowMs: 700 });
+    restored.importState(state);
+
+    expect(restored.canUndo()).toBe(true);
+    // 恢复后的第一次修改另起一步，不会误合并进刷新前的旧步骤。
+    restored.record(5, true, 100);
+    expect(restored.size()).toBe(2);
+    expect(restored.undo(6)).toBe(5);
+    expect(restored.undo(5)).toBe(0);
+  });
 });

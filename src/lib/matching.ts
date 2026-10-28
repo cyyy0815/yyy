@@ -1,25 +1,14 @@
 import { JOB_PROFILES, type JobProfile } from "./jobProfiles";
+import { canonicalSkillKey, skillAliases } from "./skillSynonyms";
 import type { Resume } from "./types";
-
-/** 统一技能写法：小写、去空格与分隔符、去掉 .js 后缀（node.js -> node）。 */
-function normSkill(value: string): string {
-  const normalized = value
-    .toLowerCase()
-    .replace(/[\s._\-+/]/g, "")
-    .trim();
-  if (normalized.length > 3 && normalized.endsWith("js")) {
-    return normalized.slice(0, -2);
-  }
-  return normalized;
-}
 
 function hasCJK(value: string): boolean {
   return /[一-鿿]/.test(value);
 }
 
 export function skillMatches(userSkill: string, target: string): boolean {
-  const a = normSkill(userSkill);
-  const b = normSkill(target);
+  const a = canonicalSkillKey(userSkill);
+  const b = canonicalSkillKey(target);
   if (!a || !b) return false;
   if (a === b) return true;
   // 中文用包含关系（如「性能优化」vs「前端性能优化」）；英文必须精确，避免 java 命中 javascript
@@ -29,25 +18,32 @@ export function skillMatches(userSkill: string, target: string): boolean {
   return false;
 }
 
-function textHasAlias(text: string, alias: string): boolean {
-  const lowerText = text.toLowerCase();
-  const lowerAlias = alias.toLowerCase();
-  if (hasCJK(lowerAlias)) return lowerText.includes(lowerAlias);
-  const escaped = lowerAlias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(lowerText);
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** 在自由文本（经历、项目、简介、JD）里找技能，避免「Java」误命中「JavaScript」。 */
-export function textHasSkill(text: string, skill: string): boolean {
+function textHasAlias(text: string, alias: string): boolean {
   const lowerText = text.toLowerCase();
-  const lowerSkill = skill.toLowerCase();
-  if (hasCJK(lowerSkill)) return lowerText.includes(lowerSkill);
+  const lowerAlias = alias.toLowerCase().trim();
+  if (!lowerAlias) return false;
+  if (hasCJK(lowerAlias)) return lowerText.includes(lowerAlias);
 
-  const base = lowerSkill.replace(/\.js\b/g, "");
-  const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(^|[^a-z0-9])${escaped}(js)?([^a-z0-9]|$)`, "i").test(
-    lowerText,
-  );
+  const escaped = escapeRegExp(lowerAlias);
+  // JS 不能命中 Node.js / Next.js 这类 .js 名字；C 不能命中 C++ / C#。
+  const before = lowerAlias === "js" ? "(^|[^a-z0-9.])" : "(^|[^a-z0-9])";
+  const after =
+    lowerAlias === "c"
+      ? "(?![a-z0-9+#])"
+      : /[+#]$/.test(lowerAlias)
+        ? // C++11 / C# 8.0 这类版本号仍算命中
+          "(?![a-z])"
+        : "([^a-z0-9]|$)";
+  return new RegExp(`${before}${escaped}${after}`).test(lowerText);
+}
+
+/** 在自由文本（经历、项目、简介、JD）里找技能，支持同义词且避免 Java / JavaScript 互相误命中。 */
+export function textHasSkill(text: string, skill: string): boolean {
+  return skillAliases(skill).some((alias) => textHasAlias(text, alias));
 }
 
 export function buildResumeText(resume: Resume): string {

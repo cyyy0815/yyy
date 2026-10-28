@@ -1,9 +1,11 @@
+import { RESUME_SCHEMA_VERSION } from "./schema";
 import { DEFAULT_ACCENT } from "./theme";
-import { newId, type Resume } from "./types";
+import { DEFAULT_SECTION_ORDER, newId, type Resume } from "./types";
 
 /** 首次访问时展示的示例数据，便于直接看到成品效果。 */
 export function createSampleResume(): Resume {
   return {
+    schemaVersion: RESUME_SCHEMA_VERSION,
     basic: {
       name: "林一",
       headline: "前端工程师",
@@ -111,5 +113,6 @@ export function createSampleResume(): Resume {
       性能优化: { level: "熟练", group: "工程化" },
     },
     theme: { accent: DEFAULT_ACCENT },
+    layout: { order: [...DEFAULT_SECTION_ORDER], hidden: [] },
   };
 }
