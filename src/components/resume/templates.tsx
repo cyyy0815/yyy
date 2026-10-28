@@ -1,4 +1,10 @@
 import { displayUrl, toSafeHref } from "@/lib/links";
+import {
+  formatSkill,
+  groupSkills,
+  hasSkillDetails,
+  skillGroupKey,
+} from "@/lib/skills";
 import { accentStyle } from "@/lib/theme";
 import type {
   CustomItem,
@@ -52,6 +58,74 @@ function ResumeLink({
     >
       {label}
     </a>
+  );
+}
+
+/** 纯文本模板：没有分组/熟练度时保持旧的单行展示；有则按组分行。 */
+function SkillText({
+  resume,
+  separator,
+  className,
+  titleClassName = "",
+}: {
+  resume: Resume;
+  separator: string;
+  className: string;
+  titleClassName?: string;
+}) {
+  if (!hasSkillDetails(resume)) {
+    return <p className={className}>{resume.skills.join(separator)}</p>;
+  }
+  return (
+    <div className={className}>
+      {groupSkills(resume).map((group) => (
+        <p key={skillGroupKey(group)}>
+          {group.title ? (
+            <span className={titleClassName}>{group.title}：</span>
+          ) : null}
+          {group.skills.map(formatSkill).join(separator)}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+/** 标签模板：有分组时按组显示，没有时沿用原来的扁平标签。 */
+function SkillChips({
+  resume,
+  chipClassName,
+  titleClassName = "",
+}: {
+  resume: Resume;
+  chipClassName: string;
+  titleClassName?: string;
+}) {
+  if (!hasSkillDetails(resume)) {
+    return (
+      <div className="flex flex-wrap gap-1">
+        {resume.skills.map((skill) => (
+          <span key={skill} className={chipClassName}>
+            {skill}
+          </span>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-1.5">
+      {groupSkills(resume).map((group) => (
+        <div key={skillGroupKey(group)}>
+          {group.title ? <p className={titleClassName}>{group.title}</p> : null}
+          <div className="flex flex-wrap gap-1">
+            {group.skills.map((entry) => (
+              <span key={entry.name} className={chipClassName}>
+                {formatSkill(entry)}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -478,16 +552,11 @@ function ModernTemplate({ resume }: { resume: Resume }) {
             {resume.skills.length > 0 ? (
               <section>
                 <AccentSectionTitle>技能</AccentSectionTitle>
-                <div className="flex flex-wrap gap-1">
-                  {resume.skills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="resume-soft rounded px-1.5 py-0.5 text-[9.5px] leading-[1.5] text-zinc-600"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
+                <SkillChips
+                  resume={resume}
+                  chipClassName="resume-soft rounded px-1.5 py-0.5 text-[9.5px] leading-[1.5] text-zinc-600"
+                  titleClassName="mb-0.5 text-[9px] font-medium text-zinc-400"
+                />
               </section>
             ) : null}
 
@@ -720,9 +789,12 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
       {resume.skills.length > 0 ? (
         <section className="mt-5">
           <ClassicSectionTitle>专业技能</ClassicSectionTitle>
-          <p className="text-[10.5px] leading-[1.8] text-zinc-600">
-            {resume.skills.join("、")}
-          </p>
+          <SkillText
+            resume={resume}
+            separator="、"
+            className="text-[10.5px] leading-[1.8] text-zinc-600"
+            titleClassName="font-semibold text-zinc-700"
+          />
         </section>
       ) : null}
     </article>
@@ -916,9 +988,12 @@ function CompactTemplate({ resume }: { resume: Resume }) {
         {resume.skills.length > 0 ? (
           <section>
             <CompactSectionTitle>专业技能</CompactSectionTitle>
-            <p className="text-[9.5px] leading-[1.7] text-zinc-600">
-              {resume.skills.join(" · ")}
-            </p>
+            <SkillText
+              resume={resume}
+              separator=" · "
+              className="text-[9.5px] leading-[1.7] text-zinc-600"
+              titleClassName="font-semibold text-zinc-700"
+            />
           </section>
         ) : null}
       </div>
@@ -1008,16 +1083,11 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
         {resume.skills.length > 0 ? (
           <section className="mt-5">
             <SidebarHeading>技能</SidebarHeading>
-            <div className="flex flex-wrap gap-1">
-              {resume.skills.map((skill) => (
-                <span
-                  key={skill}
-                  className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] leading-[1.5] text-white/80"
-                >
-                  {skill}
-                </span>
-              ))}
-            </div>
+            <SkillChips
+              resume={resume}
+              chipClassName="rounded bg-white/10 px-1.5 py-0.5 text-[9px] leading-[1.5] text-white/80"
+              titleClassName="mb-1 text-[8.5px] font-medium tracking-wide text-white/45"
+            />
           </section>
         ) : null}
 
@@ -1354,16 +1424,11 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
           {resume.skills.length > 0 ? (
             <section>
               <AccentSectionTitle>专业技能</AccentSectionTitle>
-              <div className="flex flex-wrap gap-1">
-                {resume.skills.map((skill) => (
-                  <span
-                    key={skill}
-                    className="resume-soft rounded px-1.5 py-0.5 text-[9.5px] leading-[1.5] text-zinc-600"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
+              <SkillChips
+                resume={resume}
+                chipClassName="resume-soft rounded px-1.5 py-0.5 text-[9.5px] leading-[1.5] text-zinc-600"
+                titleClassName="mb-0.5 text-[9px] font-medium text-zinc-400"
+              />
             </section>
           ) : null}
         </div>

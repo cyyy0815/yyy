@@ -4,6 +4,7 @@ import { analyzeResume } from "@/lib/matching";
 import { buildJobBoardUrl, JOB_BOARDS } from "@/lib/jobBoards";
 import type { Resume } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
+import { CoverLetterWriter } from "./CoverLetterWriter";
 import { JdMatcher } from "./JdMatcher";
 import { SkillChip } from "./SkillChip";
 
@@ -328,6 +329,8 @@ export function JobsPanel({
       </div>
 
       <JdMatcher resume={resume} onAddSkill={onAddSkill} />
+
+      <CoverLetterWriter resume={resume} />
 
       <section className="rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
         <div className="flex flex-wrap items-center justify-between gap-3">

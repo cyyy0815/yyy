@@ -36,6 +36,7 @@ const SECTION_LABELS: Record<AiSection, string> = {
   summary: "个人简介",
   experience: "工作经历",
   project: "项目经历",
+  cover: "求职信",
 };
 
 const NEW_ENTRY_HINTS: Record<"experience" | "project", string> = {
@@ -722,7 +723,8 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
                     </Field>
                   </div>
 
-                  {!fullMode && section !== "summary" ? (
+                  {!fullMode &&
+                  (section === "experience" || section === "project") ? (
                     <>
                       <Field label="写入到">
                         <Select
@@ -839,7 +841,9 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
                     )}
                   </div>
 
-                  {!fullMode && section !== "summary" && targetId !== "new" ? (
+                  {!fullMode &&
+                  (section === "experience" || section === "project") &&
+                  targetId !== "new" ? (
                     <Field label="采用方式" hint="追加不会删除原文">
                       <Select
                         value={adoptMode}

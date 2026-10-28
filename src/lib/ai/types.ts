@@ -1,4 +1,4 @@
-export const AI_SECTIONS = ["summary", "experience", "project"] as const;
+export const AI_SECTIONS = ["summary", "experience", "project", "cover"] as const;
 export type AiSection = (typeof AI_SECTIONS)[number];
 
 export const AI_MODES = ["draft", "polish"] as const;

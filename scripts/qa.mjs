@@ -202,6 +202,7 @@ async function interceptAi(
   page,
   { configured = true, text = "", fullText = text } = {},
 ) {
+  page.aiPayloads = [];
   await page.setRequestInterception(true);
   page.on("request", (request) => {
     const url = request.url();
@@ -220,6 +221,7 @@ async function interceptAi(
       } catch {
         // 保持空对象，按默认文本返回。
       }
+      page.aiPayloads.push(payload);
       const source = url.includes("/api/ai/full") ? fullText : text;
       const resolved = typeof source === "function" ? source(payload) : source;
       const split = Math.max(1, Math.floor(resolved.length / 2));
@@ -776,6 +778,210 @@ await aiFullPage.evaluate(() => {
   localStorage.removeItem("resume-workshop:library:v1");
 });
 await aiFullPage.close();
+
+// AI 求职信：读取简介/技能/JD、生成、编辑、复制下载入口与隐私字段
+const COVER_TEXT = [
+  "尊敬的招聘负责人：",
+  "",
+  "看到贵公司招聘前端工程师，我拥有 4 年前端经验，主导中后台平台重构，首屏性能提升 40%。",
+  "",
+  "在星野科技期间，我用 React 与 TypeScript 搭建组件库，覆盖 12 条业务线，重复开发工时下降约 30%。",
+  "",
+  "期待有机会进一步沟通。",
+  "",
+  "此致",
+  "敬礼",
+].join("\n");
+const coverResume = {
+  basic: {
+    name: "林一",
+    headline: "前端工程师",
+    email: "lin@example.com",
+    phone: "13800000000",
+    city: "上海",
+    website: "linyi.dev",
+    github: "",
+    summary: "4 年前端经验，主导中后台重构，首屏性能提升 40%。",
+    photo: "",
+  },
+  intent: {
+    targetRole: "前端工程师",
+    targetCity: "上海",
+    salaryMin: "",
+    salaryMax: "",
+    jobType: "全职",
+    experience: "3-5 年",
+  },
+  educations: [],
+  experiences: [
+    {
+      id: "qa-cover-e",
+      company: "星野科技",
+      role: "前端工程师",
+      start: "2021.07",
+      end: "至今",
+      description: "主导中后台平台重构。",
+    },
+  ],
+  projects: [],
+  customSections: [],
+  skills: ["React", "TypeScript"],
+  theme: { accent: "#1d4ed8" },
+};
+
+const coverPage = await open({ width: 1440, height: 1000 });
+await interceptAi(coverPage, { text: COVER_TEXT });
+await coverPage.goto(`${BASE}/#jobs`, { waitUntil: "networkidle0" });
+await coverPage.evaluate((resume) => {
+  localStorage.clear();
+  localStorage.setItem("resume-workshop:v1", JSON.stringify(resume));
+  localStorage.setItem(
+    "resume-workshop:jd",
+    "任职要求：熟悉 React 与 TypeScript，有性能优化经验。",
+  );
+}, coverResume);
+await coverPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+await coverPage.waitForSelector('[data-qa="cover-letter-open"]', {
+  timeout: 15000,
+});
+await coverPage.click('[data-qa="cover-letter-open"]');
+await coverPage.waitForSelector('[data-qa="cover-brief"]', { timeout: 15000 });
+
+const coverPrefill = await coverPage.evaluate(() => ({
+  role: document.querySelector('[data-qa="cover-role"]')?.value ?? "",
+  years: document.querySelector('[data-qa="cover-years"]')?.value ?? "",
+  brief: document.querySelector('[data-qa="cover-brief"]')?.value ?? "",
+  jd: document.querySelector('[data-qa="cover-jd"]')?.value ?? "",
+}));
+expect(
+  "求职信默认读取岗位、年限、简介/技能与已存 JD",
+  coverPrefill.role === "前端工程师" &&
+    coverPrefill.years === "3-5 年" &&
+    coverPrefill.brief.includes("首屏性能提升 40%") &&
+    coverPrefill.brief.includes("React") &&
+    coverPrefill.jd.includes("性能优化经验"),
+  JSON.stringify(coverPrefill),
+);
+
+await clickText(coverPage, "生成求职信", '[role="dialog"]');
+await coverPage.waitForFunction(
+  () => {
+    const element = document.querySelector('[data-qa="cover-output"]');
+    return (
+      element instanceof HTMLTextAreaElement &&
+      element.value.includes("尊敬的招聘负责人")
+    );
+  },
+  { timeout: 20000 },
+);
+const coverResult = await coverPage.evaluate(() => {
+  const output = document.querySelector('[data-qa="cover-output"]');
+  return {
+    text: output?.value ?? "",
+    editable:
+      output instanceof HTMLTextAreaElement &&
+      !output.readOnly &&
+      !output.disabled,
+    hasCopy: Boolean(document.querySelector('[data-qa="cover-copy"]')),
+    hasDownload: Boolean(document.querySelector('[data-qa="cover-download"]')),
+  };
+});
+expect(
+  "求职信可预览、编辑，并提供复制与下载",
+  coverResult.text.includes("此致") &&
+    coverResult.text.includes("敬礼") &&
+    coverResult.editable &&
+    coverResult.hasCopy &&
+    coverResult.hasDownload,
+  JSON.stringify({
+    editable: coverResult.editable,
+    hasCopy: coverResult.hasCopy,
+    hasDownload: coverResult.hasDownload,
+    length: coverResult.text.length,
+  }),
+);
+
+const coverPayload = coverPage.aiPayloads.find(
+  (payload) => payload.section === "cover",
+);
+const coverPayloadRaw = JSON.stringify(coverPayload ?? {});
+expect(
+  "求职信请求只发送素材、岗位、年限与 JD",
+  coverPayload?.section === "cover" &&
+    coverPayload?.role === "前端工程师" &&
+    coverPayload?.years === "3-5 年" &&
+    String(coverPayload?.keywords).includes("首屏性能提升 40%") &&
+    String(coverPayload?.jd).includes("React") &&
+    !coverPayloadRaw.includes("林一") &&
+    !coverPayloadRaw.includes("lin@example.com") &&
+    !coverPayloadRaw.includes("13800000000"),
+  coverPayloadRaw.slice(0, 200),
+);
+
+const coverStored = await coverPage.evaluate(() => {
+  try {
+    return JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}").basic
+      ?.summary;
+  } catch {
+    return null;
+  }
+});
+expect(
+  "求职信不会写入简历",
+  coverStored === "4 年前端经验，主导中后台重构，首屏性能提升 40%。",
+  String(coverStored),
+);
+
+const coverDialog = await coverPage.$('[role="dialog"]');
+if (coverDialog) {
+  await coverDialog.screenshot({ path: `${OUT}/qa-cover-letter.png` });
+}
+await clickText(coverPage, "关闭", '[role="dialog"]');
+expect(
+  "求职信页面无控制台错误",
+  coverPage.qaErrors.length === 0,
+  coverPage.qaErrors.join(" | "),
+);
+await coverPage.close();
+
+// 未配置 Key：求职信显示配置步骤，不渲染生成表单
+const coverOff = await open({ width: 1440, height: 1000 });
+await interceptAi(coverOff, { configured: false });
+await coverOff.goto(`${BASE}/#jobs`, { waitUntil: "networkidle0" });
+await coverOff.evaluate((resume) => {
+  localStorage.setItem("resume-workshop:v1", JSON.stringify(resume));
+}, coverResume);
+await coverOff.reload({ waitUntil: "networkidle0" });
+await pause(700);
+await coverOff.waitForSelector('[data-qa="cover-letter-open"]', {
+  timeout: 15000,
+});
+await coverOff.click('[data-qa="cover-letter-open"]');
+await coverOff.waitForFunction(
+  () =>
+    (document.querySelector('[role="dialog"]')?.textContent ?? "").includes(
+      "还没有配置",
+    ),
+  { timeout: 15000 },
+);
+const coverOffInfo = await coverOff.evaluate(() => ({
+  steps: (document.querySelector('[role="dialog"]')?.textContent ?? "").includes(
+    "DEEPSEEK_API_KEY",
+  ),
+  hasForm: Boolean(document.querySelector('[data-qa="cover-brief"]')),
+}));
+expect(
+  "未配置 Key 时求职信显示配置步骤",
+  coverOffInfo.steps && !coverOffInfo.hasForm,
+  JSON.stringify(coverOffInfo),
+);
+expect(
+  "未配置求职信页面无控制台错误",
+  coverOff.qaErrors.length === 0,
+  coverOff.qaErrors.join(" | "),
+);
+await coverOff.close();
 
 // AI 弹窗 390px 无横向溢出
 const aiMobile = await open({ width: 390, height: 844, mobile: true });
@@ -3370,6 +3576,314 @@ expect(
   linksPage.qaErrors.join("; "),
 );
 await linksPage.close();
+
+// 全局撤销 / 重做：按钮、快捷键与自动保存
+const historyPage = await open({ width: 1440, height: 1000 });
+await historyPage.goto(BASE, { waitUntil: "networkidle0" });
+await historyPage.evaluate(() => {
+  localStorage.clear();
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: {
+        name: "原名",
+        headline: "前端工程师",
+        email: "",
+        phone: "",
+        city: "",
+        website: "",
+        github: "",
+        summary: "原始简介",
+        photo: "",
+      },
+      intent: {},
+      educations: [],
+      experiences: [
+        {
+          id: "x1",
+          company: "原公司",
+          role: "前端",
+          start: "",
+          end: "",
+          description: "原描述",
+        },
+      ],
+      projects: [],
+      customSections: [],
+      skills: ["React"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await historyPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+
+const readHistoryName = () =>
+  historyPage.evaluate(() => {
+    const label = [...document.querySelectorAll("label")].find((node) =>
+      node.textContent?.includes("姓名"),
+    );
+    return label?.querySelector("input")?.value ?? "";
+  });
+
+const historyButtonStates = () =>
+  historyPage.evaluate(() =>
+    [...document.querySelectorAll('[data-qa="history-controls"] button')].map(
+      (button) => ({
+        label: button.getAttribute("aria-label") ?? "",
+        disabled: button.disabled,
+      }),
+    ),
+  );
+
+const clickHistoryButton = (label) =>
+  historyPage.evaluate((name) => {
+    const root = document.querySelector('[data-qa="history-controls"]');
+    const button = [...(root?.querySelectorAll("button") ?? [])].find(
+      (item) => item.getAttribute("aria-label") === name,
+    );
+    if (!button || button.disabled) return false;
+    button.click();
+    return true;
+  }, label);
+
+const initialHistoryButtons = await historyButtonStates();
+expect(
+  "初始状态撤销与重做均不可用",
+  initialHistoryButtons.length === 2 &&
+    initialHistoryButtons.every((button) => button.disabled),
+  JSON.stringify(initialHistoryButtons),
+);
+
+await setFieldByLabel(historyPage, "姓名", "新名字");
+await pause(200);
+expect("编辑后撤销按钮可用", await clickHistoryButton("撤销"), "撤销不可点击");
+await pause(200);
+const undoName = await readHistoryName();
+
+expect("按钮重做按钮可用", await clickHistoryButton("重做"), "重做不可点击");
+await pause(200);
+const redoName = await readHistoryName();
+expect(
+  "按钮撤销 / 重做恢复内容",
+  undoName === "原名" && redoName === "新名字",
+  JSON.stringify({ undoName, redoName }),
+);
+
+await historyPage.evaluate(() => document.activeElement?.blur());
+await historyPage.keyboard.down("Control");
+await historyPage.keyboard.press("KeyZ");
+await historyPage.keyboard.up("Control");
+await pause(200);
+const shortcutUndoName = await readHistoryName();
+
+await historyPage.keyboard.down("Control");
+await historyPage.keyboard.down("Shift");
+await historyPage.keyboard.press("KeyZ");
+await historyPage.keyboard.up("Shift");
+await historyPage.keyboard.up("Control");
+await pause(200);
+const shortcutRedoName = await readHistoryName();
+expect(
+  "Ctrl+Z / Ctrl+Shift+Z 撤销与重做",
+  shortcutUndoName === "原名" && shortcutRedoName === "新名字",
+  JSON.stringify({ shortcutUndoName, shortcutRedoName }),
+);
+
+await pause(700);
+const savedHistoryName = await historyPage.evaluate(() => {
+  try {
+    return JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}").basic
+      ?.name;
+  } catch {
+    return null;
+  }
+});
+expect(
+  "撤销 / 重做结果自动保存",
+  savedHistoryName === "新名字",
+  JSON.stringify({ savedHistoryName }),
+);
+
+const countHistoryExperiences = () =>
+  historyPage.evaluate(
+    () => document.querySelectorAll('[aria-label="删除"]').length,
+  );
+const beforeAdd = await countHistoryExperiences();
+await clickText(historyPage, "+ 添加工作经历");
+await pause(200);
+const afterAdd = await countHistoryExperiences();
+await clickHistoryButton("撤销");
+await pause(200);
+const afterAddUndo = await countHistoryExperiences();
+expect(
+  "新增条目可全局撤销",
+  beforeAdd === 1 && afterAdd === 2 && afterAddUndo === 1,
+  JSON.stringify({ beforeAdd, afterAdd, afterAddUndo }),
+);
+
+await historyPage.screenshot({ path: `${OUT}/qa-history.png` });
+expect(
+  "撤销 / 重做页面无控制台错误",
+  historyPage.qaErrors.length === 0,
+  historyPage.qaErrors.join("; "),
+);
+await historyPage.close();
+
+// P2：技能分组 / 熟练度：旧数据兼容、表单保存与五种模板展示
+const skillPage = await open({ width: 1440, height: 1000 });
+await skillPage.goto(BASE, { waitUntil: "networkidle0" });
+await skillPage.evaluate(() => {
+  localStorage.clear();
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: {
+        name: "林一",
+        headline: "前端工程师",
+        email: "",
+        phone: "",
+        city: "",
+        website: "",
+        github: "",
+        summary: "",
+        photo: "",
+      },
+      intent: {},
+      educations: [],
+      experiences: [],
+      projects: [],
+      customSections: [],
+      skills: ["React", "Node.js"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await skillPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+
+const flatSkillView = await skillPage.evaluate(() => {
+  const text = document.querySelector("#resume-print")?.textContent ?? "";
+  return {
+    hasSkills: text.includes("React") && text.includes("Node.js"),
+    hasLevel: text.includes("（精通）") || text.includes("（熟练）"),
+    hasGroupEditor: Boolean(document.querySelector('[data-qa="skill-groups"]')),
+  };
+});
+expect(
+  "没有分组的老数据保持扁平技能展示",
+  flatSkillView.hasSkills && !flatSkillView.hasLevel && !flatSkillView.hasGroupEditor,
+  JSON.stringify(flatSkillView),
+);
+
+let skillPromptReply = "前端";
+skillPage.on("dialog", async (dialog) => {
+  await dialog.accept(skillPromptReply);
+});
+await clickText(skillPage, "＋ 新建分组");
+await pause(300);
+const skillGroupCards = await skillPage.evaluate(() => {
+  const root = document.querySelector('[data-qa="skill-groups"]');
+  return [...(root?.children ?? [])].map(
+    (node) => node.querySelector("span")?.textContent?.trim() ?? "",
+  );
+});
+expect(
+  "新建分组后出现分组与未分组两栏",
+  skillGroupCards.length === 2 &&
+    skillGroupCards[0] === "前端" &&
+    skillGroupCards[1] === "未分组",
+  JSON.stringify(skillGroupCards),
+);
+
+await setQaValue(skillPage, '[data-qa="skill-form"] input', "TypeScript");
+await selectByOptionText(skillPage, "精通", '[data-qa="skill-form"]');
+await clickText(skillPage, "添加", '[data-qa="skill-form"]');
+await pause(900);
+const savedSkillMeta = await skillPage.evaluate(() => {
+  try {
+    const data = JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}");
+    return {
+      skills: data.skills ?? [],
+      meta: data.skillMeta ?? {},
+      groups: data.skillGroups ?? [],
+    };
+  } catch {
+    return null;
+  }
+});
+expect(
+  "新技能按所选分组与熟练度保存",
+  Boolean(savedSkillMeta) &&
+    savedSkillMeta.skills.includes("TypeScript") &&
+    savedSkillMeta.meta.TypeScript?.level === "精通" &&
+    savedSkillMeta.meta.TypeScript?.group === "前端" &&
+    savedSkillMeta.groups.includes("前端"),
+  JSON.stringify(savedSkillMeta),
+);
+
+const detailedSkillsResume = {
+  basic: {
+    name: "林一",
+    headline: "前端工程师",
+    email: "",
+    phone: "",
+    city: "",
+    website: "",
+    github: "",
+    summary: "",
+    photo: "",
+  },
+  intent: {},
+  educations: [],
+  experiences: [],
+  projects: [],
+  customSections: [],
+  skills: ["React", "Node.js", "Rust"],
+  skillGroups: ["前端", "后端"],
+  skillMeta: {
+    React: { level: "精通", group: "前端" },
+    "Node.js": { level: "熟练", group: "后端" },
+    Rust: { level: "了解", group: "" },
+  },
+  theme: { accent: "#1d4ed8" },
+};
+
+const templateSkillResults = [];
+for (const template of ["modern", "classic", "compact", "sidebar", "timeline"]) {
+  await skillPage.evaluate(
+    ({ resume, templateId }) => {
+      localStorage.setItem("resume-workshop:v1", JSON.stringify(resume));
+      localStorage.setItem("resume-workshop:template", templateId);
+    },
+    { resume: detailedSkillsResume, templateId: template },
+  );
+  await skillPage.reload({ waitUntil: "networkidle0" });
+  await pause(500);
+  const text = await skillPage.evaluate(
+    () => document.querySelector("#resume-print")?.textContent ?? "",
+  );
+  templateSkillResults.push({
+    template,
+    groups: text.includes("前端") && text.includes("后端"),
+    levels: text.includes("React（精通）") && text.includes("Rust（了解）"),
+  });
+}
+expect(
+  "五种模板都渲染技能分组与熟练度",
+  templateSkillResults.every((item) => item.groups && item.levels),
+  JSON.stringify(templateSkillResults),
+);
+
+await skillPage.screenshot({ path: `${OUT}/qa-skills.png` });
+expect(
+  "技能分组页面无控制台错误",
+  skillPage.qaErrors.length === 0,
+  skillPage.qaErrors.join("; "),
+);
+await skillPage.close();
 
 await browser.close();
 if (failures.length > 0) {

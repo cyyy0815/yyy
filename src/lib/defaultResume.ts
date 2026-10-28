@@ -95,6 +95,21 @@ export function createSampleResume(): Resume {
       "性能优化",
       "小程序",
     ],
+    skillGroups: ["前端开发", "工程化"],
+    skillMeta: {
+      React: { level: "精通", group: "前端开发" },
+      TypeScript: { level: "熟练", group: "前端开发" },
+      JavaScript: { level: "熟练", group: "前端开发" },
+      Vue: { level: "熟练", group: "前端开发" },
+      "Next.js": { level: "熟练", group: "前端开发" },
+      "Tailwind CSS": { level: "熟练", group: "前端开发" },
+      小程序: { level: "了解", group: "前端开发" },
+      "Node.js": { level: "熟练", group: "工程化" },
+      ECharts: { level: "熟练", group: "工程化" },
+      Webpack: { level: "熟练", group: "工程化" },
+      Vite: { level: "熟练", group: "工程化" },
+      性能优化: { level: "熟练", group: "工程化" },
+    },
     theme: { accent: DEFAULT_ACCENT },
   };
 }

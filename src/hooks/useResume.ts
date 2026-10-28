@@ -9,6 +9,7 @@ import {
   type SetStateAction,
 } from "react";
 import { createSampleResume } from "@/lib/defaultResume";
+import { createHistory, type History } from "@/lib/history";
 import {
   clearResume,
   loadResume,
@@ -34,6 +35,16 @@ export type UseResume = {
   clearAll: () => void;
   loadSample: () => void;
   replaceResume: (resume: Resume) => void;
+  /** 撤销 / 重做简历内容；切换或导入简历会清空历史。 */
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+};
+
+type HistorySnapshot = {
+  resume: Resume;
+  isSample: boolean;
 };
 
 function loadInitial(): { resume: Resume; isSample: boolean } {
@@ -53,6 +64,40 @@ export function useResume(): UseResume {
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(readLastSavedAt);
   const [hasConflict, setHasConflict] = useState(false);
+
+  // 事件处理里需要同步读取最新值，state 在同一个事件中不会立即更新。
+  const resumeRef = useRef(resume);
+  const isSampleRef = useRef(isSample);
+  useEffect(() => {
+    resumeRef.current = resume;
+  }, [resume]);
+  useEffect(() => {
+    isSampleRef.current = isSample;
+  }, [isSample]);
+
+  // 撤销栈保存简历快照（按引用），切换 / 导入简历时整体清空。
+  const historyRef = useRef<History<HistorySnapshot> | null>(null);
+  if (historyRef.current === null) {
+    historyRef.current = createHistory<HistorySnapshot>();
+  }
+  const history = historyRef.current;
+  // 撤销栈本身不是渲染数据，只把按钮需要的两个布尔值同步到 state。
+  const [historyFlags, setHistoryFlags] = useState({
+    canUndo: false,
+    canRedo: false,
+  });
+  const syncHistoryFlags = useCallback(() => {
+    setHistoryFlags((previous) => {
+      const next = {
+        canUndo: history.canUndo(),
+        canRedo: history.canRedo(),
+      };
+      return previous.canUndo === next.canUndo &&
+        previous.canRedo === next.canRedo
+        ? previous
+        : next;
+    });
+  }, [history]);
 
   // 本页最后一次读到 / 写入的原始 JSON。保存前与实际 storage 比对，
   // 若被其他标签页改过就不写，避免后保存的整份覆盖前一份。
@@ -104,42 +149,114 @@ export function useResume(): UseResume {
 
   const updateResume: Dispatch<SetStateAction<Resume>> = useCallback(
     (action) => {
+      const previous = resumeRef.current;
+      const next =
+        typeof action === "function"
+          ? (action as (current: Resume) => Resume)(previous)
+          : action;
+      if (Object.is(next, previous)) return;
+
+      const previousIsSample = isSampleRef.current;
+      // 连续输入合并为一步；结构性修改由 700ms 空闲自然分段。
+      history.record(
+        { resume: previous, isSample: previousIsSample },
+        true,
+      );
+      syncHistoryFlags();
+
+      resumeRef.current = next;
+      isSampleRef.current = false;
       setIsSample(false);
       // 冲突期间保存被暂停，不要让状态又回到「保存中」。
       setSaveState(hasConflict ? "conflict" : "saving");
-      setResume(action);
+      setResume(next);
     },
-    [hasConflict],
+    [hasConflict, history, syncHistoryFlags],
   );
 
   const clearAll = useCallback(() => {
+    history.record(
+      { resume: resumeRef.current, isSample: isSampleRef.current },
+      false,
+    );
+    syncHistoryFlags();
     clearResume();
+    const empty = createEmptyResume();
+    resumeRef.current = empty;
+    isSampleRef.current = false;
     lastWrittenRef.current = readStoredResumeRaw();
-    setResume(createEmptyResume());
+    setResume(empty);
     setIsSample(false);
     setSaveState("saved");
     setLastSavedAt(null);
     setHasConflict(false);
-  }, []);
+  }, [history, syncHistoryFlags]);
 
   const loadSample = useCallback(() => {
-    setResume(createSampleResume());
+    history.record(
+      { resume: resumeRef.current, isSample: isSampleRef.current },
+      false,
+    );
+    syncHistoryFlags();
+    const sample = createSampleResume();
+    resumeRef.current = sample;
+    isSampleRef.current = true;
+    setResume(sample);
     setIsSample(true);
     setSaveState("saved");
     setLastSavedAt(null);
     setHasConflict(false);
-  }, []);
+  }, [history, syncHistoryFlags]);
 
-  const replaceResume = useCallback((next: Resume) => {
-    // 多份简历切换 / 导入会先写 storage 或即将写入；以当前 storage 为新基线，
-    // 这样随后由本 hook 触发的自动保存不会被误判成跨标签页冲突。
-    lastWrittenRef.current = readStoredResumeRaw();
-    setResume(next);
-    setIsSample(false);
-    setSaveState("saving");
-    setLastSavedAt(readLastSavedAt());
-    setHasConflict(false);
-  }, []);
+  const replaceResume = useCallback(
+    (next: Resume) => {
+      // 切换 / 导入简历是文档级操作，不进入当前文档的撤销栈。
+      history.reset();
+      syncHistoryFlags();
+      // 多份简历切换 / 导入会先写 storage 或即将写入；以当前 storage 为新基线，
+      // 这样随后由本 hook 触发的自动保存不会被误判成跨标签页冲突。
+      lastWrittenRef.current = readStoredResumeRaw();
+      resumeRef.current = next;
+      isSampleRef.current = false;
+      setResume(next);
+      setIsSample(false);
+      setSaveState("saving");
+      setLastSavedAt(readLastSavedAt());
+      setHasConflict(false);
+    },
+    [history, syncHistoryFlags],
+  );
+
+  const applySnapshot = useCallback(
+    (snapshot: HistorySnapshot) => {
+      resumeRef.current = snapshot.resume;
+      isSampleRef.current = snapshot.isSample;
+      setResume(snapshot.resume);
+      setIsSample(snapshot.isSample);
+      setSaveState(
+        hasConflict ? "conflict" : snapshot.isSample ? "saved" : "saving",
+      );
+    },
+    [hasConflict],
+  );
+
+  const undo = useCallback(() => {
+    const previous = history.undo({
+      resume: resumeRef.current,
+      isSample: isSampleRef.current,
+    });
+    if (previous) applySnapshot(previous);
+    syncHistoryFlags();
+  }, [applySnapshot, history, syncHistoryFlags]);
+
+  const redo = useCallback(() => {
+    const next = history.redo({
+      resume: resumeRef.current,
+      isSample: isSampleRef.current,
+    });
+    if (next) applySnapshot(next);
+    syncHistoryFlags();
+  }, [applySnapshot, history, syncHistoryFlags]);
 
   const keepLocalVersion = useCallback(() => {
     if (!saveResume(resume)) {
@@ -164,5 +281,9 @@ export function useResume(): UseResume {
     clearAll,
     loadSample,
     replaceResume,
+    undo,
+    redo,
+    canUndo: historyFlags.canUndo,
+    canRedo: historyFlags.canRedo,
   };
 }

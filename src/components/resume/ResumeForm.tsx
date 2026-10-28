@@ -20,13 +20,17 @@ import {
 } from "@/lib/validate";
 import {
   newId,
+  SKILL_LEVELS,
   type BasicInfo,
   type Education,
   type Experience,
   type JobIntent,
   type Project,
   type Resume,
+  type SkillLevel,
+  type SkillMeta,
 } from "@/lib/types";
+import { groupSkills } from "@/lib/skills";
 import { AiWriter } from "@/components/resume/AiWriter";
 import { CustomSectionsEditor } from "@/components/resume/CustomSectionsEditor";
 import {
@@ -718,10 +722,75 @@ function EducationSection({ resume, onChange, onDelete }: SectionProps) {
   );
 }
 
+function SkillChip({
+  name,
+  level,
+  group,
+  groupOptions,
+  onLevelChange,
+  onGroupChange,
+  onRemove,
+}: {
+  name: string;
+  level: SkillLevel;
+  group: string;
+  groupOptions: string[];
+  onLevelChange: (level: SkillLevel) => void;
+  onGroupChange: (group: string) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white py-1 pl-2.5 pr-1.5 text-[12px] text-zinc-700">
+      {name}
+      <select
+        value={level}
+        onChange={(event) => onLevelChange(event.target.value as SkillLevel)}
+        aria-label={`${name} 熟练度`}
+        className="rounded border-0 bg-transparent py-0 text-[11px] text-zinc-500 outline-none"
+      >
+        <option value="">熟练度</option>
+        {SKILL_LEVELS.filter(Boolean).map((item) => (
+          <option key={item} value={item}>
+            {item}
+          </option>
+        ))}
+      </select>
+      {groupOptions.length > 0 ? (
+        <select
+          value={group}
+          onChange={(event) => onGroupChange(event.target.value)}
+          aria-label={`${name} 分组`}
+          className="max-w-[88px] rounded border-0 bg-transparent py-0 text-[11px] text-zinc-500 outline-none"
+        >
+          <option value="">未分组</option>
+          {groupOptions.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      ) : null}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="flex h-4 w-4 items-center justify-center rounded-full text-zinc-400 transition hover:bg-red-50 hover:text-red-600"
+        aria-label={`删除技能 ${name}`}
+      >
+        ×
+      </button>
+    </span>
+  );
+}
+
 function SkillsSection({ resume, onChange }: EditorProps) {
   const [draft, setDraft] = useState("");
+  const [draftLevel, setDraftLevel] = useState<SkillLevel>("");
+  const [draftGroup, setDraftGroup] = useState("");
+  const [groupError, setGroupError] = useState("");
   const analysis = analyzeResume(resume);
 
+  const hasGroups = resume.skillGroups.length > 0;
+  const grouped = groupSkills(resume, { includeEmpty: true });
   const suggestions = analysis.profile
     ? [...analysis.missingCore, ...analysis.profile.bonus]
         .filter(
@@ -733,50 +802,264 @@ function SkillsSection({ resume, onChange }: EditorProps) {
         .slice(0, 8)
     : [];
 
-  const addSkill = (value: string) => {
+  const addSkill = (value: string, group = draftGroup, level = draftLevel) => {
     const skill = value.trim();
     if (!skill) return;
     if (resume.skills.some((item) => item.toLowerCase() === skill.toLowerCase())) {
       setDraft("");
       return;
     }
-    onChange((prev) => ({ ...prev, skills: [...prev.skills, skill] }));
+    const normalizedGroup = group.trim();
+    onChange((prev) => ({
+      ...prev,
+      skills: [...prev.skills, skill],
+      skillMeta:
+        normalizedGroup || level
+          ? {
+              ...prev.skillMeta,
+              [skill]: { level, group: normalizedGroup },
+            }
+          : prev.skillMeta,
+      skillGroups:
+        normalizedGroup && !prev.skillGroups.includes(normalizedGroup)
+          ? [...prev.skillGroups, normalizedGroup]
+          : prev.skillGroups,
+    }));
     setDraft("");
+    setDraftLevel("");
+  };
+
+  const updateMeta = (
+    name: string,
+    patch: Partial<SkillMeta>,
+  ) =>
+    onChange((prev) => {
+      const current = prev.skillMeta[name] ?? { level: "", group: "" };
+      const next = { ...current, ...patch };
+      const skillMeta = { ...prev.skillMeta };
+      if (!next.level && !next.group) delete skillMeta[name];
+      else skillMeta[name] = next;
+      return { ...prev, skillMeta };
+    });
+
+  const removeSkill = (name: string) =>
+    onChange((prev) => {
+      const skillMeta = { ...prev.skillMeta };
+      delete skillMeta[name];
+      return {
+        ...prev,
+        skills: prev.skills.filter((item) => item !== name),
+        skillMeta,
+      };
+    });
+
+  const createGroup = () => {
+    const input = window.prompt("新建技能分组，如 前端开发、后端、工具");
+    if (input === null) return;
+    const title = input.trim().slice(0, 24);
+    if (!title) {
+      setGroupError("分组名称不能为空");
+      return;
+    }
+    if (
+      resume.skillGroups.some(
+        (group) => group.toLowerCase() === title.toLowerCase(),
+      )
+    ) {
+      setGroupError(`分组「${title}」已存在`);
+      return;
+    }
+    setGroupError("");
+    onChange((prev) => ({
+      ...prev,
+      skillGroups: [...prev.skillGroups, title],
+    }));
+    setDraftGroup(title);
+  };
+
+  const renameGroup = (oldTitle: string) => {
+    const input = window.prompt("重命名技能分组", oldTitle);
+    if (input === null) return;
+    const title = input.trim().slice(0, 24);
+    if (!title || title === oldTitle) return;
+    if (
+      resume.skillGroups.some(
+        (group) =>
+          group !== oldTitle && group.toLowerCase() === title.toLowerCase(),
+      )
+    ) {
+      setGroupError(`分组「${title}」已存在`);
+      return;
+    }
+    setGroupError("");
+    onChange((prev) => {
+      const skillMeta: Record<string, SkillMeta> = {};
+      for (const [name, meta] of Object.entries(prev.skillMeta)) {
+        skillMeta[name] =
+          meta.group === oldTitle ? { ...meta, group: title } : meta;
+      }
+      return {
+        ...prev,
+        skillGroups: prev.skillGroups.map((group) =>
+          group === oldTitle ? title : group,
+        ),
+        skillMeta,
+      };
+    });
+    setDraftGroup((current) => (current === oldTitle ? title : current));
+  };
+
+  const deleteGroup = (title: string) => {
+    if (
+      !window.confirm(
+        `删除分组「${title}」？组内技能会移到未分组，不会删除技能。`,
+      )
+    ) {
+      return;
+    }
+    setGroupError("");
+    onChange((prev) => {
+      const skillMeta: Record<string, SkillMeta> = {};
+      for (const [name, meta] of Object.entries(prev.skillMeta)) {
+        if (meta.group !== title) {
+          skillMeta[name] = meta;
+        } else if (meta.level) {
+          skillMeta[name] = { level: meta.level, group: "" };
+        }
+      }
+      return {
+        ...prev,
+        skillGroups: prev.skillGroups.filter((group) => group !== title),
+        skillMeta,
+      };
+    });
+    setDraftGroup((current) => (current === title ? "" : current));
+  };
+
+  const moveGroup = (title: string, direction: -1 | 1) =>
+    onChange((prev) => {
+      const list = [...prev.skillGroups];
+      const index = list.indexOf(title);
+      const next = index + direction;
+      if (index < 0 || next < 0 || next >= list.length) return prev;
+      [list[index], list[next]] = [list[next], list[index]];
+      return { ...prev, skillGroups: list };
+    });
+
+  const renderChip = (name: string) => {
+    const meta = resume.skillMeta[name] ?? { level: "", group: "" };
+    return (
+      <SkillChip
+        key={name}
+        name={name}
+        level={meta.level}
+        group={meta.group}
+        groupOptions={resume.skillGroups}
+        onLevelChange={(level) => updateMeta(name, { level })}
+        onGroupChange={(group) => updateMeta(name, { group })}
+        onRemove={() => removeSkill(name)}
+      />
+    );
   };
 
   return (
     <SectionCard
       title="技能标签"
-      description="写具体的技术、工具或方法，推荐匹配会用到它们"
+      description="写具体的技术、工具或方法；可分组与标注熟练度，推荐匹配会用到它们"
     >
-      <div className="flex flex-wrap gap-1.5">
-        {resume.skills.map((skill) => (
-          <span
-            key={skill}
-            className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white py-1 pl-2.5 pr-1.5 text-[12px] text-zinc-700"
-          >
-            {skill}
-            <button
-              type="button"
-              onClick={() =>
-                onChange((prev) => ({
-                  ...prev,
-                  skills: prev.skills.filter((item) => item !== skill),
-                }))
-              }
-              className="flex h-4 w-4 items-center justify-center rounded-full text-zinc-400 transition hover:bg-red-50 hover:text-red-600"
-              aria-label={`删除技能 ${skill}`}
-            >
-              ×
-            </button>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" onClick={createGroup}>
+          ＋ 新建分组
+        </Button>
+        {hasGroups ? (
+          <span className="text-[11px] text-zinc-400">
+            分组只影响简历展示；技能本身仍会被推荐匹配
           </span>
-        ))}
-        {resume.skills.length === 0 ? (
-          <span className="text-[12px] text-zinc-400">还没有技能标签</span>
+        ) : null}
+        {groupError ? (
+          <p role="alert" className="text-[11px] text-red-600">
+            {groupError}
+          </p>
         ) : null}
       </div>
 
-      <div className="mt-3 flex gap-2">
+      {hasGroups ? (
+        <div className="space-y-3" data-qa="skill-groups">
+          {grouped.map((group) => (
+            <div
+              key={group.title || "__ungrouped"}
+              className="rounded-xl border border-zinc-200/80 bg-zinc-50/40 p-3"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-[11px] font-medium text-zinc-500">
+                  {group.title || "未分组"}
+                </span>
+                {group.title ? (
+                  <div className="flex items-center gap-0.5">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => moveGroup(group.title, -1)}
+                      disabled={resume.skillGroups.indexOf(group.title) === 0}
+                      aria-label={`上移分组 ${group.title}`}
+                      className="px-1.5"
+                    >
+                      ↑
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => moveGroup(group.title, 1)}
+                      disabled={
+                        resume.skillGroups.indexOf(group.title) ===
+                        resume.skillGroups.length - 1
+                      }
+                      aria-label={`下移分组 ${group.title}`}
+                      className="px-1.5"
+                    >
+                      ↓
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => renameGroup(group.title)}
+                      className="rounded px-1.5 py-1 text-[11px] text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
+                    >
+                      重命名
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteGroup(group.title)}
+                      className="rounded px-1.5 py-1 text-[11px] text-zinc-400 transition hover:bg-red-50 hover:text-red-600"
+                    >
+                      删除分组
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {group.skills.map((skill) => renderChip(skill.name))}
+                {group.skills.length === 0 ? (
+                  <span className="text-[11px] text-zinc-400">
+                    暂无技能，在下方添加
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {resume.skills.map((skill) => renderChip(skill))}
+          {resume.skills.length === 0 ? (
+            <span className="text-[12px] text-zinc-400">还没有技能标签</span>
+          ) : null}
+        </div>
+      )}
+
+      <div
+        className="mt-3 flex flex-wrap items-center gap-2"
+        data-qa="skill-form"
+      >
         <TextInput
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -787,7 +1070,38 @@ function SkillsSection({ resume, onChange }: EditorProps) {
             }
           }}
           placeholder="输入技能后按回车，如 React"
+          className="min-w-[140px] flex-1"
         />
+        <select
+          value={draftLevel}
+          onChange={(event) =>
+            setDraftLevel(event.target.value as SkillLevel)
+          }
+          aria-label="新技能熟练度"
+          className="h-9 rounded-lg border border-zinc-200 bg-white px-2 text-[12px] text-zinc-600"
+        >
+          <option value="">熟练度</option>
+          {SKILL_LEVELS.filter(Boolean).map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+        {hasGroups ? (
+          <select
+            value={draftGroup}
+            onChange={(event) => setDraftGroup(event.target.value)}
+            aria-label="新技能分组"
+            className="h-9 max-w-[140px] rounded-lg border border-zinc-200 bg-white px-2 text-[12px] text-zinc-600"
+          >
+            <option value="">未分组</option>
+            {resume.skillGroups.map((group) => (
+              <option key={group} value={group}>
+                {group}
+              </option>
+            ))}
+          </select>
+        ) : null}
         <Button variant="outline" onClick={() => addSkill(draft)}>
           添加
         </Button>

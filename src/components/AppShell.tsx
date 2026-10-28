@@ -119,6 +119,10 @@ function ResumeWorkspace() {
     clearAll,
     loadSample,
     replaceResume,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   } = useResume();
 
   const [tab, setTab] = useState<Tab>(() =>
@@ -189,6 +193,34 @@ function ResumeWorkspace() {
     const timer = window.setTimeout(() => setNotice(null), 2800);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  // 撤销 / 重做快捷键：输入框内保留浏览器原生的文本撤销，避免两套历史互相打架。
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.isContentEditable ||
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT")
+      ) {
+        return;
+      }
+      const key = event.key.toLowerCase();
+      if (key === "z") {
+        event.preventDefault();
+        if (event.shiftKey) redo();
+        else undo();
+      } else if (key === "y") {
+        event.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [undo, redo]);
 
   const showBackupReminder =
     backupDue && !isSample && hasResumeContent(resume);
@@ -674,6 +706,39 @@ function ResumeWorkspace() {
                   mobilePane === "form" ? "block" : "hidden"
                 } lg:block`}
               >
+                <div
+                  data-qa="history-controls"
+                  className="mb-3 flex items-center justify-between gap-2"
+                >
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={undo}
+                      disabled={!canUndo}
+                      title="撤销 (Ctrl+Z)"
+                      aria-label="撤销"
+                      className="disabled:opacity-40"
+                    >
+                      ↶ 撤销
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={redo}
+                      disabled={!canRedo}
+                      title="重做 (Ctrl+Shift+Z)"
+                      aria-label="重做"
+                      className="disabled:opacity-40"
+                    >
+                      ↷ 重做
+                    </Button>
+                  </div>
+                  <span className="hidden text-[11px] text-zinc-400 sm:inline">
+                    Ctrl+Z 撤销 · Ctrl+Shift+Z 重做
+                  </span>
+                </div>
+
                 <ResumeForm
                   key={resumeVersion}
                   resume={resume}

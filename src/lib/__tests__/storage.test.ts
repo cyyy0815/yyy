@@ -90,6 +90,47 @@ describe("normalizeResume", () => {
     expect(resume.theme.accent).toBe("#be123c");
   });
 
+  it("旧数据没有技能分组字段时补空，且不改变扁平技能", () => {
+    const resume = normalizeResume({
+      basic: { name: "林一" },
+      skills: ["React", "TypeScript"],
+    });
+    expect(resume.skills).toEqual(["React", "TypeScript"]);
+    expect(resume.skillMeta).toEqual({});
+    expect(resume.skillGroups).toEqual([]);
+  });
+
+  it("收敛技能分组与熟练度：去重、裁剪、丢弃无效值", () => {
+    const resume = normalizeResume({
+      basic: { name: "林一" },
+      skills: ["React", "TypeScript", "Vue"],
+      skillGroups: [" 前端 ", "前端", "", 42, "工程化"],
+      skillMeta: {
+        React: { level: "精通", group: " 前端 " },
+        TypeScript: { level: "专家", group: "工程化" },
+        Vue: { level: "了解", group: 123 },
+        Removed: { level: "精通", group: "前端" },
+        Bad: "oops",
+      },
+    });
+    expect(resume.skillGroups).toEqual(["前端", "工程化"]);
+    expect(resume.skillMeta).toEqual({
+      React: { level: "精通", group: "前端" },
+      TypeScript: { level: "", group: "工程化" },
+      Vue: { level: "了解", group: "" },
+    });
+  });
+
+  it("技能元数据里的新分组追加到 skillGroups 末尾", () => {
+    const resume = normalizeResume({
+      basic: { name: "林一" },
+      skills: ["Docker"],
+      skillGroups: ["前端"],
+      skillMeta: { Docker: { level: "熟练", group: "运维" } },
+    });
+    expect(resume.skillGroups).toEqual(["前端", "运维"]);
+  });
+
   it("拒绝非图片 Data URL 与超长照片", () => {
     const valid = createEmptyResume();
     valid.basic.photo = "data:image/jpeg;base64,AAAA";
@@ -152,6 +193,30 @@ describe("parseResumeJSON", () => {
     ["经历包含非对象", '{"basic":{"name":"x"},"experiences":[1]}'],
     ["技能不是数组", '{"basic":{"name":"x"},"skills":"React"}'],
     ["技能包含非文本", '{"basic":{"name":"x"},"skills":["React",1]}'],
+    [
+      "技能分组不是数组",
+      '{"basic":{"name":"x"},"skillGroups":"前端"}',
+    ],
+    [
+      "技能分组包含非文本",
+      '{"basic":{"name":"x"},"skillGroups":["前端",1]}',
+    ],
+    [
+      "技能熟练度不是对象",
+      '{"basic":{"name":"x"},"skillMeta":[]}',
+    ],
+    [
+      "技能熟练度条目无效",
+      '{"basic":{"name":"x"},"skillMeta":{"React":"精通"}}',
+    ],
+    [
+      "技能熟练度等级无效",
+      '{"basic":{"name":"x"},"skillMeta":{"React":{"level":"专家"}}}',
+    ],
+    [
+      "技能分组名称不是文本",
+      '{"basic":{"name":"x"},"skillMeta":{"React":{"group":1}}}',
+    ],
     ["主题不是对象", '{"basic":{"name":"x"},"theme":"red"}'],
   ])("拒绝 %s", (_label, text) => {
     expect(parseResumeJSON(text).ok).toBe(false);

@@ -82,6 +82,23 @@ export type ResumeTheme = {
   accent: string;
 };
 
+export const SKILL_LEVELS = ["", "了解", "熟练", "精通"] as const;
+
+export type SkillLevel = (typeof SKILL_LEVELS)[number];
+
+export function isSkillLevel(value: unknown): value is SkillLevel {
+  return (
+    typeof value === "string" &&
+    (SKILL_LEVELS as readonly string[]).includes(value)
+  );
+}
+
+export type SkillMeta = {
+  level: SkillLevel;
+  /** 分组名称；空字符串表示未分组 */
+  group: string;
+};
+
 export type Resume = {
   basic: BasicInfo;
   intent: JobIntent;
@@ -89,7 +106,12 @@ export type Resume = {
   experiences: Experience[];
   projects: Project[];
   customSections: CustomSection[];
+  /** 扁平技能列表，匹配与 AI 只读取这里 */
   skills: string[];
+  /** 技能名 → 熟练度与分组；旧数据为空对象 */
+  skillMeta: Record<string, SkillMeta>;
+  /** 分组的展示顺序；空数组表示全部未分组 */
+  skillGroups: string[];
   theme: ResumeTheme;
 };
 
@@ -143,6 +165,8 @@ export function createEmptyResume(): Resume {
     projects: [],
     customSections: [],
     skills: [],
+    skillMeta: {},
+    skillGroups: [],
     theme: { accent: DEFAULT_ACCENT },
   };
 }

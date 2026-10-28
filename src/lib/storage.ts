@@ -2,9 +2,11 @@ import { isPhotoDataUrl } from "./photo";
 import { normalizeAccent } from "./theme";
 import {
   createEmptyResume,
+  isSkillLevel,
   isTemplateId,
   newId,
   type Resume,
+  type SkillMeta,
   type TemplateId,
 } from "./types";
 
@@ -31,6 +33,48 @@ function asRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {};
 }
 
+const MAX_SKILL_GROUP_LENGTH = 24;
+
+/**
+ * 技能分组与熟练度是展示层数据：只保留仍存在于 skills 里的技能，
+ * 分组顺序以 skillGroups 为准，元数据里出现的新分组追加到末尾。
+ */
+function normalizeSkillDetails(
+  rawMeta: unknown,
+  rawGroups: unknown,
+  skills: string[],
+): { skillMeta: Record<string, SkillMeta>; skillGroups: string[] } {
+  const groups: string[] = [];
+  const seen = new Set<string>();
+  const addGroup = (value: string) => {
+    const group = value.trim().slice(0, MAX_SKILL_GROUP_LENGTH);
+    if (!group || seen.has(group)) return "";
+    seen.add(group);
+    groups.push(group);
+    return group;
+  };
+
+  for (const value of asArray<unknown>(rawGroups)) {
+    if (typeof value === "string") addGroup(value);
+  }
+
+  const source = asRecord(rawMeta);
+  const skillMeta: Record<string, SkillMeta> = {};
+  for (const name of skills) {
+    const value = source[name];
+    if (!isRecord(value)) continue;
+    const level = isSkillLevel(value.level) ? value.level : "";
+    const group =
+      typeof value.group === "string"
+        ? value.group.trim().slice(0, MAX_SKILL_GROUP_LENGTH)
+        : "";
+    if (group) addGroup(group);
+    if (level || group) skillMeta[name] = { level, group };
+  }
+
+  return { skillMeta, skillGroups: groups };
+}
+
 /** 把任意来源的数据收敛成合法的 Resume，避免旧版本或坏文件导致崩溃。 */
 export function normalizeResume(input: unknown): Resume {
   const base = createEmptyResume();
@@ -40,6 +84,15 @@ export function normalizeResume(input: unknown): Resume {
   const basic = asRecord(raw.basic);
   const intent = asRecord(raw.intent);
   const theme = asRecord(raw.theme);
+  const skills = asArray<unknown>(raw.skills)
+    .filter((skill): skill is string => typeof skill === "string")
+    .map((skill) => skill.trim())
+    .filter((skill, index, list) => Boolean(skill) && list.indexOf(skill) === index);
+  const { skillMeta, skillGroups } = normalizeSkillDetails(
+    raw.skillMeta,
+    raw.skillGroups,
+    skills,
+  );
 
   return {
     basic: {
@@ -107,10 +160,9 @@ export function normalizeResume(input: unknown): Resume {
           link: asString(item.link),
         })),
       })),
-    skills: asArray<unknown>(raw.skills)
-      .filter((skill): skill is string => typeof skill === "string")
-      .map((skill) => skill.trim())
-      .filter(Boolean),
+    skills,
+    skillMeta,
+    skillGroups,
     theme: { accent: normalizeAccent(theme.accent) },
   };
 }
@@ -311,6 +363,30 @@ function checkImportShape(data: unknown): string | null {
     if (!Array.isArray(data.skills)) return "技能（skills）必须是数组";
     if (data.skills.some((skill) => typeof skill !== "string")) {
       return "技能（skills）中存在非文本条目";
+    }
+  }
+  if (data.skillGroups !== undefined) {
+    if (!Array.isArray(data.skillGroups)) {
+      return "技能分组（skillGroups）必须是数组";
+    }
+    if (data.skillGroups.some((group) => typeof group !== "string")) {
+      return "技能分组（skillGroups）中存在非文本条目";
+    }
+  }
+  if (data.skillMeta !== undefined) {
+    if (!isRecord(data.skillMeta)) {
+      return "技能熟练度（skillMeta）必须是对象";
+    }
+    for (const value of Object.values(data.skillMeta)) {
+      if (!isRecord(value)) {
+        return "技能熟练度（skillMeta）中存在无效条目";
+      }
+      if (value.level !== undefined && !isSkillLevel(value.level)) {
+        return "技能熟练度（skillMeta）的 level 无效";
+      }
+      if (value.group !== undefined && typeof value.group !== "string") {
+        return "技能熟练度（skillMeta）的 group 必须是文本";
+      }
     }
   }
   if (data.theme !== undefined && !isRecord(data.theme)) {
