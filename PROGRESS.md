@@ -35,11 +35,15 @@
 | 17 | P2 收尾：可点击链接（追加） | ✅ 完成（安全 href + 五套模板） |
 | 18 | AI 整份简历结构化生成（追加） | ✅ 完成（自述 → 教育/工作/项目/技能，新建简历） |
 | 19 | 全部简历备份与导入（追加） | ✅ 完成（整库导出 + 兼容导入） |
+| 20 | 全局撤销 / 重做 + 真实 Key 验证（追加） | ✅ 完成（撤销栈 + 快捷键 + `/api/ai/full` 实测） |
+| 21 | 技能分组与熟练度（追加） | ✅ 完成（分组增删改排序 + 熟练度 + 五套模板展示） |
+| 22 | AI 求职信（追加） | ✅ 完成（求职信生成 + 预览编辑 + 复制下载） |
 
 ## 关机交接（2026-10-28）
 
-- 提交：`fd3f191 feat(storage): 支持整库导出与导入全部简历`，其后为交接文档提交；工作区干净。
-- 阶段 0–19 全部完成；最新验证为 `tsc`、`lint`、`npm test`（61 passed）、`npm run qa`、`npm run build` 全部通过。
+- 阶段 20–22 的代码（撤销 / 重做、技能分组、AI 求职信）已提交，代码提交为 `bff465b`；文档随本次提交更新。
+- 阶段 0–22 全部完成；最新验证为 `tsc`、`lint`、`npm test`（93 passed）、`npm run qa`、`npm run build` 全部通过。
+- `/api/ai/full` 已用 `.env.local` 中的真实 DeepSeek Key 验证：长自述返回合法 JSON，`response_format: json_object` 生效，`usage` 为 prompt 1489 / completion 2245，未触发 4000 token 上限，输出不含联系方式。
 - 下次先读本文件的「当前进度 / 下次继续」与 `PLAN.md`，再运行：
 
   ```bash
@@ -47,8 +51,7 @@
   ```
 
   打开 http://localhost:3000 ；AI 功能依赖 `.env.local` 中的 DeepSeek 配置，改动环境变量后需重启 dev server。
-- 尚未开始的可选项：全局撤销、技能分组、双语简历、AI 求职信 / 英文输出、离线缓存。开始前先确认需求。
-- 待验证：`/api/ai/full` 只用 mock 跑过，尚未用真实 DeepSeek Key 验证 `response_format: json_object` 与长简历的 token 上限。
+- 尚未开始的可选项：双语简历、英文输出、离线缓存。开始前先确认需求。
 
 ## 阶段明细
 
@@ -296,10 +299,50 @@
 - [x] QA：导出备份含两份文档与模板；在另一份简历上导入后恢复两份文档、当前文档与模板；照片 / 自定义板块 / 打印导出断言改用新格式
 - [x] 验证：`tsc`、`npm run lint`、`npm test`（61 passed）、`npm run qa`、`npm run build` 通过
 
+### 阶段 20 — 全局撤销 / 重做 + 真实 Key 验证（追加）✅
+- [x] 新增 `src/lib/history.ts`：通用撤销 / 重做栈，上限 60 步，连续输入 700ms 内合并为一步
+- [x] 快照按引用保存；所有简历更新均为不可变更新，无需深拷贝
+- [x] `useResume` 统一记录内容修改：表单编辑、AI 采用、增删、排序、分页开关、主题色、清空、载入示例
+- [x] 撤销 / 重做会恢复当时的 `isSample` 状态；切换、复制、新建、导入简历时清空历史，避免跨文档撤销
+- [x] 编辑区顶部新增「↶ 撤销 / ↷ 重做」按钮，按可用状态禁用；快捷键 `Ctrl/Cmd+Z`、`Ctrl/Cmd+Shift+Z`、`Ctrl+Y`
+- [x] 输入框内保留浏览器原生文本撤销，不拦截快捷键，避免两套历史冲突
+- [x] 撤销 / 重做仍走原有自动保存与多标签页冲突保护
+- [x] 单测新增 7 个（共 68 个）：撤销 / 重做、时间合并、非合并边界、清空重做栈、撤销后新输入、上限裁剪、reset
+- [x] QA 新增：初始按钮禁用、编辑后可撤销、按钮与快捷键撤销 / 重做、结果自动保存、新增条目可全局撤销
+- [x] 真实 Key 验证 `/api/ai/full`：长自述（约 1300 字，6 段经历 / 5 个项目素材）返回合法 JSON，教育 1、工作 5、项目 5、技能 18；无姓名 / 邮箱 / 电话字段
+- [x] 真实 Key 用量：prompt 1489 / completion 2245 tokens，8.2 秒完成，未触及 4000 token 上限
+- [x] 验证：`tsc`、`npm run lint`、`npm test`（68 passed）、`npm run qa`、`npm run build` 通过
+
+### 阶段 21 — 技能分组与熟练度（追加）✅
+- [x] `Resume` 新增展示层字段：`skillMeta`（技能 → 熟练度 / 分组）与有序的 `skillGroups`；扁平 `skills` 仍是匹配与 AI 的唯一数据源
+- [x] 熟练度取值 `了解 / 熟练 / 精通`（可为空）；旧 JSON 与 AI 整份生成结果自动视为未分组
+- [x] `storage.ts` 归一化：裁剪分组名、去重、只保留仍存在于 `skills` 的元数据、丢弃非法熟练度；导入校验同步覆盖新字段
+- [x] 新增 `src/lib/skills.ts`：`groupSkills` / `hasSkillDetails` / `formatSkill` 等展示辅助，无分组时保持旧的扁平排版
+- [x] 编辑表单：新建 / 重命名 / 删除分组（删除只解除分组，不删技能）、上下移动分组；每个技能可改熟练度与所属分组
+- [x] 添加技能时可直接选择分组与熟练度；按岗位推荐的缺失技能沿用当前选择；删除技能同时清理元数据
+- [x] 五套模板按分组渲染；经典与紧凑模板按「分组：技能（熟练度）」分行，其余模板显示分组小标题与技能标签
+- [x] 示例简历补充「前端开发 / 工程化」两个分组与各技能熟练度
+- [x] 单测新增 19 个（共 87 个）：分组顺序、空分组、元数据追加分组、展示辅助、旧数据补齐、脏数据收敛与导入校验
+- [x] QA 新增：旧数据扁平展示、新建分组、按分组 / 熟练度保存、五种模板均渲染分组与熟练度
+- [x] 验证：`tsc`、`npm run lint`、`npm test`（87 passed）、`npm run qa`、`npm run build` 通过
+
+### 阶段 22 — AI 求职信（追加）✅
+- [x] `AiSection` 新增 `cover`：复用原有 SSE 客户端、`/api/ai/generate`、限流与上游重试，不新增接口
+- [x] 求职信使用专属提示词：第一行「尊敬的招聘负责人：」，正文 2–3 段、300–500 字，结尾「此致 / 敬礼」；未知公司统一写「贵公司」
+- [x] 明确禁止写入求职者姓名、联系方式、日期与地址；禁止把 JD 要求写成用户已有经历；额外要求用具体成果支撑
+- [x] 求职信 token 预算 1200，保持 `reasoning_effort: "low"`；清理函数保留段落空行，只去代码围栏与行首标题符号
+- [x] 新增 `CoverLetterWriter`：入口卡片、配置检查、目标岗位 / 年限 / 个人素材 / 参考 JD / 风格、流式生成与停止
+- [x] 打开面板时自动带入目标岗位、工作年限、简介与前 12 个技能，并读取 JD 匹配页已保存的参考 JD；均可手动修改
+- [x] 生成结果可直接编辑，支持复制全文与下载 `.txt`；不写入简历，关闭面板或卸载时中止请求
+- [x] 隐私：只发送目标岗位、工作年限、个人素材与参考 JD；姓名、邮箱、电话和链接不进入请求，服务端仍会再次过滤
+- [x] 单测新增 6 个（共 93 个）：求职信系统提示词、JD 规则编号、用户提示词脱敏、token 预算、段落清理与经历清理回归
+- [x] QA 新增 7 项：默认带入岗位 / 年限 / 素材 / 已存 JD、生成后可编辑与复制下载、请求仅含素材且不含姓名与联系方式、不写入简历、无配置时显示步骤
+- [x] 验证：`tsc`、`npm run lint`、`npm test`（93 passed）、`npm run qa`、`npm run build` 通过
+
 ## 当前进度
 
 - 最近更新：2026-10-28
-- 状态：**阶段 0–19 全部完成；P1–P4、AI 功能完善、可点击链接、整份结构化生成与整库备份全部完成**
+- 状态：**阶段 0–22 全部完成；P1–P4、AI 功能完善、可点击链接、整份结构化生成、整库备份、全局撤销 / 重做、技能分组与 AI 求职信全部完成**
 - 代码状态：
   - M0：git 仓库、`.env.example`、`scripts/mock-deepseek.mjs` 完成
   - M1：`/api/ai/status`、`/api/ai/generate`、SSE 转换完成
@@ -313,7 +356,11 @@
 - P2 收尾：网站 / GitHub / 项目 / 自定义板块链接在五套模板与 PDF 中可点击，危险协议降级为纯文本
 - 阶段 18：AI 整份生成改为一段自述 → 结构化 JSON（教育/工作/项目/技能），采用时新建简历、旧简历保留
 - 阶段 19：JSON 导出升级为整库备份（当前文档 + 其他快照 + activeId），导入兼容旧版单份文件；整库导入整体替换并恢复当前文档
-- 工程命令：`npm test` 运行单元测试（61 个）；CI 覆盖 lint + 类型检查 + 单测 + 构建
+- 阶段 20：新增 `src/lib/history.ts` 与 `useResume` 撤销 / 重做；编辑区顶部按钮与 `Ctrl/Cmd+Z` / `Ctrl/Cmd+Shift+Z` 快捷键，切换简历时清空历史
+- 阶段 20：`/api/ai/full` 已用真实 DeepSeek Key 验证长自述生成合法 JSON（completion 2245 tokens，未触及上限）
+- 阶段 21：技能支持分组与熟练度；`skillMeta` / `skillGroups` 仅用于展示，扁平 `skills` 继续驱动匹配与 AI，旧 JSON 自动兼容
+- 阶段 22：推荐页新增 AI 求职信；复用 `/api/ai/generate` 的 `cover` 板块，生成后可编辑、复制或下载 `.txt`，不写入简历
+- 工程命令：`npm test` 运行单元测试（93 个）；CI 覆盖 lint + 类型检查 + 单测 + 构建
 - 本地地址：http://localhost:3000 （推荐页 http://localhost:3000/#jobs）
 - 一键自检：先 `npm run dev`，再 `npm run qa`（截图输出到 `.screenshots/`）
 - 单一方案文档：**`PLAN.md`**
@@ -332,6 +379,21 @@
 - 阶段 19：整库导入前提示会替换全部简历；QA 新增整库导出 / 导入回放，旧照片与自定义板块导出断言改用 `documents[0].resume`
 - 阶段 19：新增 6 个单测（合计 61 passed）
 - 阶段 19 验证：`tsc`、`lint`、`npm test`（61 passed）、`npm run qa`、`npm run build` 全部通过
+- 阶段 20：新增 `src/lib/history.ts`（上限 60、700ms 合并、撤销后新输入另起一步）与 7 个单测
+- 阶段 20：`useResume` 在所有修改路径记录快照，撤销 / 重做恢复 `isSample`；文档级操作调用 `history.reset()`
+- 阶段 20：编辑区顶部加入按钮，快捷键在非输入控件上生效，输入框保留原生文本撤销
+- 阶段 20：QA 增加撤销 / 重做按钮、快捷键、自动保存与新增条目撤销检查，截图 `qa-history.png`
+- 阶段 20：真实 Key 调用 `/api/ai/full`，长自述返回合法 JSON；prompt 1489 / completion 2245 tokens，未触及上限
+- 阶段 20 验证：`tsc`、`lint`、`npm test`（68 passed）、`npm run qa`、`npm run build` 全部通过
+- 阶段 21：新增 `SkillLevel` / `SkillMeta` 与 `skillMeta` / `skillGroups` 字段；`storage.ts` 归一化并校验新字段
+- 阶段 21：新增 `src/lib/skills.ts`，五套模板按分组展示，无分组时保持旧排版；编辑表单支持分组增删改排序与逐技能熟练度
+- 阶段 21：新增 19 个单测（合计 87 passed）；QA 增加旧数据兼容、表单保存与五模板分组展示检查，截图 `qa-skills.png`
+- 阶段 21 验证：`tsc`、`lint`、`npm test`（87 passed）、`npm run qa`、`npm run build` 全部通过
+- 阶段 22：`AiSection` 增加 `cover`，提示词与清理函数按求职信格式单独处理；token 预算 1200
+- 阶段 22：新增 `CoverLetterWriter` 并挂到推荐页 JD 匹配下方，自带配置检查、流式预览、编辑、复制与下载
+- 阶段 22：姓名与联系方式不进入请求；QA 记录实际请求载荷并断言只含岗位、年限、素材与 JD
+- 阶段 22：新增 6 个单测（合计 93 passed）；QA 新增 7 项求职信检查，截图 `qa-cover-letter.png`
+- 阶段 22 验证：`tsc`、`lint`、`npm test`（93 passed）、`npm run qa`、`npm run build` 全部通过
 
 ### 本次会话日志（2026-10-27）
 
@@ -433,8 +495,8 @@
 ### 下次继续
 
 1. 先读 `PLAN.md` 与 `PROGRESS.md`「当前进度」
-2. 阶段 0–18 全部完成；P1–P4、AI 增强、可点击链接与整份结构化生成均已完成
-3. 可选后续：P2 剩余缺口（全局撤销、技能分组、双语）、AI 求职信 / 英文输出、离线缓存
+2. 阶段 0–22 全部完成；P1–P4、AI 增强、可点击链接、整份结构化生成、整库备份、全局撤销 / 重做、技能分组与 AI 求职信均已完成
+3. 可选后续：P2 剩余缺口（双语）、英文输出、离线缓存
 4. 每完成一项跑 `npm run lint`、`npm test`、`npm run build`、`npm run qa` 并更新本文件
 
 ## 可选后续
@@ -448,13 +510,17 @@
 - [x] P4 工程化与分发（Vitest、CI、SEO/OG、manifest、图标清理；离线缓存未做）
 - [x] 简历链接可点击（网站 / GitHub / 项目 / 自定义板块；危险协议过滤）
 - [x] AI 整份简历结构化生成（一段自述 → 教育 / 工作 / 项目 / 技能；采用时新建简历）
+- [x] 全局撤销 / 重做（按钮 + 快捷键，连续输入合并，切换简历时清空）
+- [x] 真实 DeepSeek Key 验证 `/api/ai/full`（JSON 输出与长文本 token 上限）
+- [x] 技能分组与熟练度（分组增删改排序、逐技能熟练度、五套模板展示、旧 JSON 兼容）
+- [x] AI 求职信（素材 / 岗位 / JD → 中文求职信，可编辑、复制与下载，不写入简历）
 
 ## 如何继续
 
 1. 读「当前进度」和 `PLAN.md` 的「P0：AI 写简历」
 2. 确认 `.env.local` 里的 `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL`
 3. `npm run dev`
-4. AI（P0）、AI 增强、P1、P2（3.1–3.5 及阶段 17 可点击链接）、P3（4.1–4.8）、P4 与阶段 18 整份生成均已完成
+4. AI（P0）、AI 增强、P1、P2（3.1–3.5、阶段 17 可点击链接、阶段 20 全局撤销、阶段 21 技能分组）、P3（4.1–4.8）、P4、阶段 18 整份生成、阶段 19 整库备份与阶段 22 AI 求职信均已完成
 5. 每完成一步更新本文件，尤其是「当前进度」「关机交接」与对应阶段勾选项
 
 ## 文件地图
@@ -476,14 +542,17 @@ src/
     jobs/
       JobsPanel.tsx     匹配结果、建议、招聘站入口
       JdMatcher.tsx     粘贴 JD 测匹配度
+      CoverLetterWriter.tsx AI 求职信生成、编辑、复制与下载
       SkillChip.tsx     技能标签
     ui/                 Field / Button / SectionCard
-  hooks/useResume.ts    初始化、自动保存、清空、示例
+  hooks/useResume.ts    初始化、自动保存、清空、示例、撤销 / 重做
   lib/
     types.ts            类型与空白工厂
     defaultResume.ts    示例数据
     storage.ts          localStorage、JSON 导入导出与校验
     backupReminder.ts   备份提醒状态（7 天 / 暂停 3 天）
+    history.ts          通用撤销 / 重做栈（合并窗口、上限、reset）
+    skills.ts           技能分组视图、熟练度格式化与旧排版判断
     validate.ts         邮箱、手机、链接、薪资与起止时间校验
     jobProfiles.ts      岗位画像库
     matching.ts         技能匹配、评分、建议
@@ -493,7 +562,7 @@ src/
     jobBoards.ts        招聘站 URL 与城市编码
     theme.ts            主题色校验、可读性压暗与 CSS 变量
     ai/                 types / config / prompt / fullResume / http / deepseek / client
-    __tests__/          Vitest：storage / matching / jdMatch / validate / SSE / 整份解析（55 个）
+    __tests__/          Vitest：storage / matching / jdMatch / validate / links / SSE / 整份解析 / 撤销栈 / 技能分组 / 提示词（93 个）
 public/
   icon-192.png / icon-512.png  安装清单图标
 scripts/qa.mjs          无头浏览器截图、溢出检查、分页与 PDF 页数自检

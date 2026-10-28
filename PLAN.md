@@ -285,7 +285,7 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 - **数据最小化**：不发送姓名、电话、邮箱、GitHub、整份简历；只发送当前板块和面板填写内容。
 - **提示注入**：关键词视为素材，系统提示明确忽略其中指令；即使被绕，也只影响用户自己看到的预览。
 - **滥用防护**：长度限制 + IP 限流；公开部署时建议再加登录或共享密钥。
-- **成本控制**：按板块生成、`max_tokens` 上限、单次重试；整份生成按 3 次串行调用计量，占用同一 IP 限流额度。
+- **成本控制**：按板块生成、`max_tokens` 上限、单次重试；整份生成已改为单次结构化调用，所有 AI 请求共用同一 IP 限流额度。
 - **数据去向**：弹窗和 README 明确写「内容会发送到 DeepSeek」。
 - **部署**：API 路由需要 Node 运行时（`next start` / Vercel），不能再纯静态导出；不要在前端直连 DeepSeek。
 
@@ -322,6 +322,15 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 | M2 | AI 弹窗、简介生成、采用、未配置状态 | 最小可用闭环 |
 | M3 | 工作/项目目标选择、优化模式、停止/重试、撤销 | 完整首版 |
 | M4 | QA 脚本、README/PROGRESS、真实 Key 联调、build | 可交付 |
+
+### 1.11 求职信（阶段 22 已实现）
+
+- **入口**：推荐页「JD 匹配」下方的「AI 求职信」卡片，与简历编辑页的 AI 弹窗相互独立。
+- **输入**：目标岗位、工作年限、个人素材（默认取简介与前 12 个技能）、参考 JD（默认读取 JD 匹配页已保存内容）、风格。
+- **输出**：中文纯文本，首行「尊敬的招聘负责人：」，正文 2–3 段、300–500 字，结尾「此致 / 敬礼」；未知公司统一写「贵公司」。
+- **交互**：复用 `/api/ai/generate` 的 `cover` 板块与 SSE 流式预览；生成结果可编辑、复制全文、下载 `.txt`，不写入简历。
+- **隐私**：不发送姓名、邮箱、电话与链接；服务端仍会再次过滤。提示词禁止虚构公司、数字与经历。
+- **预算**：`max_tokens: 1200`，`reasoning_effort: "low"`；QA 通过固定 SSE 拦截，不消耗真实额度。
 
 ---
 
@@ -388,8 +397,8 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 | 项目起止时间 | `types.ts:23-31` 的 `Project` 无时间 | 增加 `start/end`，五套模板展示 |
 | 教育信息 | 缺 GPA/排名、主修课程、荣誉 | 增加选填字段 |
 | 多份简历 | 只有一份 | 复制/重命名/按 JD 定制，配合已有 JD 匹配 |
-| 撤销/重做 | 无历史栈 | 全局 undo/redo 或至少操作级撤销 |
-| 技能组织 | 只能加/删 | 拖拽排序、分组、熟练度 |
+| 撤销/重做 ✅ | 只有删除后 8 秒撤销 | 已实现全局 undo/redo：编辑区按钮 + 快捷键，连续输入 700ms 内合并，上限 60 步，切换简历时清空 |
+| 技能组织 ✅ | 只能加/删 | 已支持分组增删改排序与逐技能熟练度（了解 / 熟练 / 精通）；扁平 `skills` 仍驱动匹配与 AI，旧 JSON 自动兼容 |
 | 链接不可点击 ✅ | 模板里网站/GitHub/项目链接是纯文本 | 已输出 `<a>`，PDF 中可点击；自动补 `https://`，过滤 `javascript:` / `data:` 等危险协议 |
 | 中英双语 | 仅中文 | 面向外企/海外时再做 |
 
@@ -418,7 +427,7 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 ## 5. P4：工程化与分发（已完成）
 
 - **git**：P0 前置已完成；后续每个阶段独立提交。
-- **单元测试**：已接入 Vitest，61 个用例覆盖 `normalizeResume`、`parseResumeJSON` / `parseImportFile`、技能匹配与评分、JD 关键词/年限/学历、输入校验、安全链接、AI 整份 JSON 解析、SSE 分片与中止。命令：`npm test` / `npm run test:watch`。
+- **单元测试**：已接入 Vitest，93 个用例覆盖 `normalizeResume`、`parseResumeJSON` / `parseImportFile`、技能匹配与评分、JD 关键词/年限/学历、输入校验、安全链接、AI 整份 JSON 解析、AI 提示词与求职信清理、SSE 分片与中止、撤销 / 重做栈、技能分组与旧数据兼容。命令：`npm test` / `npm run test:watch`。
 - **CI**：`.github/workflows/ci.yml` 在 push / PR 时执行 lint、`tsc --noEmit`、单元测试与生产构建；QA 截图需要本机 Chrome，未放入 CI。
 - **SEO/分享**：`layout.tsx` 已补 Open Graph、Twitter Card、keywords、theme-color 与 `formatDetection`；`opengraph-image.tsx` 生成 1200×630 分享图；`manifest.ts` 提供安装清单；自定义 `icon.svg` / `apple-icon.png` / `favicon.ico`。分享图文案用英文，避免 `ImageResponse` 默认字体缺中文字形。
 - **部署地址**：支持 `NEXT_PUBLIC_SITE_URL`；Vercel 自动使用 `VERCEL_PROJECT_PRODUCTION_URL`，本地回退 `http://localhost:3000`。
@@ -437,7 +446,7 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 | 3 | **P0-AI M3** | 工作/项目 + 优化模式 + 停止/撤销 | 首版完整 |
 | 4 | **P0-AI M4** | QA、文档、真实 Key 联调 | lint/build/qa 全绿 |
 | 5 | P1 | 侧栏跨页、保存失败、覆盖保护、PDF 文件名、手机导入、模板随 JSON | 数据安全与打印交付达标 |
-| 6 | P2 | 照片、自定义板块、项目时间、教育增强、多份简历 | 内容模型完善 |
+| 6 | P2 | 照片、自定义板块、项目时间、教育增强、多份简历、技能分组 | 内容模型完善 |
 | 7 | P3 | 跨标签页、校验、错误边界、打印兼容、可访问性 | 体验与健壮性达标 |
 | 8 | P4 ✅ | 单元测试、CI、OG/manifest、图标清理 | 工程化完善；离线缓存未做 |
 
@@ -446,10 +455,11 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 ## 7. 已确认事项
 
 1. **模型**：已用 `/models` 确认真实模型，当前 `deepseek-flash`，`reasoning_effort: "low"`。
-2. **范围**：按板块生成已实现；整份生成于阶段 18 升级为「一段自述 → 结构化简历」，覆盖教育、工作、项目与技能，缺失字段留空并新建一份简历。
+2. **范围**：按板块生成已实现；整份生成于阶段 18 升级为「一段自述 → 结构化简历」，覆盖教育、工作、项目与技能，缺失字段留空并新建一份简历；阶段 22 新增 AI 求职信，结果只用于复制 / 下载，不写入简历。
 3. **部署**：目前按本机 / Node 运行时设计；公网部署仍需自行补登录或访问控制。
 4. **隐私**：只发送当前板块文本、岗位/年限/关键词与参考 JD，不发送姓名、联系方式和整份简历。
 5. **降级**：未配置 Key 时显示配置步骤，不阻塞原有编辑。
+6. **真实 Key 验证**：`/api/ai/full` 已用 `.env.local` 的真实 Key 跑通长自述（约 1300 字），返回合法 JSON，completion 2245 tokens，未触及 4000 token 上限；`response_format: json_object` 生效。
 
 ---
 
