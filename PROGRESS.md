@@ -48,6 +48,7 @@
 
   打开 http://localhost:3000 ；AI 功能依赖 `.env.local` 中的 DeepSeek 配置，改动环境变量后需重启 dev server。
 - 尚未开始的可选项：全局撤销、技能分组、双语简历、AI 求职信 / 英文输出、离线缓存。开始前先确认需求。
+- 待验证：`/api/ai/full` 只用 mock 跑过，尚未用真实 DeepSeek Key 验证 `response_format: json_object` 与长简历的 token 上限。
 
 ## 阶段明细
 
