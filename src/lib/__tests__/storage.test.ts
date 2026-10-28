@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_IMPORT_BYTES,
   normalizeResume,
+  parseImportFile,
   parseResumeJSON,
 } from "../storage";
 import { createEmptyResume } from "../types";
@@ -162,5 +163,81 @@ describe("parseResumeJSON", () => {
       ok: false,
       error: "文件过大（超过 5 MB），请检查是否选错了文件",
     });
+  });
+});
+
+describe("parseImportFile", () => {
+  it("旧版单份 JSON 仍按单份导入", () => {
+    const result = parseImportFile(
+      JSON.stringify({ basic: { name: "林一" }, template: "classic" }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.kind).toBe("single");
+    if (result.kind !== "single") return;
+    expect(result.resume.basic.name).toBe("林一");
+    expect(result.template).toBe("classic");
+  });
+
+  it("解析全部简历备份并恢复当前文档", () => {
+    const result = parseImportFile(
+      JSON.stringify({
+        format: "resume-workshop",
+        version: 2,
+        activeId: "b",
+        documents: [
+          {
+            id: "a",
+            title: "主简历",
+            template: "sidebar",
+            resume: { basic: { name: "林一" }, skills: [" React "] },
+          },
+          {
+            id: "b",
+            title: "备用",
+            template: "unknown",
+            resume: { basic: { name: "林二" } },
+          },
+        ],
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "library") return;
+    expect(result.activeId).toBe("b");
+    expect(result.documents).toHaveLength(2);
+    expect(result.documents[0]).toMatchObject({
+      id: "a",
+      title: "主简历",
+      template: "sidebar",
+    });
+    expect(result.documents[0].resume.skills).toEqual(["React"]);
+    expect(result.documents[1].template).toBe("modern");
+  });
+
+  it("activeId 缺失时回退到第一份，重复 id 会重新生成", () => {
+    const result = parseImportFile(
+      JSON.stringify({
+        documents: [
+          { id: "same", title: "", resume: { basic: { name: "A" } } },
+          { id: "same", title: "第二份", resume: { basic: { name: "B" } } },
+        ],
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "library") return;
+    expect(result.activeId).toBe("same");
+    expect(result.documents[0].title).toBe("简历 1");
+    expect(result.documents[0].id).not.toBe(result.documents[1].id);
+  });
+
+  it.each([
+    ["没有简历", JSON.stringify({ documents: [] })],
+    ["条目不是对象", JSON.stringify({ documents: [1] })],
+    [
+      "条目缺少简历结构",
+      JSON.stringify({ documents: [{ title: "坏文件" }] }),
+    ],
+  ])("拒绝 %s 的备份", (_label, text) => {
+    expect(parseImportFile(text).ok).toBe(false);
   });
 });

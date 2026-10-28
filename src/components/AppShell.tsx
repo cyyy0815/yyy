@@ -15,9 +15,9 @@ import {
   subscribeBackupReminder,
 } from "@/lib/backupReminder";
 import {
-  downloadResumeJSON,
+  downloadResumeArchive,
   MAX_IMPORT_BYTES,
-  parseResumeJSON,
+  parseImportFile,
   recordExport,
   snoozeBackupReminder,
 } from "@/lib/storage";
@@ -211,7 +211,12 @@ function ResumeWorkspace() {
   };
 
   const handleExport = () => {
-    downloadResumeJSON(resume, template);
+    const snapshot = documents.collectAll();
+    downloadResumeArchive(
+      snapshot.documents,
+      snapshot.activeId,
+      documents.currentTitle,
+    );
     recordExport();
     refreshBackupReminder();
   };
@@ -236,9 +241,32 @@ function ResumeWorkspace() {
       setNotice({ type: "error", message: "无法读取该文件，请重试" });
       return;
     }
-    const result = parseResumeJSON(text);
+    const result = parseImportFile(text);
     if (!result.ok) {
       setNotice({ type: "error", message: result.error });
+      return;
+    }
+    if (result.kind === "library") {
+      if (
+        !window.confirm(
+          `导入会替换当前全部简历（共 ${result.documents.length} 份），建议先导出 JSON 备份。确定继续吗？`,
+        )
+      ) {
+        setNotice({ type: "ok", message: "已取消导入" });
+        return;
+      }
+      if (!documents.importLibrary(result.documents, result.activeId)) {
+        setNotice({
+          type: "error",
+          message: "导入失败：浏览器存储不可用或空间已满",
+        });
+        return;
+      }
+      setResumeVersion((value) => value + 1);
+      setNotice({
+        type: "ok",
+        message: `已导入 ${result.documents.length} 份简历`,
+      });
       return;
     }
     if (

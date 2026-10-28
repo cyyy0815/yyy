@@ -1340,10 +1340,11 @@ await photoPage.waitForFunction(() => Boolean(window.__photoExport), {
 });
 const photoExport = await photoPage.evaluate(async () => {
   const payload = JSON.parse(await window.__photoExport.text());
+  const document = payload.documents?.[0];
   return {
-    prefix: payload.basic?.photo?.slice(0, 23) ?? "",
-    length: payload.basic?.photo?.length ?? 0,
-    template: payload.template,
+    prefix: document?.resume?.basic?.photo?.slice(0, 23) ?? "",
+    length: document?.resume?.basic?.photo?.length ?? 0,
+    template: document?.template,
   };
 });
 expect(
@@ -1791,22 +1792,23 @@ await customPage.waitForFunction(() => Boolean(window.__customExport), {
 });
 const customExport = await customPage.evaluate(async () => {
   const payload = JSON.parse(await window.__customExport.text());
+  const resume = payload.documents?.[0]?.resume ?? {};
   return {
-    count: payload.customSections?.length ?? 0,
-    titles: payload.customSections?.map((section) => section.title) ?? [],
-    visible: payload.customSections?.map((section) => section.visible) ?? [],
-    items: payload.customSections?.map((section) =>
+    count: resume.customSections?.length ?? 0,
+    titles: resume.customSections?.map((section) => section.title) ?? [],
+    visible: resume.customSections?.map((section) => section.visible) ?? [],
+    items: resume.customSections?.map((section) =>
       section.items?.map((item) => item.title),
     ) ?? [],
     projectDates: {
-      start: payload.projects?.[0]?.start,
-      end: payload.projects?.[0]?.end,
+      start: resume.projects?.[0]?.start,
+      end: resume.projects?.[0]?.end,
     },
     education: {
-      gpa: payload.educations?.[0]?.gpa,
-      ranking: payload.educations?.[0]?.ranking,
-      courses: payload.educations?.[0]?.courses,
-      honors: payload.educations?.[0]?.honors,
+      gpa: resume.educations?.[0]?.gpa,
+      ranking: resume.educations?.[0]?.ranking,
+      courses: resume.educations?.[0]?.courses,
+      honors: resume.educations?.[0]?.honors,
     },
   };
 });
@@ -2198,6 +2200,61 @@ const blankRetained = await multiPage.evaluate(() => {
 });
 expect("新建的空白简历可再次切回", blankRetained);
 
+// 导出全部简历：一份备份同时包含当前文档与其他文档
+await multiPage.evaluate(() => {
+  window.__exportedBlob = null;
+  window.__downloadName = "";
+  const originalCreate = URL.createObjectURL.bind(URL);
+  URL.createObjectURL = (blob) => {
+    window.__exportedBlob = blob;
+    return originalCreate(blob);
+  };
+  HTMLAnchorElement.prototype.click = function () {
+    window.__downloadName = this.download;
+  };
+});
+await clickText(multiPage, "导出");
+await multiPage.waitForFunction(() => Boolean(window.__exportedBlob), {
+  timeout: 5000,
+});
+const libraryArchive = await multiPage.evaluate(async () => {
+  const payload = JSON.parse(await window.__exportedBlob.text());
+  return {
+    format: payload.format,
+    version: payload.version,
+    activeId: payload.activeId,
+    downloadName: window.__downloadName,
+    documents: (payload.documents ?? []).map((document) => ({
+      id: document.id,
+      title: document.title,
+      name: document.resume?.basic?.name,
+      template: document.template,
+    })),
+    json: JSON.stringify(payload),
+  };
+});
+expect(
+  "导出备份包含全部简历",
+  libraryArchive.format === "resume-workshop" &&
+    libraryArchive.version === 2 &&
+    libraryArchive.documents.length === 2 &&
+    libraryArchive.downloadName === "主简历-全部简历.json" &&
+    libraryArchive.documents.some(
+      (document) =>
+        document.title === "主简历" &&
+        document.name === "多简历测试" &&
+        document.template === "classic",
+    ) &&
+    libraryArchive.documents.some(
+      (document) =>
+        document.title === "新简历" &&
+        document.name === "" &&
+        document.template === "modern",
+    ),
+  JSON.stringify({ ...libraryArchive, json: undefined }),
+);
+const libraryArchiveJson = libraryArchive.json;
+
 await multiPage.setViewport({
   width: 390,
   height: 844,
@@ -2240,6 +2297,73 @@ await multiPage.evaluate(() => {
   localStorage.setItem("resume-workshop:template", "modern");
 });
 await multiPage.close();
+
+// 整库导入：替换当前全部简历并恢复备份时的当前文档
+const archivePath = path.join(OUT, "qa-library.json");
+await writeFile(archivePath, libraryArchiveJson, "utf8");
+const archivePage = await open({ width: 1440, height: 1000 });
+await archivePage.goto(BASE, { waitUntil: "networkidle0" });
+await archivePage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:library:v1");
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({ basic: { name: "待覆盖" } }),
+  );
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await archivePage.reload({ waitUntil: "networkidle0" });
+await pause(600);
+const archiveInput = await archivePage.$('input[type="file"]');
+archivePage.once("dialog", async (dialog) => {
+  await dialog.accept();
+});
+await archiveInput.uploadFile(archivePath);
+await archivePage.waitForFunction(
+  () => document.body.innerText.includes("已导入 2 份简历"),
+  { timeout: 5000 },
+);
+const restoredLibrary = await archivePage.evaluate(() => {
+  const library = JSON.parse(
+    localStorage.getItem("resume-workshop:library:v1") ?? "null",
+  );
+  const select = document.querySelector('select[aria-label="切换简历"]');
+  const nameLabel = [...document.querySelectorAll("label")].find((node) =>
+    node.textContent?.includes("姓名"),
+  );
+  return {
+    activeTitle: library?.activeTitle,
+    others: (library?.others ?? []).map((document) => ({
+      title: document.title,
+      name: document.resume?.basic?.name,
+      template: document.template,
+    })),
+    count: select?.options.length,
+    selected: select?.selectedOptions[0]?.textContent,
+    name: nameLabel?.querySelector("input")?.value,
+    template: localStorage.getItem("resume-workshop:template"),
+  };
+});
+expect(
+  "整库导入恢复全部简历与当前文档",
+  restoredLibrary.activeTitle === "主简历" &&
+    restoredLibrary.count === 2 &&
+    restoredLibrary.selected === "主简历" &&
+    restoredLibrary.name === "多简历测试" &&
+    restoredLibrary.template === "classic" &&
+    restoredLibrary.others.some(
+      (document) =>
+        document.title === "新简历" &&
+        document.name === "" &&
+        document.template === "modern",
+    ),
+  JSON.stringify(restoredLibrary),
+);
+await archivePage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.removeItem("resume-workshop:library:v1");
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await archivePage.close();
 
 // P3 输入校验：格式提示只在失焦后出现，不阻止保存
 const validationPage = await open({ width: 1440, height: 1000 });
@@ -2620,17 +2744,25 @@ await pdfNamePage.waitForFunction(() => Boolean(window.__exportedBlob), {
 const exported = await pdfNamePage.evaluate(async () => {
   const blob = window.__exportedBlob;
   const payload = JSON.parse(await blob.text());
+  const document = payload.documents?.[0];
   return {
-    template: payload.template,
-    name: payload.basic?.name,
+    format: payload.format,
+    version: payload.version,
+    count: payload.documents?.length,
+    activeId: payload.activeId,
+    template: document?.template,
+    name: document?.resume?.basic?.name,
     downloadName: window.__downloadName,
   };
 });
 expect(
-  "导出包含模板且文件名正确",
-  exported.template === "modern" &&
+  "导出全部简历且文件名正确",
+  exported.format === "resume-workshop" &&
+    exported.version === 2 &&
+    exported.count === 1 &&
+    exported.template === "modern" &&
     exported.name === "林一" &&
-    exported.downloadName === "林一.json",
+    exported.downloadName === "示例简历-全部简历.json",
   JSON.stringify(exported),
 );
 await pdfNamePage.close();

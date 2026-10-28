@@ -185,6 +185,48 @@ export function useResumeDocuments({
     return title;
   };
 
+  /** 当前文档 + 其他快照，用于整库导出。 */
+  const collectAll = (): {
+    activeId: string;
+    documents: StoredDocument[];
+  } => ({
+    activeId,
+    documents: [currentDocument(), ...others],
+  });
+
+  /** 用备份文件替换全部简历；当前文档仍写入 v1。 */
+  const importLibrary = (
+    imported: StoredDocument[],
+    nextActiveId: string,
+  ): boolean => {
+    if (imported.length === 0) return false;
+    const usedTitles: string[] = [];
+    const remapped = imported.map((document) => {
+      const title = uniqueTitle(document.title, usedTitles);
+      usedTitles.push(title);
+      return { ...document, id: newId(), title };
+    });
+    const target =
+      remapped.find((_, index) => imported[index].id === nextActiveId) ??
+      remapped[0];
+    if (!saveResume(target.resume)) return false;
+
+    const library: ResumeLibrary = {
+      activeId: target.id,
+      activeTitle: target.title,
+      others: remapped.filter((document) => document.id !== target.id),
+    };
+    if (!saveResumeLibrary(library)) {
+      saveResume(resume);
+      return false;
+    }
+
+    setState({ library, activeTitle: target.title });
+    replaceResume(target.resume);
+    setTemplate(target.template);
+    return true;
+  };
+
   const deleteActive = (): boolean => {
     if (others.length === 0) return false;
     const [next, ...rest] = others;
@@ -227,5 +269,7 @@ export function useResumeDocuments({
     duplicateCurrent,
     deleteActive,
     renameActive,
+    collectAll,
+    importLibrary,
   };
 }

@@ -206,24 +206,69 @@ export function clearResume(): void {
   }
 }
 
-export function downloadResumeJSON(
-  resume: Resume,
-  template?: TemplateId,
+export type ArchiveDocument = {
+  id: string;
+  title: string;
+  template: TemplateId;
+  resume: Resume;
+};
+
+export type ResumeArchive = {
+  format: "resume-workshop";
+  version: 2;
+  exportedAt: string;
+  activeId: string;
+  documents: ArchiveDocument[];
+};
+
+const ARCHIVE_FORMAT = "resume-workshop";
+const ARCHIVE_VERSION = 2;
+
+function safeFileName(name: string): string {
+  const cleaned = name
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+  return cleaned || "我的简历";
+}
+
+/** 导出全部简历（含当前文档）为一份备份文件。 */
+export function downloadResumeArchive(
+  documents: ArchiveDocument[],
+  activeId: string,
+  currentTitle: string,
 ): void {
-  const payload = template ? { ...resume, template } : resume;
+  const payload: ResumeArchive = {
+    format: ARCHIVE_FORMAT,
+    version: ARCHIVE_VERSION,
+    exportedAt: new Date().toISOString(),
+    activeId,
+    documents,
+  };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
   });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `${resume.basic.name || "我的简历"}.json`;
+  anchor.download = `${safeFileName(currentTitle)}-全部简历.json`;
   anchor.click();
   URL.revokeObjectURL(url);
 }
 
 export type ImportResult =
   | { ok: true; resume: Resume; template?: TemplateId }
+  | { ok: false; error: string };
+
+export type ImportFileResult =
+  | { ok: true; kind: "single"; resume: Resume; template?: TemplateId }
+  | {
+      ok: true;
+      kind: "library";
+      documents: ArchiveDocument[];
+      activeId: string;
+    }
   | { ok: false; error: string };
 
 const BASIC_KEYS = [
@@ -274,16 +319,20 @@ function checkImportShape(data: unknown): string | null {
   return null;
 }
 
-export function parseResumeJSON(text: string): ImportResult {
+function parseJson(
+  text: string,
+): { ok: true; data: unknown } | { ok: false; error: string } {
   if (text.length > MAX_IMPORT_BYTES) {
     return { ok: false, error: "文件过大（超过 5 MB），请检查是否选错了文件" };
   }
-  let data: unknown;
   try {
-    data = JSON.parse(text);
+    return { ok: true, data: JSON.parse(text) };
   } catch {
     return { ok: false, error: "无法解析该文件，请选择由本工具导出的 JSON" };
   }
+}
+
+function toSingleImport(data: unknown): ImportResult {
   const shapeError = checkImportShape(data);
   if (shapeError) return { ok: false, error: shapeError };
   const template = (data as { template?: unknown }).template;
@@ -291,5 +340,68 @@ export function parseResumeJSON(text: string): ImportResult {
     ok: true,
     resume: normalizeResume(data),
     ...(isTemplateId(template) ? { template } : {}),
+  };
+}
+
+/** 旧版单份简历导入；保持原行为，`template` 为可选。 */
+export function parseResumeJSON(text: string): ImportResult {
+  const parsed = parseJson(text);
+  if (!parsed.ok) return parsed;
+  return toSingleImport(parsed.data);
+}
+
+function parseArchive(data: Record<string, unknown>): ImportFileResult {
+  const rawDocuments = Array.isArray(data.documents) ? data.documents : [];
+  if (rawDocuments.length === 0) {
+    return { ok: false, error: "备份文件里没有任何简历" };
+  }
+  const documents: ArchiveDocument[] = [];
+  const seenIds = new Set<string>();
+  for (let index = 0; index < rawDocuments.length; index += 1) {
+    const item = rawDocuments[index];
+    if (!isRecord(item)) {
+      return { ok: false, error: `第 ${index + 1} 份简历格式不正确` };
+    }
+    const shapeError = checkImportShape(item.resume);
+    if (shapeError) {
+      return { ok: false, error: `第 ${index + 1} 份简历：${shapeError}` };
+    }
+    const rawId = asString(item.id).trim();
+    const id = rawId && !seenIds.has(rawId) ? rawId : newId();
+    seenIds.add(id);
+    const title = asString(item.title).trim().slice(0, 60);
+    documents.push({
+      id,
+      title: title || `简历 ${index + 1}`,
+      template: isTemplateId(item.template) ? item.template : "modern",
+      resume: normalizeResume(item.resume),
+    });
+  }
+  const requested = asString(data.activeId).trim();
+  return {
+    ok: true,
+    kind: "library",
+    documents,
+    activeId: documents.some((document) => document.id === requested)
+      ? requested
+      : documents[0].id,
+  };
+}
+
+/** 兼容导入：旧版单份简历 JSON 与「全部简历」备份。 */
+export function parseImportFile(text: string): ImportFileResult {
+  const parsed = parseJson(text);
+  if (!parsed.ok) return parsed;
+  const data = parsed.data;
+  if (isRecord(data) && Array.isArray(data.documents)) {
+    return parseArchive(data);
+  }
+  const single = toSingleImport(data);
+  if (!single.ok) return single;
+  return {
+    ok: true,
+    kind: "single",
+    resume: single.resume,
+    ...(single.template ? { template: single.template } : {}),
   };
 }

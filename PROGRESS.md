@@ -34,11 +34,12 @@
 | 16 | P4 工程化与分发（追加） | ✅ 完成（单测 / CI / SEO / manifest / 清理） |
 | 17 | P2 收尾：可点击链接（追加） | ✅ 完成（安全 href + 五套模板） |
 | 18 | AI 整份简历结构化生成（追加） | ✅ 完成（自述 → 教育/工作/项目/技能，新建简历） |
+| 19 | 全部简历备份与导入（追加） | ✅ 完成（整库导出 + 兼容导入） |
 
 ## 关机交接（2026-10-28）
 
-- 当前提交：阶段 18 提交（`feat(ai): 支持一段自述生成整份结构化简历`），工作区干净。
-- 阶段 0–18 全部完成；最新验证为 `tsc`、`lint`、`npm test`（55 passed）、`npm run qa`、`npm run build` 全部通过。
+- 当前提交：阶段 19 提交（`0899412 feat(storage): 支持整库导出与导入全部简历`），工作区干净。
+- 阶段 0–19 全部完成；最新验证为 `tsc`、`lint`、`npm test`（61 passed）、`npm run qa`、`npm run build` 全部通过。
 - 下次先读本文件的「当前进度 / 下次继续」与 `PLAN.md`，再运行：
 
   ```bash
@@ -284,10 +285,20 @@
 - [x] 单测新增 6 个（共 55 个）：JSON 围栏、白名单过滤、缺失字段、空白条目、错误格式、payload
 - [x] 验证：`tsc`、`npm run lint`、`npm test`（55 passed）、`npm run qa`、`npm run build` 通过
 
+### 阶段 19 — 全部简历备份与导入（追加）✅
+- [x] `storage.ts` 新增整库备份格式（`format` / `version: 2` / `activeId` / `documents`），包含当前文档与所有快照
+- [x] 导出文件名取当前文档标题：`标题-全部简历.json`；文件名非法字符替换
+- [x] `parseImportFile` 兼容旧版单份 JSON 与整库备份：逐份校验结构、去重 id、修正无效 activeId
+- [x] `useResumeDocuments` 新增 `collectAll` / `importLibrary`：导入时重新分配 id、去重标题，替换全部简历并恢复模板
+- [x] 整库导入前二次确认，成功后提示导入份数；旧版单份导入流程与提示不变
+- [x] 单测新增 6 个（共 61 个）：旧格式兼容、整库解析、activeId 回退、重复 id、无效备份
+- [x] QA：导出备份含两份文档与模板；在另一份简历上导入后恢复两份文档、当前文档与模板；照片 / 自定义板块 / 打印导出断言改用新格式
+- [x] 验证：`tsc`、`npm run lint`、`npm test`（61 passed）、`npm run qa`、`npm run build` 通过
+
 ## 当前进度
 
 - 最近更新：2026-10-28
-- 状态：**阶段 0–18 全部完成；P1–P4、AI 功能完善、可点击链接与整份结构化生成全部完成**
+- 状态：**阶段 0–19 全部完成；P1–P4、AI 功能完善、可点击链接、整份结构化生成与整库备份全部完成**
 - 代码状态：
   - M0：git 仓库、`.env.example`、`scripts/mock-deepseek.mjs` 完成
   - M1：`/api/ai/status`、`/api/ai/generate`、SSE 转换完成
@@ -300,7 +311,8 @@
 - P4 进度：Vitest 单元测试、GitHub Actions CI、SEO/OG、manifest 与图标、静态资源清理全部完成；离线缓存未实现
 - P2 收尾：网站 / GitHub / 项目 / 自定义板块链接在五套模板与 PDF 中可点击，危险协议降级为纯文本
 - 阶段 18：AI 整份生成改为一段自述 → 结构化 JSON（教育/工作/项目/技能），采用时新建简历、旧简历保留
-- 工程命令：`npm test` 运行单元测试（55 个）；CI 覆盖 lint + 类型检查 + 单测 + 构建
+- 阶段 19：JSON 导出升级为整库备份（当前文档 + 其他快照 + activeId），导入兼容旧版单份文件；整库导入整体替换并恢复当前文档
+- 工程命令：`npm test` 运行单元测试（61 个）；CI 覆盖 lint + 类型检查 + 单测 + 构建
 - 本地地址：http://localhost:3000 （推荐页 http://localhost:3000/#jobs）
 - 一键自检：先 `npm run dev`，再 `npm run qa`（截图输出到 `.screenshots/`）
 - 单一方案文档：**`PLAN.md`**
@@ -314,6 +326,11 @@
 - 阶段 18：不生成姓名、邮箱、电话与链接；未提及的字段留空并在预览里列出待补充项
 - 阶段 18：mock 上游与 QA 场景更新；新增 6 个单测（合计 55 passed）
 - 阶段 18 验证：`tsc`、`lint`、`npm test`（55 passed）、`npm run qa`、`npm run build` 全部通过
+- 阶段 19：`storage.ts` 新增 `downloadResumeArchive` / `parseImportFile` 与整库备份类型；旧 `parseResumeJSON` 保持兼容
+- 阶段 19：`useResumeDocuments` 新增 `collectAll` / `importLibrary`；导入时重新分配文档 id、标题去重并恢复当前文档模板
+- 阶段 19：整库导入前提示会替换全部简历；QA 新增整库导出 / 导入回放，旧照片与自定义板块导出断言改用 `documents[0].resume`
+- 阶段 19：新增 6 个单测（合计 61 passed）
+- 阶段 19 验证：`tsc`、`lint`、`npm test`（61 passed）、`npm run qa`、`npm run build` 全部通过
 
 ### 本次会话日志（2026-10-27）
 

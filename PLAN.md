@@ -418,7 +418,7 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 ## 5. P4：工程化与分发（已完成）
 
 - **git**：P0 前置已完成；后续每个阶段独立提交。
-- **单元测试**：已接入 Vitest，49 个用例覆盖 `normalizeResume`、`parseResumeJSON`、技能匹配与评分、JD 关键词/年限/学历、输入校验、安全链接、SSE 分片与中止。命令：`npm test` / `npm run test:watch`。
+- **单元测试**：已接入 Vitest，61 个用例覆盖 `normalizeResume`、`parseResumeJSON` / `parseImportFile`、技能匹配与评分、JD 关键词/年限/学历、输入校验、安全链接、AI 整份 JSON 解析、SSE 分片与中止。命令：`npm test` / `npm run test:watch`。
 - **CI**：`.github/workflows/ci.yml` 在 push / PR 时执行 lint、`tsc --noEmit`、单元测试与生产构建；QA 截图需要本机 Chrome，未放入 CI。
 - **SEO/分享**：`layout.tsx` 已补 Open Graph、Twitter Card、keywords、theme-color 与 `formatDetection`；`opengraph-image.tsx` 生成 1200×630 分享图；`manifest.ts` 提供安装清单；自定义 `icon.svg` / `apple-icon.png` / `favicon.ico`。分享图文案用英文，避免 `ImageResponse` 默认字体缺中文字形。
 - **部署地址**：支持 `NEXT_PUBLIC_SITE_URL`；Vercel 自动使用 `VERCEL_PROJECT_PRODUCTION_URL`，本地回退 `http://localhost:3000`。
