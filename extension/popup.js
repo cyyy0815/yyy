@@ -112,6 +112,58 @@ document.getElementById("fill").addEventListener("click", async () => {
   }
 });
 
+let lastDiagnosis = null;
+
+document.getElementById("diagnose").addEventListener("click", async () => {
+  const tab = await activeTab();
+  if (!tab || !tab.id) {
+    setResult("没有可用的标签页", "error");
+    return;
+  }
+
+  let report = null;
+  try {
+    report = await chrome.tabs.sendMessage(tab.id, { type: "diagnose" });
+  } catch {
+    report = null;
+  }
+  if (!report || !report.ok) {
+    setResult("当前页面没有诊断脚本：确认是支持的站点且扩展已启用", "error");
+    return;
+  }
+
+  const sources = report.trace.sources;
+  const hits = report.selectorHits
+    .filter((item) => item.count > 0)
+    .map((item) => `${item.selector}(${item.count})`);
+  const lines = [
+    `站点：${report.trace.host}${report.trace.hasRule ? "" : "（未配置规则）"}`,
+    `岗位：${report.lead.role || "（空）"} ← ${sources.role || "无"}`,
+    `公司：${report.lead.company || "（空）"} ← ${sources.company || "无"}`,
+    `JD：${report.lead.jdLength} 字 ← ${sources.jd || "无"}`,
+    `JSON-LD：${report.trace.jsonLd ? "有" : "无"}`,
+    `命中选择器：${hits.join("、") || "无"}`,
+    `标题：${report.headings.join(" / ") || "无"}`,
+  ];
+
+  const pre = $("diag");
+  pre.textContent = lines.join("\n");
+  pre.hidden = false;
+  $("diagActions").hidden = false;
+  lastDiagnosis = report;
+  setResult("诊断完成，可复制结果", "ok");
+});
+
+document.getElementById("copyDiag").addEventListener("click", async () => {
+  if (!lastDiagnosis) return;
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(lastDiagnosis, null, 2));
+    setResult("诊断结果已复制", "ok");
+  } catch {
+    setResult("复制失败，请手动选中", "error");
+  }
+});
+
 document.getElementById("copy").addEventListener("click", async () => {
   const text = fields.jd.value.trim();
   if (!text) {

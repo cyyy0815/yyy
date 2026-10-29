@@ -164,48 +164,132 @@ function extractCompanyFromLink() {
   return "";
 }
 
-function extract() {
-  const rule = SITE_RULES[location.hostname] || {};
+/** 逐个选择器试，命中时返回值与来源，便于诊断「哪条规则起作用」。 */
+function firstTextWithSource(selectors, prefix) {
+  for (const selector of selectors || []) {
+    const value = firstText([selector]);
+    if (value) return { value, source: `${prefix}:${selector}` };
+  }
+  return { value: "", source: "" };
+}
+
+function extractWithTrace() {
+  const host = location.hostname;
+  const rule = SITE_RULES[host] || {};
   const structured = fromJsonLd();
 
-  let company = firstText(rule.company);
-  let role = firstText(rule.role);
-  let jd = firstText(rule.jd);
+  let company = firstTextWithSource(rule.company, "site");
+  let role = firstTextWithSource(rule.role, "site");
+  let jd = firstTextWithSource(rule.jd, "site");
 
   if (structured) {
-    company = company || structured.company;
-    role = role || structured.role;
-    jd = jd || structured.jd;
+    if (!company.value && structured.company) {
+      company = { value: structured.company, source: "jsonld" };
+    }
+    if (!role.value && structured.role) {
+      role = { value: structured.role, source: "jsonld" };
+    }
+    if (!jd.value && structured.jd) {
+      jd = { value: structured.jd, source: "jsonld" };
+    }
   }
 
-  if (!company) {
-    company =
-      firstText(['[class*="company-name"]', '[class*="companyName"]']) ||
-      extractCompanyFromLink();
+  if (!company.value) {
+    const byClass = firstTextWithSource(
+      ['[class*="company-name"]', '[class*="companyName"]'],
+      "fallback",
+    );
+    if (byClass.value) {
+      company = byClass;
+    } else {
+      const byLink = extractCompanyFromLink();
+      company = { value: byLink, source: byLink ? "fallback:companyLink" : "" };
+    }
   }
-  if (!role) {
-    role = metaContent(["og:title", "twitter:title"]) || firstText(["h1"]);
+
+  if (!role.value) {
+    const meta = metaContent(["og:title", "twitter:title"]);
+    if (meta) {
+      role = { value: meta, source: "fallback:meta" };
+    } else {
+      const h1 = firstText(["h1"]);
+      role = { value: h1, source: h1 ? "fallback:h1" : "" };
+    }
   }
 
   // 结构化内容太短时，用「按标题找正文」和正文区域兜底，避免只抓到一句职责标题。
-  if (!jd || jd.length < 120) {
+  if (!jd.value || jd.value.length < 120) {
     const byHeading = extractByHeading();
-    if (byHeading.length > jd.length) jd = byHeading;
+    if (byHeading.length > (jd.value || "").length) {
+      jd = { value: byHeading, source: "fallback:heading" };
+    }
   }
-  if (!jd || jd.length < 120) {
+  if (!jd.value || jd.value.length < 120) {
     const fallback = textOf(document.querySelector("article, main"));
-    if (fallback.length > jd.length) jd = fallback;
+    if (fallback.length > (jd.value || "").length) {
+      jd = { value: fallback, source: "fallback:article" };
+    }
   }
 
   return {
-    company: clean(company).slice(0, 100),
-    role: clean(role).slice(0, 100),
-    // 智联等站点会在正文末尾插「登录查看完整内容」，清掉这行噪声
-    jd: clean(jd)
-      .replace(/登录(后)?查看完整内容/g, "")
-      .trim()
-      .slice(0, MAX_JD_CHARS),
+    lead: {
+      company: clean(company.value).slice(0, 100),
+      role: clean(role.value).slice(0, 100),
+      // 智联等站点会在正文末尾插「登录查看完整内容」，清掉这行噪声
+      jd: clean(jd.value)
+        .replace(/登录(后)?查看完整内容/g, "")
+        .trim()
+        .slice(0, MAX_JD_CHARS),
+      url: location.href,
+    },
+    trace: {
+      host,
+      hasRule: Boolean(SITE_RULES[host]),
+      jsonLd: Boolean(structured),
+      sources: { company: company.source, role: role.source, jd: jd.source },
+    },
+  };
+}
+
+function extract() {
+  return extractWithTrace().lead;
+}
+
+/**
+ * 诊断：不改变页面，只回报「哪条选择器命中、哪些候选存在」。
+ * 用户在登录态下点一次，把结果贴回来即可按真实 DOM 精确修正。
+ */
+function diagnose() {
+  const { lead, trace } = extractWithTrace();
+  const rule = SITE_RULES[location.hostname] || {};
+  const selectors = [
+    ...(rule.role || []),
+    ...(rule.company || []),
+    ...(rule.jd || []),
+    "h1",
+    "article",
+    "main",
+  ].filter((value, index, list) => list.indexOf(value) === index);
+
+  return {
+    ok: true,
     url: location.href,
+    trace,
+    lead: {
+      company: lead.company,
+      role: lead.role,
+      jdLength: lead.jd.length,
+      jdPreview: lead.jd.slice(0, 60),
+    },
+    selectorHits: selectors.map((selector) => ({
+      selector,
+      count: document.querySelectorAll(selector).length,
+    })),
+    headings: Array.from(document.querySelectorAll("h1, h2"))
+      .map((node) => textOf(node).slice(0, 24))
+      .filter(Boolean)
+      .slice(0, 10),
+    textLength: document.body ? document.body.innerText.length : 0,
   };
 }
 
@@ -337,6 +421,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "extract") {
     try {
       sendResponse({ ok: true, lead: extract() });
+    } catch (error) {
+      sendResponse({
+        ok: false,
+        error: error && error.message ? error.message : String(error),
+      });
+    }
+    return false;
+  }
+
+  if (message.type === "diagnose") {
+    try {
+      sendResponse(diagnose());
     } catch (error) {
       sendResponse({
         ok: false,

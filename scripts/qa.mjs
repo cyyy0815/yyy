@@ -6012,6 +6012,25 @@ expect(
     !zhaopinExtracted.lead.jd.includes("登录查看完整内容"),
   JSON.stringify(zhaopinExtracted),
 );
+
+// 诊断模式：回报每个字段命中的来源，用户在登录态下贴回来即可按真实 DOM 修正
+const zhaopinDiag = await zhaopinPage.evaluate(
+  () =>
+    new Promise((resolve) => {
+      window.__extractHandler({ type: "diagnose" }, null, resolve);
+    }),
+);
+expect(
+  "诊断能回报选择器命中来源",
+  zhaopinDiag.ok &&
+    zhaopinDiag.trace.sources.role.includes("summary-planes__title") &&
+    zhaopinDiag.trace.sources.company.includes("companydetail") &&
+    zhaopinDiag.trace.sources.jd === "fallback:heading" &&
+    zhaopinDiag.selectorHits.some(
+      (item) => item.selector === ".summary-planes__title" && item.count === 1,
+    ),
+  JSON.stringify(zhaopinDiag),
+);
 await zhaopinPage.close();
 
 // ATS 纯文本 / Markdown 导出与 JD 关键词覆盖

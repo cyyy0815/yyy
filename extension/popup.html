@@ -91,6 +91,19 @@
       details input {
         margin-top: 6px;
       }
+      pre {
+        margin: 10px 0 0;
+        padding: 8px;
+        max-height: 170px;
+        overflow: auto;
+        border: 1px solid #e4e4e7;
+        border-radius: 8px;
+        background: #fff;
+        font-size: 11px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
     </style>
   </head>
   <body>
@@ -114,6 +127,14 @@
     <p class="hint">
       填表只写姓名 / 联系方式等文本字段，不提交、不碰身份证与密码；简历附件请手动上传。
     </p>
+
+    <div class="row">
+      <button class="ghost" id="diagnose">诊断选择器</button>
+    </div>
+    <pre id="diag" hidden></pre>
+    <div class="row" id="diagActions" hidden>
+      <button class="ghost" id="copyDiag">复制诊断结果</button>
+    </div>
 
     <details>
       <summary>应用地址</summary>
