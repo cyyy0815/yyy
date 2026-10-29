@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "简历工坊 · JD 助手",
+  "version": "0.1.0",
+  "description": "从招聘网站抓取岗位描述，一键发送到本地简历工坊的待投清单。",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://www.zhipin.com/*",
+    "https://www.lagou.com/*",
+    "https://www.liepin.com/*",
+    "https://www.zhaopin.com/*",
+    "https://sou.zhaopin.com/*",
+    "https://we.51job.com/*",
+    "https://jobs.51job.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "发送岗位到简历工坊"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["content-app.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.zhipin.com/*",
+        "https://www.lagou.com/*",
+        "https://www.liepin.com/*",
+        "https://www.zhaopin.com/*",
+        "https://sou.zhaopin.com/*",
+        "https://we.51job.com/*",
+        "https://jobs.51job.com/*"
+      ],
+      "js": ["content-job.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
