@@ -513,15 +513,31 @@ await aiPage.waitForFunction(
 
 await clickText(aiPage, "采用到简历", '[role="dialog"]');
 await pause(300);
-const confirmShown = await aiPage.evaluate(() =>
-  [...document.querySelectorAll('[role="dialog"] button')].some(
-    (button) => button.textContent?.trim() === "确认覆盖",
-  ),
-);
+const confirmState = await aiPage.evaluate(() => {
+  const button = [...document.querySelectorAll('[role="dialog"] button')].find(
+    (node) => node.textContent?.trim() === "确认覆盖",
+  );
+  if (!button) return { shown: false, visible: false };
+  const rect = button.getBoundingClientRect();
+  return {
+    shown: true,
+    visible:
+      rect.top >= 0 &&
+      rect.left >= 0 &&
+      rect.bottom <= window.innerHeight &&
+      rect.right <= window.innerWidth,
+  };
+});
+const confirmShown = confirmState.shown;
 expect(
   "覆盖非空简介需确认",
   summaryBefore.trim() === "" || confirmShown,
   JSON.stringify({ summaryBefore, confirmShown }),
+);
+expect(
+  "覆盖确认按钮无需滚动即可看到",
+  summaryBefore.trim() === "" || confirmState.visible,
+  JSON.stringify(confirmState),
 );
 if (confirmShown) {
   await clickText(aiPage, "确认覆盖", '[role="dialog"]');
@@ -791,6 +807,30 @@ expect(
     (text) => fullPreviewText.includes(text),
   ),
   fullPreviewText.slice(0, 120),
+);
+expect(
+  "整份生成完成提示写入左侧表单",
+  fullPreviewText.includes("内容会写入左侧编辑表单"),
+  fullPreviewText.slice(0, 120),
+);
+const fullReadyVisible = await aiFullPage.evaluate(() => {
+  const dialog = document.querySelector('[role="dialog"]');
+  if (!dialog) return false;
+  return [...dialog.querySelectorAll('[role="status"]')].some((node) => {
+    if (!(node.textContent ?? "").includes("已生成完整简历")) return false;
+    const rect = node.getBoundingClientRect();
+    return (
+      rect.top >= 0 &&
+      rect.left >= 0 &&
+      rect.bottom <= window.innerHeight &&
+      rect.right <= window.innerWidth
+    );
+  });
+});
+expect(
+  "整份生成完成状态在底栏可见",
+  fullReadyVisible,
+  String(fullReadyVisible),
 );
 const fullFact = await aiFullPage.$eval(
   '[data-qa="ai-full-preview"] [data-qa="fact-check"]',
@@ -2833,7 +2873,7 @@ const singleInput = await singlePage.$('input[type="file"][accept*="json"]');
 await singlePage.click('[data-qa="merge-import"]');
 await singleInput.uploadFile(singlePath);
 await singlePage.waitForFunction(
-  () => document.body.innerText.includes("已作为新简历"),
+  () => document.body.innerText.includes("已追加简历"),
   { timeout: 5000 },
 );
 const afterSingleMerge = await singlePage.evaluate(() => {
@@ -2848,10 +2888,10 @@ const afterSingleMerge = await singlePage.evaluate(() => {
   };
 });
 expect(
-  "合并导入单份简历会新增副本且保留原简历",
+  "合并导入单份简历会新增副本且不切换当前简历",
   afterSingleMerge.count === 2 &&
-    afterSingleMerge.selected === "单份导出 2" &&
-    afterSingleMerge.others.includes("单份导出"),
+    afterSingleMerge.selected === "单份导出" &&
+    afterSingleMerge.others.includes("单份导出 2"),
   JSON.stringify(afterSingleMerge),
 );
 
@@ -2908,8 +2948,9 @@ const afterLibraryMerge = await singlePage.evaluate(() => {
 expect(
   "整库合并导入追加简历与投递记录且不覆盖当前简历",
   afterLibraryMerge.count === 3 &&
-    afterLibraryMerge.selected === "单份导出 2" &&
-    afterLibraryMerge.activeTitle === "单份导出 2" &&
+    afterLibraryMerge.selected === "单份导出" &&
+    afterLibraryMerge.activeTitle === "单份导出" &&
+    afterLibraryMerge.others.includes("单份导出 2") &&
     afterLibraryMerge.others.includes("合并简历") &&
     afterLibraryMerge.companies.includes("本地公司") &&
     afterLibraryMerge.companies.includes("合并公司"),
@@ -3172,23 +3213,24 @@ await crossB.waitForFunction(
   { timeout: 5000 },
 );
 
-const conflictBanner = await crossA
-  .waitForSelector('[data-qa="storage-conflict"]', {
-    visible: true,
-    timeout: 5000,
-  })
+// 没有编辑过的标签页应该跟随最新版本，而不是被弹冲突挡住
+const followedName = await crossA
+  .waitForFunction(
+    () => {
+      const label = [...document.querySelectorAll("label")].find((node) =>
+        node.textContent?.includes("姓名"),
+      );
+      return label?.querySelector("input")?.value === "B 的修改";
+    },
+    { timeout: 5000 },
+  )
   .then(() => true)
   .catch(() => false);
-const conflictText = conflictBanner
-  ? await crossA.$eval(
-      '[data-qa="storage-conflict"]',
-      (node) => node.textContent?.trim() ?? "",
-    )
-  : "";
+const followedConflict = await crossA.$('[data-qa="storage-conflict"]');
 expect(
-  "另一标签页修改后提示冲突",
-  conflictBanner && conflictText.includes("本页已暂停保存"),
-  conflictText,
+  "未编辑的标签页自动跟随另一标签页的最新版本",
+  followedName && followedConflict === null,
+  String(followedName),
 );
 
 await crossA.evaluate(() => {
@@ -3203,27 +3245,76 @@ await crossA.evaluate(() => {
   );
   input.dispatchEvent(new Event("input", { bubbles: true }));
 });
-await pause(1000);
-const blockedStored = await crossA.evaluate(
-  () =>
-    JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}").basic?.name,
-);
-expect(
-  "冲突期间不覆盖另一标签页数据",
-  blockedStored === "B 的修改",
-  String(blockedStored),
-);
-
-crossA.once("dialog", async (dialog) => {
-  await dialog.accept();
-});
-await clickText(crossA, "保留我的版本");
+// 跟随刚落定就立刻输入，偶尔会和 React 的提交撞车；等一拍再编辑。
+await pause(400);
 await crossA.waitForFunction(
   () => {
     try {
       return (
         JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}").basic
-          ?.name === "A 的修改" &&
+          ?.name === "A 的修改"
+      );
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 5000 },
+);
+expect("跟随之后继续编辑可以正常保存", true);
+
+// 两个标签页都编辑过时仍然要停下来：后写方不能覆盖对方
+const conflictBanner = await crossB
+  .waitForSelector('[data-qa="storage-conflict"]', {
+    visible: true,
+    timeout: 5000,
+  })
+  .then(() => true)
+  .catch(() => false);
+const conflictText = conflictBanner
+  ? await crossB.$eval(
+      '[data-qa="storage-conflict"]',
+      (node) => node.textContent?.trim() ?? "",
+    )
+  : "";
+expect(
+  "两个标签页都编辑过时提示冲突",
+  conflictBanner && conflictText.includes("本页已暂停保存"),
+  conflictText,
+);
+
+await crossB.evaluate(() => {
+  const label = [...document.querySelectorAll("label")].find((node) =>
+    node.textContent?.includes("姓名"),
+  );
+  const input = label?.querySelector("input");
+  if (!input) return;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+    input,
+    "B 再改",
+  );
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await pause(1000);
+const blockedStored = await crossB.evaluate(
+  () =>
+    JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}").basic?.name,
+);
+expect(
+  "冲突期间不覆盖另一标签页数据",
+  blockedStored === "A 的修改",
+  String(blockedStored),
+);
+
+crossB.once("dialog", async (dialog) => {
+  await dialog.accept();
+});
+await clickText(crossB, "保留我的版本");
+await crossB.waitForFunction(
+  () => {
+    try {
+      return (
+        JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}").basic
+          ?.name === "B 再改" &&
         !document.querySelector('[data-qa="storage-conflict"]')
       );
     } catch {
@@ -4443,6 +4534,8 @@ const sidebarPrint = await sidebarPage.evaluate(() => {
     float: side ? getComputedStyle(side).float : "none",
     sideWidth: side ? getComputedStyle(side).width : "0",
     paperDisplay: paper ? getComputedStyle(paper).display : "none",
+    // 侧栏内容超过一页时，深色底必须跟着浮动盒跨页，否则续页是白底白字。
+    sideBg: side ? getComputedStyle(side).backgroundImage : "none",
   };
 });
 const expectedSideWidth = (72 * 96) / 25.4;
@@ -4450,7 +4543,8 @@ expect(
   "侧栏打印浮动布局",
   sidebarPrint.float === "left" &&
     sidebarPrint.paperDisplay === "block" &&
-    Math.abs(Number.parseFloat(sidebarPrint.sideWidth) - expectedSideWidth) < 1,
+    Math.abs(Number.parseFloat(sidebarPrint.sideWidth) - expectedSideWidth) < 1 &&
+    sidebarPrint.sideBg.includes("gradient"),
   JSON.stringify(sidebarPrint),
 );
 await sidebarPage.screenshot({
@@ -4472,6 +4566,86 @@ console.log(
   `qa-sidebar: float=${sidebarPrint.float} width=${sidebarPrint.sideWidth} pdfPages=${sidebarPages}`,
 );
 expect("侧栏多页 PDF 页数", sidebarPages === 2, String(sidebarPages));
+
+// 现代模板多页：分类栏是 CSS Grid，整块无法分片。修复前整段正文会被推到
+// 第 2 页（首页只剩抬头），16 段经历会打出 3 页；打印时必须拆成浮动侧栏。
+const modernPage = await open({ width: 1440, height: 1100 });
+await modernPage.goto(BASE, { waitUntil: "networkidle0" });
+await modernPage.evaluate(() => {
+  const experiences = Array.from({ length: 16 }, (_, index) => ({
+    id: `qa-modern-e${index}`,
+    company: `示例科技有限公司 ${index + 1}`,
+    role: "高级前端工程师",
+    start: "2021.03",
+    end: "2022.06",
+    description:
+      "负责核心业务前端架构设计与性能优化，主导中后台平台重构，覆盖 12 条业务线；" +
+      "建设组件库与工程化体系，重复开发工时下降约 35%；" +
+      "搭建前端监控与指标看板，线上白屏率由 1.2% 降至 0.3%。",
+  }));
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: {
+        name: "林一",
+        headline: "前端工程师",
+        email: "linyi@example.com",
+        phone: "138-0000-0000",
+        city: "上海",
+        website: "",
+        github: "",
+        summary:
+          "4 年前端开发经验，专注 React 技术栈与性能优化，主导过日活 20 万的中后台产品重构。",
+      },
+      intent: {
+        targetRole: "高级前端工程师",
+        targetCity: "上海",
+        jobType: "全职",
+        experience: "3-5年",
+      },
+      educations: [],
+      experiences,
+      projects: [],
+      customSections: [],
+      skills: ["React", "TypeScript", "Node.js", "Webpack"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await modernPage.reload({ waitUntil: "networkidle0" });
+await pause(900);
+await modernPage.emulateMediaType("print");
+await pause(300);
+const modernPrint = await modernPage.evaluate(() => {
+  const wrapper = document.querySelector(".resume-columns");
+  const aside = document.querySelector(".resume-aside-grid > aside");
+  return {
+    display: wrapper ? getComputedStyle(wrapper).display : "none",
+    asideFloat: aside ? getComputedStyle(aside).float : "none",
+  };
+});
+expect(
+  "现代模板打印改单栏流 + 侧栏浮动",
+  modernPrint.display === "block" && modernPrint.asideFloat === "right",
+  JSON.stringify(modernPrint),
+);
+await modernPage.pdf({
+  path: `${OUT}/qa-modern-multipage.pdf`,
+  format: "A4",
+  printBackground: true,
+  preferCSSPageSize: true,
+});
+await modernPage.close();
+const modernBytes = await readFile(`${OUT}/qa-modern-multipage.pdf`);
+const modernPages = (
+  modernBytes.toString("latin1").match(/\/Type\s*\/Page\b/g) ?? []
+).length;
+console.log(
+  `qa-modern: display=${modernPrint.display} asideFloat=${modernPrint.asideFloat} pdfPages=${modernPages}`,
+);
+// 修复前：3 页（首页几乎空白）；修复后：2 页且首页排满正文
+expect("现代模板多页不出现整页空白", modernPages === 2, String(modernPages));
 
 // P3 推荐页：只有简介也能进入；JD 缺口可一键补进简历
 const jobsP3Page = await open({ width: 1440, height: 1000 });
@@ -4587,7 +4761,7 @@ const expandedJobs = await jobsP3Page.evaluate(() => {
   return {
     city: url?.searchParams.get("city") ?? "",
     keyword: url?.searchParams.get("query") ?? "",
-    hasProfile: text.includes("命中核心技能"),
+    hasProfile: text.includes("命中核心要求"),
     unknownProfile: text.includes("岗位画像未收录"),
   };
 });
@@ -4635,7 +4809,7 @@ await pause(800);
 const securityJobs = await jobsP3Page.evaluate(() => {
   const text = document.body.innerText;
   return {
-    hasProfile: text.includes("命中核心技能"),
+    hasProfile: text.includes("命中核心要求"),
     unknownProfile: text.includes("岗位画像未收录"),
     role: text.includes("网络安全工程师"),
   };
@@ -5487,6 +5661,307 @@ expect(
   applicationPage.qaErrors.join(" | "),
 );
 await applicationPage.close();
+
+// P2 待投清单：批量导入 → 按匹配度排序 → 准备/标记已投
+const queuePage = await open({ width: 1440, height: 1100 });
+await queuePage.goto(`${BASE}/#jobs`, { waitUntil: "networkidle0" });
+await queuePage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:applications:v1");
+  localStorage.removeItem("resume-workshop:jd");
+  localStorage.setItem(
+    "resume-workshop:v1",
+    JSON.stringify({
+      basic: {
+        name: "林一",
+        headline: "前端工程师",
+        email: "linyi@example.com",
+        phone: "138-0000-0000",
+        city: "上海",
+        website: "",
+        github: "",
+        summary:
+          "5 年前端开发经验，负责中后台系统、组件库与性能优化，主导过日活 20 万产品的重构。",
+      },
+      intent: { targetRole: "前端工程师", targetCity: "上海" },
+      educations: [],
+      experiences: [
+        {
+          id: "queue-e1",
+          company: "某厂",
+          role: "前端工程师",
+          start: "2021.03",
+          end: "至今",
+          description:
+            "使用 React 与 TypeScript 开发中后台系统，封装 40+ 业务组件；接入 Vite 构建，首屏时间下降 45%。",
+        },
+      ],
+      projects: [],
+      skills: ["React", "TypeScript", "Webpack", "Vite", "HTML", "CSS"],
+      theme: { accent: "#1d4ed8" },
+    }),
+  );
+});
+await queuePage.reload({ waitUntil: "networkidle0" });
+await pause(800);
+await queuePage.click('[data-qa="job-import-open"]');
+await pause(300);
+await queuePage.type(
+  'textarea[aria-label="粘贴岗位描述"]',
+  [
+    "某科技 | 高级前端工程师",
+    "负责中后台系统开发，要求 3 年以上经验，熟悉 React、TypeScript、Webpack 与性能优化。",
+    "---",
+    "某金融 | Java 后端工程师",
+    "负责交易系统，要求熟悉 Spring Boot、MySQL、Redis、微服务与高并发。",
+  ].join("\n"),
+);
+await pause(300);
+await queuePage.click('[data-qa="job-import-submit"]');
+await queuePage.waitForSelector('[data-qa="job-queue-list"] li', {
+  timeout: 5000,
+});
+await pause(400);
+const queueState = await queuePage.evaluate(() => {
+  const rows = [...document.querySelectorAll('[data-qa="job-queue-list"] li')];
+  return {
+    rows: rows.map((row) => row.innerText),
+    scores: rows.map((row) => Number(row.innerText.trim().split("\n")[0])),
+    stored: JSON.parse(
+      localStorage.getItem("resume-workshop:applications:v1") ?? "[]",
+    ).length,
+    pageWidth: document.documentElement.scrollWidth,
+    viewport: window.innerWidth,
+  };
+});
+expect(
+  "批量导入按匹配度排序",
+  queueState.stored === 2 &&
+    queueState.rows.length === 2 &&
+    queueState.scores[0] > queueState.scores[1] &&
+    queueState.pageWidth <= queueState.viewport,
+  JSON.stringify(queueState),
+);
+
+// 准备 → 标记为已投：记录应离开待投清单并进入看板
+await queuePage.click('[data-qa="job-prepare"]');
+await pause(400);
+const prepDialogText = await queuePage.evaluate(
+  () => document.querySelector('[data-qa="job-prep-dialog"]')?.innerText ?? "",
+);
+expect(
+  "准备弹窗显示匹配与 JD",
+  prepDialogText.includes("关键词覆盖") && prepDialogText.includes("JD 原文"),
+  prepDialogText.slice(0, 80),
+);
+await queuePage.click('[data-qa="job-mark-applied"]');
+await pause(500);
+const afterApplied = await queuePage.evaluate(() => ({
+  queueCount: document.querySelectorAll('[data-qa="job-queue-list"] li').length,
+  applied: JSON.parse(
+    localStorage.getItem("resume-workshop:applications:v1") ?? "[]",
+  ).filter((item) => item.status === "applied").length,
+}));
+expect(
+  "标记已投后离开待投清单",
+  afterApplied.queueCount === 1 && afterApplied.applied === 1,
+  JSON.stringify(afterApplied),
+);
+
+// 准备 → 设为当前 JD 并打开求职信
+await queuePage.click('[data-qa="job-prepare"]');
+await pause(400);
+await queuePage.click('[data-qa="job-prepare-letter"]');
+await pause(600);
+const letterOpened = await queuePage.evaluate(() => ({
+  dialog: Boolean(document.querySelector('[data-qa="cover-dialog"]')),
+  jdLength: (localStorage.getItem("resume-workshop:jd") ?? "").length,
+}));
+expect(
+  "准备岗位会写入当前 JD 并打开求职信",
+  letterOpened.dialog && letterOpened.jdLength > 0,
+  JSON.stringify(letterOpened),
+);
+
+// 按 JD 优化简历：切回编辑页并打开 AI 写作弹窗（弹窗自己读取当前 JD）
+await queuePage.keyboard.press("Escape");
+await pause(400);
+await queuePage.click('[data-qa="job-prepare"]');
+await pause(400);
+await queuePage.click('[data-qa="job-optimize-resume"]');
+await pause(900);
+const optimizeState = await queuePage.evaluate(() => ({
+  hash: location.hash,
+  dialog: Boolean(document.querySelector('[data-qa="ai-writer-dialog"]')),
+  jdLength: (localStorage.getItem("resume-workshop:jd") ?? "").length,
+}));
+expect(
+  "按 JD 优化简历会切到编辑页并打开 AI 写作",
+  optimizeState.hash !== "#jobs" &&
+    optimizeState.dialog &&
+    optimizeState.jdLength > 0,
+  JSON.stringify(optimizeState),
+);
+await queuePage.close();
+
+// P3 扩展桥：页面收到 postMessage 后自动切到推荐页并预填导入弹窗
+const bridgePage = await open({ width: 1440, height: 1000 });
+await bridgePage.goto(BASE, { waitUntil: "networkidle0" });
+await pause(800);
+await bridgePage.evaluate(() => {
+  window.postMessage(
+    {
+      source: "resume-workshop-extension",
+      type: "lead",
+      payload: {
+        company: "扩展公司",
+        role: "前端工程师",
+        jd: "熟悉 React 与 TypeScript，3 年以上经验。",
+      },
+    },
+    window.location.origin,
+  );
+});
+await pause(800);
+const bridgeResult = await bridgePage.evaluate(() => ({
+  hash: location.hash,
+  dialog: Boolean(document.querySelector('[data-qa="job-import-dialog"]')),
+  text:
+    document.querySelector('textarea[aria-label="粘贴岗位描述"]')?.value ?? "",
+}));
+expect(
+  "扩展投递的岗位自动打开导入弹窗并预填",
+  bridgeResult.hash === "#jobs" &&
+    bridgeResult.dialog &&
+    bridgeResult.text.includes("扩展公司") &&
+    bridgeResult.text.includes("React"),
+  JSON.stringify(bridgeResult),
+);
+
+await bridgePage.evaluate(() => {
+  document.querySelector('[data-qa="job-import-close"]')?.click();
+});
+await pause(300);
+await bridgePage.evaluate(() => {
+  window.postMessage(
+    { source: "evil", type: "lead", payload: { jd: "伪造内容" } },
+    window.location.origin,
+  );
+});
+await pause(500);
+const spoofedMessage = await bridgePage.evaluate(() =>
+  Boolean(document.querySelector('[data-qa="job-import-dialog"]')),
+);
+expect(
+  "忽略来源不匹配的消息",
+  !spoofedMessage,
+  String(spoofedMessage),
+);
+await bridgePage.close();
+
+// P3 扩展提取脚本：拦截一个假的 BOSS 岗位页，验证站点选择器能取到公司/岗位/JD
+const extractPage = await browser.newPage();
+await extractPage.setRequestInterception(true);
+extractPage.on("request", (request) => {
+  if (request.url().includes("zhipin.com")) {
+    request.respond({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<!doctype html><html><head><meta charset="utf-8"></head><body>
+        <div class="job-banner"><div class="name"><h1>高级前端工程师</h1></div></div>
+        <div class="company-info"><span class="name">示例科技</span></div>
+        <div class="job-sec-text">负责中后台系统开发，要求熟悉 React 与 TypeScript，3 年以上经验；
+          建设组件库与工程化体系，推动性能优化与首屏提速。这段描述足够长，用来模拟真实岗位的正文区域。</div>
+      </body></html>`,
+    });
+    return;
+  }
+  request.continue();
+});
+await extractPage.goto("https://www.zhipin.com/job_detail/qa-fixture.html", {
+  waitUntil: "domcontentloaded",
+});
+await extractPage.evaluate(() => {
+  window.chrome = {
+    runtime: { onMessage: { addListener: (fn) => { window.__extractHandler = fn; } } },
+  };
+});
+await extractPage.addScriptTag({
+  path: path.join(process.cwd(), "extension/content-job.js"),
+});
+const extracted = await extractPage.evaluate(
+  () =>
+    new Promise((resolve) => {
+      const handler = window.__extractHandler;
+      if (!handler) {
+        resolve(null);
+        return;
+      }
+      handler({ type: "extract" }, null, (response) => resolve(response));
+    }),
+);
+expect(
+  "扩展能按站点选择器提取公司 / 岗位 / JD",
+  extracted?.ok &&
+    extracted.lead.company === "示例科技" &&
+    extracted.lead.role.includes("前端") &&
+    extracted.lead.jd.includes("React"),
+  JSON.stringify(extracted),
+);
+
+// 同一页面再加一个投递表单，验证自动填表：只填文本字段、跳过身份证
+await extractPage.evaluate(() => {
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    `<form>
+      <label>姓名 <input id="f-name" /></label>
+      <label>手机号 <input id="f-phone" type="tel" /></label>
+      <label>邮箱 <input id="f-email" type="email" /></label>
+      <label>期望城市 <input id="f-city" /></label>
+      <label>身份证号 <input id="f-id" /></label>
+    </form>`,
+  );
+});
+const fillResult = await extractPage.evaluate(
+  () =>
+    new Promise((resolve) => {
+      window.__extractHandler(
+        {
+          type: "fill",
+          profile: {
+            name: "林一",
+            phone: "13800000000",
+            email: "linyi@example.com",
+            city: "上海",
+            role: "",
+            summary: "",
+          },
+        },
+        null,
+        (response) =>
+          resolve({
+            response,
+            values: {
+              name: document.getElementById("f-name").value,
+              phone: document.getElementById("f-phone").value,
+              email: document.getElementById("f-email").value,
+              city: document.getElementById("f-city").value,
+              id: document.getElementById("f-id").value,
+            },
+          }),
+      );
+    }),
+);
+expect(
+  "扩展能填表并跳过身份证等敏感字段",
+  fillResult.response.ok &&
+    fillResult.values.name === "林一" &&
+    fillResult.values.phone === "13800000000" &&
+    fillResult.values.email === "linyi@example.com" &&
+    fillResult.values.city === "上海" &&
+    fillResult.values.id === "",
+  JSON.stringify(fillResult),
+);
+await extractPage.close();
 
 // ATS 纯文本 / Markdown 导出与 JD 关键词覆盖
 const atsPage = await open({ width: 1440, height: 1000 });

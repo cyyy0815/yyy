@@ -5,7 +5,7 @@ import {
   type ResumeLabels,
 } from "./language";
 import { isSectionVisible } from "./layout";
-import { textHasSkill } from "./matching";
+import { createTextSkillMatcher } from "./matching";
 import { groupSkills } from "./skills";
 import { safeFileName } from "./storage";
 import type { Resume } from "./types";
@@ -322,7 +322,8 @@ export type AtsCoverage = {
 /** 检查导出的文本里是否出现 JD 关键词；不判断真实技能掌握程度。 */
 export function analyzeAtsCoverage(text: string, jd: string): AtsCoverage {
   const keywords = extractJdKeywords(jd);
-  const matched = keywords.filter((keyword) => textHasSkill(text, keyword));
+  const hasSkill = createTextSkillMatcher(text);
+  const matched = keywords.filter(hasSkill);
   const missing = keywords.filter((keyword) => !matched.includes(keyword));
   return {
     total: keywords.length,

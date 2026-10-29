@@ -29,6 +29,10 @@ import {
   snoozeBackupReminder,
 } from "@/lib/storage";
 import { readApplications, saveApplications } from "@/lib/applications";
+import {
+  installJobBridge,
+  subscribeJobBridge,
+} from "@/lib/jobBridge";
 import { resolveSectionLayout } from "@/lib/layout";
 import {
   isTemplateId,
@@ -153,6 +157,7 @@ function ResumeWorkspace() {
   const [resumeVersion, setResumeVersion] = useState(0);
   const [atsOpen, setAtsOpen] = useState(false);
   const [fitOpen, setFitOpen] = useState(false);
+  const [aiOpenRequest, setAiOpenRequest] = useState(0);
   const [previewPages, setPreviewPages] = useState(1);
   const backupDue = useSyncExternalStore(
     subscribeBackupReminder,
@@ -209,6 +214,16 @@ function ResumeWorkspace() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
+  // 浏览器扩展抓到岗位后会用 postMessage 投递过来：切到推荐页，由待投清单接收。
+  useEffect(() => {
+    const uninstall = installJobBridge();
+    const unsubscribe = subscribeJobBridge(() => setTab("jobs"));
+    return () => {
+      unsubscribe();
+      uninstall();
+    };
+  }, []);
+
   useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(null), 2800);
@@ -246,8 +261,13 @@ function ResumeWorkspace() {
   const showBackupReminder =
     backupDue && !isSample && hasResumeContent(resume);
 
-  const handleAddSkill = (skill: string) => {
-    const value = skill.trim();
+  /** 待投清单「按 JD 优化简历」：JD 已写入当前 JD，切到编辑页并打开 AI 写作弹窗。 */
+  const handleOpenAiWriter = () => {
+    setTab("edit");
+    setAiOpenRequest((value) => value + 1);
+  };
+
+  const handleAddSkill = (skill: string) => {    const value = skill.trim();
     if (!value) return;
     const exists = resume.skills.some(
       (item) => item.trim().toLowerCase() === value.toLowerCase(),
@@ -360,7 +380,8 @@ function ResumeWorkspace() {
       return;
     }
     if (mode === "merge") {
-      const title = documents.createFromResume(
+      // 追加但不切换当前文档：导入是「加一份」，不该把正在写的那份切走。
+      const title = documents.appendDocument(
         result.resume,
         result.title || "导入简历",
         result.template ?? template,
@@ -372,8 +393,10 @@ function ResumeWorkspace() {
         });
         return;
       }
-      setResumeVersion((value) => value + 1);
-      setNotice({ type: "ok", message: `已作为新简历「${title}」导入` });
+      setNotice({
+        type: "ok",
+        message: `已追加简历「${title}」，当前简历未切换`,
+      });
       return;
     }
     if (
@@ -477,7 +500,10 @@ function ResumeWorkspace() {
       return false;
     }
     setResumeVersion((value) => value + 1);
-    setNotice({ type: "ok", message: `已生成新简历「${title}」` });
+    setNotice({
+      type: "ok",
+      message: `已生成新简历「${title}」，内容已写入左侧表单`,
+    });
     return true;
   };
 
@@ -861,6 +887,8 @@ function ResumeWorkspace() {
                   resume={resume}
                   onChange={updateResume}
                   onCreateDocument={handleCreateGeneratedResume}
+                  aiOpenRequest={aiOpenRequest}
+                  onAiOpenConsumed={() => setAiOpenRequest(0)}
                 />
                 <p className="mt-4 flex items-center gap-1.5 px-1 text-[11px] text-zinc-400">
                   <span
@@ -994,6 +1022,7 @@ function ResumeWorkspace() {
             resumeTitle={documents.currentTitle}
             onGoEdit={() => setTab("edit")}
             onAddSkill={handleAddSkill}
+            onOpenAiWriter={handleOpenAiWriter}
           />
         )}
       </main>

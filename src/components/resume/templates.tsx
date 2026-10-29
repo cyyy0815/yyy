@@ -2,6 +2,7 @@ import {
   Children,
   Fragment,
   isValidElement,
+  memo,
   type ReactNode,
 } from "react";
 import { resumeFontStyle } from "@/lib/fonts";
@@ -508,11 +509,75 @@ function ModernTemplate({ resume }: { resume: Resume }) {
       </header>
 
       <div
-        className={`mt-6 grid gap-8 ${
+        className={`resume-columns mt-6 grid gap-8 ${
           hasAside ? "resume-aside-grid grid-cols-[1fr_56mm]" : "grid-cols-1"
         }`}
       >
-        <div className="resume-main min-w-0">
+        {hasAside ? (
+          <aside className="col-start-2 row-start-1 space-y-5 border-l border-zinc-200 pl-6">
+            {isSectionVisible(resume, "intent") ? (
+              <section>
+                <AccentSectionTitle>{L.intent}</AccentSectionTitle>
+                <div className="space-y-1 text-[10.5px] leading-[1.6] text-zinc-600">
+                  {resume.intent.targetRole ? (
+                    <p className="text-[11.5px] font-medium text-zinc-800">
+                      {resume.intent.targetRole}
+                    </p>
+                  ) : null}
+                  <div className="flex flex-wrap gap-x-2 text-zinc-500">
+                    {resume.intent.targetCity ? (
+                      <span>{resume.intent.targetCity}</span>
+                    ) : null}
+                    {resume.intent.jobType ? <span>{resume.intent.jobType}</span> : null}
+                    {resume.intent.experience ? (
+                      <span>{resume.intent.experience}</span>
+                    ) : null}
+                    <SalaryRange resume={resume} />
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
+            {isSectionVisible(resume, "skills") ? (
+              <section>
+                <AccentSectionTitle>{L.skills}</AccentSectionTitle>
+                <SkillChips
+                  resume={resume}
+                  chipClassName="resume-soft rounded px-1.5 py-0.5 text-[9.5px] leading-[1.5] text-zinc-600"
+                  titleClassName="mb-0.5 text-[9px] font-medium text-zinc-400"
+                />
+              </section>
+            ) : null}
+
+            {isSectionVisible(resume, "education") ? (
+              <section>
+                <AccentSectionTitle>{L.education}</AccentSectionTitle>
+                <div className="space-y-2.5">
+                  {resume.educations.map((item) => (
+                    <div key={item.id} className="break-inside-avoid">
+                      <p className="text-[11px] font-medium leading-snug text-zinc-800">
+                        {item.school || "学校名称"}
+                      </p>
+                      <p className="text-[10px] leading-[1.6] text-zinc-500">
+                        {[item.major, item.degree].filter(Boolean).join(" · ")}
+                      </p>
+                      <p className="text-[9.5px] tabular-nums text-zinc-400">
+                        {range(item.start, item.end)}
+                      </p>
+                      <EducationDetails
+                        item={item}
+                        labels={L}
+                        className="pt-0.5 text-[9px] leading-[1.55] text-zinc-500"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </aside>
+        ) : null}
+
+        <div className="resume-main col-start-1 row-start-1 min-w-0">
           <OrderedSections resume={resume} keys={FLOW_KEYS}>
           {resume.basic.summary ? (
             <section data-section="summary" className="mb-5">
@@ -630,70 +695,6 @@ function ModernTemplate({ resume }: { resume: Resume }) {
             </p>
           ) : null}
         </div>
-
-        {hasAside ? (
-          <aside className="space-y-5 border-l border-zinc-200 pl-6">
-            {isSectionVisible(resume, "intent") ? (
-              <section>
-                <AccentSectionTitle>{L.intent}</AccentSectionTitle>
-                <div className="space-y-1 text-[10.5px] leading-[1.6] text-zinc-600">
-                  {resume.intent.targetRole ? (
-                    <p className="text-[11.5px] font-medium text-zinc-800">
-                      {resume.intent.targetRole}
-                    </p>
-                  ) : null}
-                  <div className="flex flex-wrap gap-x-2 text-zinc-500">
-                    {resume.intent.targetCity ? (
-                      <span>{resume.intent.targetCity}</span>
-                    ) : null}
-                    {resume.intent.jobType ? <span>{resume.intent.jobType}</span> : null}
-                    {resume.intent.experience ? (
-                      <span>{resume.intent.experience}</span>
-                    ) : null}
-                    <SalaryRange resume={resume} />
-                  </div>
-                </div>
-              </section>
-            ) : null}
-
-            {isSectionVisible(resume, "skills") ? (
-              <section>
-                <AccentSectionTitle>{L.skills}</AccentSectionTitle>
-                <SkillChips
-                  resume={resume}
-                  chipClassName="resume-soft rounded px-1.5 py-0.5 text-[9.5px] leading-[1.5] text-zinc-600"
-                  titleClassName="mb-0.5 text-[9px] font-medium text-zinc-400"
-                />
-              </section>
-            ) : null}
-
-            {isSectionVisible(resume, "education") ? (
-              <section>
-                <AccentSectionTitle>{L.education}</AccentSectionTitle>
-                <div className="space-y-2.5">
-                  {resume.educations.map((item) => (
-                    <div key={item.id} className="break-inside-avoid">
-                      <p className="text-[11px] font-medium leading-snug text-zinc-800">
-                        {item.school || "学校名称"}
-                      </p>
-                      <p className="text-[10px] leading-[1.6] text-zinc-500">
-                        {[item.major, item.degree].filter(Boolean).join(" · ")}
-                      </p>
-                      <p className="text-[9.5px] tabular-nums text-zinc-400">
-                        {range(item.start, item.end)}
-                      </p>
-                      <EducationDetails
-                        item={item}
-                        labels={L}
-                        className="pt-0.5 text-[9px] leading-[1.55] text-zinc-500"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-          </aside>
-        ) : null}
       </div>
     </article>
   );
@@ -2323,7 +2324,7 @@ function CardTemplate({ resume }: { resume: Resume }) {
   );
 }
 
-export function ResumePaper({
+function ResumePaperView({
   resume,
   template,
 }: {
@@ -2341,3 +2342,9 @@ export function ResumePaper({
   if (template === "card") return <CardTemplate resume={view} />;
   return <ModernTemplate resume={view} />;
 }
+
+/**
+ * 预览一次要渲染上千行 JSX（八套模板任选其一），而外层状态（提示条、弹窗、
+ * 移动端分栏）变化与简历无关。简历对象始终是函数式不可变更新，浅比较足够。
+ */
+export const ResumePaper = memo(ResumePaperView);

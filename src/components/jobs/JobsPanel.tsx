@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { analyzeResume } from "@/lib/matching";
 import { buildJobBoardUrl, JOB_BOARDS } from "@/lib/jobBoards";
 import type { Resume } from "@/lib/types";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { ApplicationBoard } from "./ApplicationBoard";
 import { CoverLetterWriter } from "./CoverLetterWriter";
 import { JdMatcher } from "./JdMatcher";
+import { JobQueuePanel } from "./JobQueuePanel";
 import { SkillChip } from "./SkillChip";
 
 function ScoreRing({
@@ -129,17 +131,22 @@ export function JobsPanel({
   resumeTitle,
   onGoEdit,
   onAddSkill,
+  onOpenAiWriter,
 }: {
   resume: Resume;
   resumeTitle: string;
   onGoEdit: () => void;
   onAddSkill: (skill: string) => void;
+  /** 打开编辑页的 AI 写作弹窗（待投清单「按 JD 优化简历」用） */
+  onOpenAiWriter: () => void;
 }) {
-  const analysis = analyzeResume(resume);
+  const analysis = useMemo(() => analyzeResume(resume), [resume]);
+  // 待投清单点「准备」时递增，用来打开求职信弹窗（弹窗自己从「当前 JD」读取内容）
+  const [coverLetterRequest, setCoverLetterRequest] = useState(0);
 
   if (!hasJobInputs(resume)) {
     return (
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-2xl space-y-4">
         <div className="rounded-3xl border border-zinc-200/80 bg-white px-6 py-16 text-center shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100 text-[20px]">
             ⌕
@@ -154,6 +161,14 @@ export function JobsPanel({
             去填写
           </Button>
         </div>
+        {/* 简历还没填时也保留待投清单：扩展发来的岗位不能因为没简历就丢掉 */}
+        <JobQueuePanel
+          resume={resume}
+          resumeTitle={resumeTitle}
+          onAddSkill={onAddSkill}
+          onPrepareCoverLetter={() => setCoverLetterRequest((value) => value + 1)}
+          onOpenAiWriter={onOpenAiWriter}
+        />
       </div>
     );
   }
@@ -214,8 +229,7 @@ export function JobsPanel({
             <p className="mt-1 text-[12.5px] leading-6 text-zinc-500">
               {analysis.profile ? (
                 <>
-                  命中核心技能 {analysis.matchedCore.length}/
-                  {analysis.matchedCore.length + analysis.missingCore.length} ·
+                  命中核心要求 {analysis.coreHit}/{analysis.coreTotal} ·
                   加分技能 {analysis.matchedBonus.length} 项 · 简历完整度{" "}
                   {analysis.completeness}%
                 </>
@@ -226,6 +240,13 @@ export function JobsPanel({
                 </>
               )}
             </p>
+            {analysis.profile ? (
+              <p className="mt-1 text-[11px] text-zinc-400">
+                匹配分 = 核心 {analysis.breakdown.core} + 加分{" "}
+                {analysis.breakdown.bonus} + 完整度{" "}
+                {analysis.breakdown.completeness}
+              </p>
+            ) : null}
             <div className="mt-3 h-1.5 w-full max-w-md overflow-hidden rounded-full bg-zinc-100">
               <div
                 className="h-full rounded-full bg-zinc-900/80 transition-all"
@@ -245,13 +266,13 @@ export function JobsPanel({
             <div className="mt-4 space-y-4">
               <div>
                 <p className="mb-2 text-[11px] text-zinc-400">
-                  已命中核心技能（{analysis.matchedCore.length}）
+                  已满足的核心要求（{analysis.matchedRequirements.length}）
                 </p>
-                {analysis.matchedCore.length > 0 ? (
+                {analysis.matchedRequirements.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
-                    {analysis.matchedCore.map((skill) => (
-                      <SkillChip key={skill} tone="matched">
-                        {skill}
+                    {analysis.matchedRequirements.map((requirement) => (
+                      <SkillChip key={requirement} tone="matched">
+                        {requirement}
                       </SkillChip>
                     ))}
                   </div>
@@ -262,16 +283,16 @@ export function JobsPanel({
 
               <div>
                 <p className="mb-2 text-[11px] text-zinc-400">
-                  缺失核心技能（{analysis.missingCore.length}）
-                  {analysis.missingCore.length > 0 ? (
+                  缺失核心技能（{analysis.missingSkills.length}）
+                  {analysis.missingSkills.length > 0 ? (
                     <span className="ml-1 text-zinc-300">
                       · 若你掌握，点击补进简历
                     </span>
                   ) : null}
                 </p>
-                {analysis.missingCore.length > 0 ? (
+                {analysis.missingSkills.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
-                    {analysis.missingCore.map((skill) => (
+                    {analysis.missingSkills.map((skill) => (
                       <SkillChip
                         key={skill}
                         tone="missing"
@@ -333,7 +354,18 @@ export function JobsPanel({
 
       <JdMatcher resume={resume} onAddSkill={onAddSkill} />
 
-      <CoverLetterWriter resume={resume} />
+      <JobQueuePanel
+        resume={resume}
+        resumeTitle={resumeTitle}
+        onAddSkill={onAddSkill}
+        onPrepareCoverLetter={() => setCoverLetterRequest((value) => value + 1)}
+        onOpenAiWriter={onOpenAiWriter}
+      />
+
+      <CoverLetterWriter
+        resume={resume}
+        openRequest={coverLetterRequest}
+      />
 
       <ApplicationBoard resumeTitle={resumeTitle} />
 

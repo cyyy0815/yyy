@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { analyzeResume, resumeHasSkill, skillMatches, textHasSkill } from "../matching";
 import { analyzeJd } from "../jdMatch";
-import { JOB_PROFILES } from "../jobProfiles";
+import { JOB_PROFILES, coreSkillGroups } from "../jobProfiles";
 import { createEmptyResume, type Education, type Experience } from "../types";
 
 function education(degree: string): Education {
@@ -128,9 +128,47 @@ describe("analyzeResume", () => {
     const result = analyzeResume(resume);
 
     expect(result.profile?.id).toBe("frontend");
-    expect(result.missingCore).toContain("JavaScript");
-    expect(result.missingCore).toContain("CSS");
+    // 同族要求合并成一条，避免提示「请补充 Vue」
+    expect(result.missingCore).toContain("JavaScript / TypeScript");
+    expect(result.missingCore).toContain("HTML / CSS");
+    expect(result.missingCore.join(" ")).not.toContain("Vue");
+    // 可点击补进简历的是具体技能，不是「JavaScript / TypeScript」这种组合标签
+    expect(result.missingSkills).toEqual(
+      expect.arrayContaining(["JavaScript", "TypeScript", "HTML", "CSS"]),
+    );
+    expect(result.missingSkills.some((skill) => skill.includes("/"))).toBe(false);
     expect(result.suggestions.join(" ")).toContain("还没有体现");
+  });
+
+  it("同族技能命中即满足该项要求", () => {
+    const resume = createEmptyResume();
+    resume.intent.targetRole = "前端工程师";
+    resume.skills = ["Vue", "JavaScript", "HTML", "CSS", "工程化", "浏览器"];
+
+    const result = analyzeResume(resume);
+
+    expect(result.profile?.id).toBe("frontend");
+    expect(result.coreHit).toBe(result.coreTotal);
+    expect(result.missingCore).toEqual([]);
+    // 已满足的要求与缺口共用同一套分组口径，条数必须对得上
+    expect(result.matchedRequirements).toHaveLength(result.coreTotal);
+    expect(result.breakdown.core).toBe(55);
+  });
+
+  it("每个画像的分组覆盖全部 core、且组内外都不重复", () => {
+    for (const profile of JOB_PROFILES) {
+      const groups = coreSkillGroups(profile);
+      const grouped = groups.flat();
+      // 组内与组间都不允许出现同一个技能（否则一项要求会被重复计数）
+      expect(new Set(grouped).size, profile.id).toBe(grouped.length);
+      // 分组可以额外放「可检测信号」（如用 Webpack 代表工程化），但 core 必须被完整覆盖
+      const coreInGroups = grouped.filter((skill) =>
+        profile.core.includes(skill),
+      );
+      expect([...coreInGroups].sort(), profile.id).toEqual(
+        [...profile.core].sort(),
+      );
+    }
   });
 
   it.each([

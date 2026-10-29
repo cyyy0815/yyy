@@ -63,7 +63,14 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export function CoverLetterWriter({ resume }: { resume: Resume }) {
+export function CoverLetterWriter({
+  resume,
+  openRequest = 0,
+}: {
+  resume: Resume;
+  /** 外部（待投清单）请求打开时递增；打开前调用方会先写好「当前 JD」 */
+  openRequest?: number;
+}) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<AiStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -134,6 +141,19 @@ export function CoverLetterWriter({ resume }: { resume: Resume }) {
     setOpen(true);
     if (!status && !statusLoading && !statusError) void checkStatus();
   };
+
+  // 待投清单点「准备」：JD 已经写进「当前 JD」，这里只负责把弹窗打开。
+  const lastOpenRequest = useRef(openRequest);
+  useEffect(() => {
+    if (openRequest <= lastOpenRequest.current) {
+      lastOpenRequest.current = openRequest;
+      return;
+    }
+    lastOpenRequest.current = openRequest;
+    openDialog();
+    // openDialog 每次渲染都会重建，只跟随外部请求变化
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest]);
 
   const handleGenerate = async () => {
     const trimmedMaterial = material.trim();

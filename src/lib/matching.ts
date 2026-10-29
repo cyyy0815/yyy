@@ -1,4 +1,8 @@
-import { JOB_PROFILES, type JobProfile } from "./jobProfiles";
+import {
+  coreSkillGroups,
+  JOB_PROFILES,
+  type JobProfile,
+} from "./jobProfiles";
 import { canonicalSkillKey, skillAliases } from "./skillSynonyms";
 import type { Resume } from "./types";
 
@@ -22,28 +26,56 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function textHasAlias(text: string, alias: string): boolean {
-  const lowerText = text.toLowerCase();
-  const lowerAlias = alias.toLowerCase().trim();
-  if (!lowerAlias) return false;
-  if (hasCJK(lowerAlias)) return lowerText.includes(lowerAlias);
+/**
+ * 别名对应的正则只编译一次。
+ * 分析一次简历会对 200+ 个技能各跑一遍匹配，每次新建 RegExp 纯属浪费；
+ * 别名集合是静态的，缓存不会无限增长。
+ */
+const aliasPatterns = new Map<string, RegExp>();
 
-  const escaped = escapeRegExp(lowerAlias);
+function aliasPattern(alias: string): RegExp {
+  const cached = aliasPatterns.get(alias);
+  if (cached) return cached;
+
+  const escaped = escapeRegExp(alias);
   // JS 不能命中 Node.js / Next.js 这类 .js 名字；C 不能命中 C++ / C#。
-  const before = lowerAlias === "js" ? "(^|[^a-z0-9.])" : "(^|[^a-z0-9])";
+  const before = alias === "js" ? "(^|[^a-z0-9.])" : "(^|[^a-z0-9])";
   const after =
-    lowerAlias === "c"
+    alias === "c"
       ? "(?![a-z0-9+#])"
-      : /[+#]$/.test(lowerAlias)
+      : /[+#]$/.test(alias)
         ? // C++11 / C# 8.0 这类版本号仍算命中
           "(?![a-z])"
         : "([^a-z0-9]|$)";
-  return new RegExp(`${before}${escaped}${after}`).test(lowerText);
+  const pattern = new RegExp(`${before}${escaped}${after}`);
+  aliasPatterns.set(alias, pattern);
+  return pattern;
+}
+
+/** `lowerText` 需已转小写；批量匹配时复用同一份小写文本。 */
+function aliasMatchesText(lowerText: string, alias: string): boolean {
+  const lowerAlias = alias.toLowerCase().trim();
+  if (!lowerAlias) return false;
+  if (hasCJK(lowerAlias)) return lowerText.includes(lowerAlias);
+  return aliasPattern(lowerAlias).test(lowerText);
+}
+
+function textHasAlias(text: string, alias: string): boolean {
+  return aliasMatchesText(text.toLowerCase(), alias);
+}
+
+/** 同一段文本要反复匹配多个技能时用它，避免每次都重建小写副本。 */
+export function createTextSkillMatcher(
+  text: string,
+): (skill: string) => boolean {
+  const lowerText = text.toLowerCase();
+  return (skill) =>
+    skillAliases(skill).some((alias) => aliasMatchesText(lowerText, alias));
 }
 
 /** 在自由文本（经历、项目、简介、JD）里找技能，支持同义词且避免 Java / JavaScript 互相误命中。 */
 export function textHasSkill(text: string, skill: string): boolean {
-  return skillAliases(skill).some((alias) => textHasAlias(text, alias));
+  return createTextSkillMatcher(text)(skill);
 }
 
 export function buildResumeText(resume: Resume): string {
@@ -55,12 +87,21 @@ export function buildResumeText(resume: Resume): string {
   ].join(" ");
 }
 
+/**
+ * 批量检查简历技能时先拼一次正文，避免「每判断一个技能就重建整份经历文本」。
+ */
+export function createResumeSkillMatcher(
+  resume: Resume,
+): (skill: string) => boolean {
+  const lowerText = buildResumeText(resume).toLowerCase();
+  return (skill) =>
+    resume.skills.some((userSkill) => skillMatches(userSkill, skill)) ||
+    skillAliases(skill).some((alias) => aliasMatchesText(lowerText, alias));
+}
+
 /** 技能标签或经历/项目正文任一处出现过，就算简历具备该技能。 */
 export function resumeHasSkill(resume: Resume, skill: string): boolean {
-  return (
-    resume.skills.some((userSkill) => skillMatches(userSkill, skill)) ||
-    textHasSkill(buildResumeText(resume), skill)
-  );
+  return createResumeSkillMatcher(resume)(skill);
 }
 
 export type MatchResult = {
@@ -68,11 +109,23 @@ export type MatchResult = {
   inferredRole: string;
   score: number;
   label: string;
+  /** 命中的核心技能（扁平，按画像分组顺序） */
   matchedCore: string[];
+  /** 未满足的核心要求；同族技能合并成「React / Vue」这样的一条 */
   missingCore: string[];
+  /** 未满足要求里的具体技能（可点击补进简历，避免把「React / Vue」当技能名添加） */
+  missingSkills: string[];
   matchedBonus: string[];
+  /** 已满足的核心要求（可读标签，如「JavaScript / TypeScript」「工程化」） */
+  matchedRequirements: string[];
+  /** 已满足的核心要求数（按分组口径，同族技能算一项） */
+  coreHit: number;
+  /** 核心要求总数（按分组口径） */
+  coreTotal: number;
   /** 0-100 */
   completeness: number;
+  /** 匹配分的三个组成部分，相加等于 score */
+  breakdown: { core: number; bonus: number; completeness: number };
   keywords: string[];
   suggestions: string[];
 };
@@ -151,6 +204,8 @@ function buildSuggestions(
 export function analyzeResume(resume: Resume): MatchResult {
   const completeness = resumeCompleteness(resume);
   const roleText = `${resume.intent.targetRole} ${resume.basic.headline}`.trim();
+  // 简历正文只拼一次：下面 26 个画像会对 200+ 个技能反复调用它。
+  const hasSkill = createResumeSkillMatcher(resume);
 
   let best: JobProfile | null = null;
   let bestScore = 0;
@@ -162,9 +217,7 @@ export function analyzeResume(resume: Resume): MatchResult {
         score += 10 + alias.length;
       }
     }
-    const coreHits = profile.core.filter((skill) =>
-      resumeHasSkill(resume, skill),
-    ).length;
+    const coreHits = profile.core.filter(hasSkill).length;
     score += coreHits * 2;
 
     if (score > bestScore) {
@@ -198,22 +251,53 @@ export function analyzeResume(resume: Resume): MatchResult {
       label: "岗位画像未收录",
       matchedCore: [],
       missingCore: [],
+      missingSkills: [],
       matchedBonus: [],
+      matchedRequirements: [],
+      coreHit: 0,
+      coreTotal: 0,
       completeness,
+      breakdown: {
+        core: 0,
+        bonus: 0,
+        completeness: Math.round(25 * (completeness / 100)),
+      },
       keywords,
       suggestions: buildSuggestions(resume, [], [], completeness),
     };
   }
 
-  const matchedCore = best.core.filter((skill) => resumeHasSkill(resume, skill));
-  const missingCore = best.core.filter((skill) => !matchedCore.includes(skill));
-  const matchedBonus = best.bonus.filter((skill) => resumeHasSkill(resume, skill));
-
-  const coreRatio = best.core.length ? matchedCore.length / best.core.length : 0;
-  const bonusRatio = best.bonus.length ? matchedBonus.length / best.bonus.length : 0;
-  const score = Math.round(
-    55 * coreRatio + 20 * bonusRatio + 25 * (completeness / 100),
+  // 核心要求按「同族技能任选其一」分组计算：只会 React 也算满足前端框架要求，
+  // 不会因此被判定"缺 Vue"。分组里还可以放可检测的等价信号（如用 Webpack 代表
+  // 「工程化」），但匹配结果只回填 core 里的规范技能名，避免把信号词当技能。
+  const groups = coreSkillGroups(best);
+  const coreSet = new Set(best.core);
+  const hitLists = groups.map((group) => group.filter(hasSkill));
+  const matchedCore = Array.from(
+    new Set(hitLists.flat().filter((skill) => coreSet.has(skill))),
   );
+  const missingGroups = groups.filter((_, index) => hitLists[index].length === 0);
+  const missingCore = missingGroups.map((group) =>
+    group.filter((skill) => coreSet.has(skill)).join(" / "),
+  );
+  const missingSkills = Array.from(
+    new Set(missingGroups.flat().filter((skill) => coreSet.has(skill))),
+  );
+  const matchedRequirements = groups
+    .filter((_, index) => hitLists[index].length > 0)
+    .map((group) => group.filter((skill) => coreSet.has(skill)).join(" / "));
+  const coreHit = hitLists.filter((list) => list.length > 0).length;
+  const coreTotal = groups.length;
+  const matchedBonus = best.bonus.filter(hasSkill);
+
+  const coreRatio = coreTotal ? coreHit / coreTotal : 0;
+  const bonusRatio = best.bonus.length ? matchedBonus.length / best.bonus.length : 0;
+  const breakdown = {
+    core: Math.round(55 * coreRatio),
+    bonus: Math.round(20 * bonusRatio),
+    completeness: Math.round(25 * (completeness / 100)),
+  };
+  const score = breakdown.core + breakdown.bonus + breakdown.completeness;
 
   const label =
     score >= 80
@@ -244,8 +328,13 @@ export function analyzeResume(resume: Resume): MatchResult {
     label,
     matchedCore,
     missingCore,
+    missingSkills,
     matchedBonus,
+    matchedRequirements,
+    coreHit,
+    coreTotal,
     completeness,
+    breakdown,
     keywords,
     suggestions: buildSuggestions(resume, matchedCore, missingCore, completeness),
   };

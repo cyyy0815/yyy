@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -48,6 +49,9 @@ type Props = {
   onChange: Dispatch<SetStateAction<Resume>>;
   /** AI 整份生成采用时新建一份简历；返回是否成功。 */
   onCreateDocument: (resume: Resume, title: string) => boolean;
+  /** 外部（待投清单）请求打开 AI 写作弹窗 */
+  aiOpenRequest?: number;
+  onAiOpenConsumed?: () => void;
 };
 
 type EditorProps = Pick<Props, "resume" | "onChange">;
@@ -789,12 +793,24 @@ function SkillsSection({ resume, onChange }: EditorProps) {
   const [draftLevel, setDraftLevel] = useState<SkillLevel>("");
   const [draftGroup, setDraftGroup] = useState("");
   const [groupError, setGroupError] = useState("");
-  const analysis = analyzeResume(resume);
+  const analysis = useMemo(
+    () => analyzeResume(resume),
+    // 岗位画像只读简介、经历、项目、技能与求职意向：改姓名 / 联系方式不必重算。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      resume.basic.summary,
+      resume.basic.headline,
+      resume.intent.targetRole,
+      resume.experiences,
+      resume.projects,
+      resume.skills,
+    ],
+  );
 
   const hasGroups = resume.skillGroups.length > 0;
   const grouped = groupSkills(resume, { includeEmpty: true });
   const suggestions = analysis.profile
-    ? [...analysis.missingCore, ...analysis.profile.bonus]
+    ? [...analysis.missingSkills, ...analysis.profile.bonus]
         .filter(
           (skill) =>
             !resume.skills.some(
@@ -1134,7 +1150,13 @@ function SkillsSection({ resume, onChange }: EditorProps) {
 
 const UNDO_WINDOW_MS = 8000;
 
-export function ResumeForm({ resume, onChange, onCreateDocument }: Props) {
+export function ResumeForm({
+  resume,
+  onChange,
+  onCreateDocument,
+  aiOpenRequest = 0,
+  onAiOpenConsumed,
+}: Props) {
   const [deleted, setDeleted] = useState<DeleteTarget | null>(null);
   const undoTimer = useRef<number | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -1322,6 +1344,8 @@ export function ResumeForm({ resume, onChange, onCreateDocument }: Props) {
         resume={resume}
         onChange={onChange}
         onCreateDocument={onCreateDocument}
+        openRequest={aiOpenRequest}
+        onOpenConsumed={onAiOpenConsumed}
       />
 
       <TranslationEditor resume={resume} onChange={onChange} />

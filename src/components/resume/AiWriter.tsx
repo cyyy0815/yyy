@@ -95,9 +95,18 @@ type Props = {
   resume: Resume;
   onChange: Dispatch<SetStateAction<Resume>>;
   onCreateDocument: (resume: Resume, title: string) => boolean;
+  /** 外部（待投清单）请求打开：> 0 时打开弹窗，打开后回调置回 0 */
+  openRequest?: number;
+  onOpenConsumed?: () => void;
 };
 
-export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
+export function AiWriter({
+  resume,
+  onChange,
+  onCreateDocument,
+  openRequest = 0,
+  onOpenConsumed,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<AiStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -130,6 +139,7 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
   const abortRef = useRef<AbortController | null>(null);
   const outputRef = useRef("");
   const fullRawRef = useRef("");
+  const fullPreviewRef = useRef<HTMLDivElement>(null);
   const prefilledRef = useRef(false);
 
   const language = resume.language;
@@ -251,6 +261,12 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
     return () => window.clearTimeout(timer);
   }, [undo]);
 
+  // 整份生成完成后把预览滚进视野，避免用户以为没有结果又重复生成。
+  useEffect(() => {
+    if (!fullDraft || streaming) return;
+    fullPreviewRef.current?.scrollIntoView({ block: "nearest" });
+  }, [fullDraft, streaming]);
+
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const openDialog = () => {
@@ -267,6 +283,20 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
     setOpen(true);
     if (!status && !statusLoading && !statusError) void checkStatus();
   };
+
+  // 待投清单点「按 JD 优化简历」：JD 已经写进「当前 JD」，这里只负责打开并回报已消费。
+  useEffect(() => {
+    if (openRequest <= 0) return;
+    // 延后一拍再打开：避免在 effect 体内同步 setState，同时保证「当前 JD」先落盘，
+    // 弹窗打开时能读到刚写入的 JD。
+    const timer = window.setTimeout(() => {
+      openDialog();
+      onOpenConsumed?.();
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // 只在外部请求值变化时触发；openDialog / 回调每次渲染都会重建，不放进依赖
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest]);
 
   const resetGeneration = () => {
     setOutput("");
@@ -851,6 +881,38 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
                       jd.trim() ? "与参考 JD" : ""
                     }，不发送姓名、电话、邮箱或整份简历。`}
               </p>
+              {confirmOverwrite && !fullMode ? (
+                <p
+                  role="status"
+                  className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11.5px] leading-4 text-amber-900"
+                >
+                  {section === "summary"
+                    ? "个人简介已有内容，采用后会覆盖原文。再次点击「确认覆盖」继续。"
+                    : `该条${SECTION_LABELS[section]}已有描述，采用后会覆盖原文。再次点击「确认覆盖」继续。`}
+                </p>
+              ) : null}
+              {error ? (
+                <p
+                  role="alert"
+                  className="mt-2 text-[11.5px] leading-4 text-red-600"
+                >
+                  {error}
+                </p>
+              ) : fullMode && fullDraft ? (
+                <p
+                  role="status"
+                  className="mt-2 text-[11.5px] leading-4 text-emerald-700"
+                >
+                  已生成完整简历，点击下方「生成新简历」写入左侧编辑表单。
+                </p>
+              ) : streaming ? (
+                <p
+                  role="status"
+                  className="mt-2 text-[11.5px] leading-4 text-zinc-500"
+                >
+                  AI 正在生成，完成后可预览并采用。
+                </p>
+              ) : null}
               <div className="mt-2 flex items-center justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={closeDialog}>
                   取消
@@ -867,7 +929,13 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
                         : !hasAiOutputText(draft, language))
                     }
                   >
-                    {fullMode ? "生成新简历" : "采用到简历"}
+                    {confirmOverwrite
+                      ? "确认覆盖"
+                      : streaming
+                        ? "生成中…"
+                        : fullMode
+                          ? "生成新简历"
+                          : "采用到简历"}
                   </Button>
                 ) : null}
               </div>
@@ -1149,9 +1217,19 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
                   </div>
 
                   {fullMode ? (
-                    <div data-qa="ai-full-preview" className="space-y-2">
+                    <div
+                      ref={fullPreviewRef}
+                      data-qa="ai-full-preview"
+                      className="space-y-2"
+                    >
                       {fullDraft ? (
                         <>
+                          <div
+                            role="status"
+                            className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11.5px] leading-4 text-emerald-800"
+                          >
+                            生成完成。点击下方「生成新简历」后，内容会写入左侧编辑表单；当前简历会保留在顶部列表。
+                          </div>
                           <FullResumePreview
                             draft={fullDraft}
                             stats={fullStats}
@@ -1161,7 +1239,7 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
                             sourceLabel="自述"
                           />
                           <p className="text-[10.5px] leading-4 text-zinc-400">
-                            采用后会新建一份简历并切换过去，当前简历保留在顶部列表里。
+                            采用后会新建一份简历并切换过去，当前简历保留在顶部列表里。姓名、电话、邮箱不会由 AI 生成，请在新简历里补充。
                           </p>
                         </>
                       ) : (
@@ -1264,38 +1342,6 @@ export function AiWriter({ resume, onChange, onCreateDocument }: Props) {
 
                   {!fullMode && draft && !streaming ? (
                     <FactCheckPanel warnings={singleWarnings} />
-                  ) : null}
-
-                  {error ? (
-                    <p role="alert" className="text-[12px] text-red-600">
-                      {error}
-                    </p>
-                  ) : null}
-
-                  {confirmOverwrite ? (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
-                      <p>
-                        {section === "summary"
-                          ? "个人简介已有内容，采用后会覆盖原文。"
-                          : `该条${SECTION_LABELS[section]}已有描述，采用后会覆盖原文。`}
-                      </p>
-                      <div className="mt-2 flex gap-2">
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={applyAdopt}
-                        >
-                          确认覆盖
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setConfirmOverwrite(false)}
-                        >
-                          取消
-                        </Button>
-                      </div>
-                    </div>
                   ) : null}
                 </div>
               )}

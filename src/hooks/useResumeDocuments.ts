@@ -186,6 +186,29 @@ export function useResumeDocuments({
     return title;
   };
 
+  /**
+   * 合并导入单份简历：追加成新文档，但**不切换**当前文档。
+   * 与「合并整库」保持一致——导入是「加一份」，不该把用户正在写的那份切走。
+   */
+  const appendDocument = (
+    nextResume: Resume,
+    baseTitle: string,
+    nextTemplate: TemplateId = template,
+  ): string | null => {
+    const title = uniqueTitle(baseTitle.trim() || "导入简历", titles);
+    const library: ResumeLibrary = {
+      activeId,
+      activeTitle: currentTitle,
+      others: [
+        ...others,
+        { id: newId(), title, template: nextTemplate, resume: nextResume },
+      ],
+    };
+    if (!saveResumeLibrary(library)) return null;
+    setState({ library, activeTitle: currentTitle });
+    return title;
+  };
+
   /** 合并导入：保留当前简历与已有文档，把备份中的简历追加为副本。 */
   const mergeLibrary = (imported: StoredDocument[]): boolean => {
     if (imported.length === 0) return false;
@@ -287,6 +310,7 @@ export function useResumeDocuments({
     switchTo,
     createBlank,
     createFromResume,
+    appendDocument,
     duplicateCurrent,
     deleteActive,
     renameActive,

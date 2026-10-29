@@ -18,6 +18,7 @@ import {
 import {
   clearResume,
   loadResume,
+  parseStoredResume,
   readLastSavedAt,
   readStoredResumeRaw,
   saveResume,
@@ -39,7 +40,8 @@ export type UseResume = {
   keepLocalVersion: () => boolean;
   clearAll: () => void;
   loadSample: () => void;
-  replaceResume: (resume: Resume) => void;
+  /** external：内容来自其他标签页且已落盘，不再重复写入，也不标记为本地编辑。 */
+  replaceResume: (resume: Resume, options?: { external?: boolean }) => void;
   /** 撤销 / 重做简历内容；切换或导入简历会清空历史。 */
   undo: () => void;
   redo: () => void;
@@ -119,9 +121,19 @@ export function useResume(): UseResume {
     resumeJsonRef.current = JSON.stringify(resume);
   }, [resume]);
 
+  // 有没有还没落盘的本地修改：决定要不要写 storage。
+  // 挂载时 storage 里已经是当前内容，不需要回写——避免"刚打开就写一次"
+  // 与另一个标签页的保存撞车（那会被误判成冲突）。
+  const dirtyRef = useRef(false);
+  // 本页是否真的动过这份简历：没动过的标签页遇到别的标签页写入时直接跟随，
+  // 只有「本页可能有未保存内容」时才弹冲突让用户选择。
+  const editedRef = useRef(false);
+
   // 示例数据不落盘：用户真正开始编辑后才保存，避免下次访问被当成他自己的简历
   useEffect(() => {
     if (isSample || hasConflict) return;
+    // 没有本地修改就不写：否则「跟随其他标签页」之后会把更新的版本又写回去。
+    if (!dirtyRef.current) return;
     const timer = window.setTimeout(() => {
       const stored = readStoredResumeRaw();
       const next = JSON.stringify(resume);
@@ -132,6 +144,7 @@ export function useResume(): UseResume {
       }
       if (saveResume(resume)) {
         lastWrittenRef.current = next;
+        dirtyRef.current = false;
         setLastSavedAt(Date.now());
         setSaveState("saved");
         // 只持久化与已保存内容对应的历史，避免刷新后撤销到未落盘的状态。
@@ -142,23 +155,6 @@ export function useResume(): UseResume {
     }, 400);
     return () => window.clearTimeout(timer);
   }, [resume, isSample, hasConflict, history]);
-
-  // storage 事件只在其他标签页写入时触发；本页写入不会触发自己。
-  useEffect(() => {
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY) return;
-      if (event.newValue === lastWrittenRef.current) return;
-      // 其他标签页写入的内容恰好与本页一致，不算冲突，只更新基线。
-      if (event.newValue === resumeJsonRef.current) {
-        lastWrittenRef.current = event.newValue;
-        return;
-      }
-      setHasConflict(true);
-      setSaveState("conflict");
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
 
   const updateResume: Dispatch<SetStateAction<Resume>> = useCallback(
     (action) => {
@@ -180,6 +176,8 @@ export function useResume(): UseResume {
       resumeRef.current = next;
       isSampleRef.current = false;
       setIsSample(false);
+      dirtyRef.current = true;
+      editedRef.current = true;
       // 冲突期间保存被暂停，不要让状态又回到「保存中」。
       setSaveState(hasConflict ? "conflict" : "saving");
       setResume(next);
@@ -198,6 +196,9 @@ export function useResume(): UseResume {
     resumeRef.current = empty;
     isSampleRef.current = false;
     lastWrittenRef.current = readStoredResumeRaw();
+    // 空简历也要落盘：否则刷新后会退回示例简历。
+    dirtyRef.current = true;
+    editedRef.current = true;
     setResume(empty);
     setIsSample(false);
     setSaveState("saved");
@@ -214,6 +215,9 @@ export function useResume(): UseResume {
     const sample = createSampleResume();
     resumeRef.current = sample;
     isSampleRef.current = true;
+    // 示例不落盘；但用户主动换了内容，之后别的标签页写入时仍应让他选择。
+    dirtyRef.current = false;
+    editedRef.current = true;
     setResume(sample);
     setIsSample(true);
     setSaveState("saved");
@@ -222,7 +226,7 @@ export function useResume(): UseResume {
   }, [history, syncHistoryFlags]);
 
   const replaceResume = useCallback(
-    (next: Resume) => {
+    (next: Resume, options?: { external?: boolean }) => {
       // 切换 / 导入简历是文档级操作，不进入当前文档的撤销栈。
       history.reset();
       clearResumeHistory();
@@ -234,17 +238,53 @@ export function useResume(): UseResume {
       isSampleRef.current = false;
       setResume(next);
       setIsSample(false);
-      setSaveState("saving");
+      // external：内容来自另一个标签页且已经落盘，不需要（也不应该）再写一次，
+      // 同时不把本页标记成「编辑过」，之后仍可继续跟随。
+      dirtyRef.current = !options?.external;
+      editedRef.current = !options?.external;
+      setSaveState(options?.external ? "saved" : "saving");
       setLastSavedAt(readLastSavedAt());
       setHasConflict(false);
     },
     [history, syncHistoryFlags],
   );
 
+  // storage 事件只在其他标签页写入时触发；本页写入不会触发自己。
+  // 没编辑过的标签页直接跟随对方的最新版本，只有存在本地修改时才停下来让用户选择，
+  // 避免「开着第二个标签页、一个字都没改」也被弹冲突并暂停保存。
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY) return;
+      if (event.newValue === lastWrittenRef.current) return;
+      // 其他标签页写入的内容恰好与本页一致，不算冲突，只更新基线。
+      if (event.newValue === resumeJsonRef.current) {
+        lastWrittenRef.current = event.newValue;
+        return;
+      }
+      if (!editedRef.current) {
+        const incoming = parseStoredResume(event.newValue);
+        if (incoming) {
+          // 文档级替换会清空撤销栈，避免撤销回到另一个文档的状态。
+          replaceResume(incoming, { external: true });
+          // 基线记「这一版」而不是当前 storage：对方若紧接着又写一次，
+          // 下一次事件仍然对得上，本页能继续跟上。
+          lastWrittenRef.current = event.newValue;
+          return;
+        }
+      }
+      setHasConflict(true);
+      setSaveState("conflict");
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [replaceResume]);
+
   const applySnapshot = useCallback(
     (snapshot: HistorySnapshot) => {
       resumeRef.current = snapshot.resume;
       isSampleRef.current = snapshot.isSample;
+      dirtyRef.current = true;
+      editedRef.current = true;
       setResume(snapshot.resume);
       setIsSample(snapshot.isSample);
       setSaveState(
@@ -278,6 +318,8 @@ export function useResume(): UseResume {
       return false;
     }
     lastWrittenRef.current = JSON.stringify(resume);
+    dirtyRef.current = false;
+    editedRef.current = true;
     setLastSavedAt(Date.now());
     setHasConflict(false);
     setSaveState("saved");

@@ -57,6 +57,7 @@ export type AiStatus = {
 export type AiErrorCode =
   | "invalid_request"
   | "payload_too_large"
+  | "forbidden"
   | "rate_limited"
   | "upstream_error"
   | "missing_api_key"

@@ -269,12 +269,14 @@ export function ApplicationBoard({ resumeTitle }: { resumeTitle: string }) {
       createdAt: editingId ? draft.createdAt : now,
       updatedAt: now,
     };
-    const next = editingId
-      ? applications.map((application) =>
-          application.id === editingId ? nextApplication : application,
-        )
-      : [nextApplication, ...applications];
-    if (!update(next)) {
+    const ok = update((current) =>
+      editingId
+        ? current.map((application) =>
+            application.id === editingId ? nextApplication : application,
+          )
+        : [nextApplication, ...current],
+    );
+    if (!ok) {
       setFormError("保存失败：浏览器存储不可用或空间已满");
       return;
     }
@@ -283,8 +285,8 @@ export function ApplicationBoard({ resumeTitle }: { resumeTitle: string }) {
   };
 
   const changeStatus = (id: string, status: ApplicationStatus) => {
-    update(
-      applications.map((application) =>
+    update((current) =>
+      current.map((application) =>
         application.id === id
           ? { ...application, status, updatedAt: Date.now() }
           : application,
@@ -298,10 +300,12 @@ export function ApplicationBoard({ resumeTitle }: { resumeTitle: string }) {
     ) {
       return;
     }
-    update(
-      applications.filter((item) => item.id !== application.id),
+    const removed = update((current) =>
+      current.filter((item) => item.id !== application.id),
     );
-    setNotice("投递记录已删除");
+    setNotice(
+      removed ? "投递记录已删除" : "删除失败：浏览器存储不可用或空间已满",
+    );
   };
 
   const activateJd = (application: JobApplication) => {

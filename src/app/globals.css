@@ -104,6 +104,14 @@ body {
   background-color: var(--resume-deep);
 }
 
+/*
+ * 纸张是 overflow:hidden 的固定宽度容器，正文里的长 URL / 无空格长串
+ * 原本会被直接裁掉（只断行到纸张边缘之外）。只在必要时断 token，不改正常换行。
+ */
+.resume-paper {
+  overflow-wrap: break-word;
+}
+
 /* ---------------- 简历字体搭配 ---------------- */
 /* 变量由 ResumePaper 的 resumeFontStyle() 注入；未注入时保持模板默认字体 */
 .resume-paper :is(h1, h2) {
@@ -237,11 +245,38 @@ body {
     padding-right: 18mm !important;
     /* 至少占满首页；侧栏内容再多也不裁切，避免丢信息 */
     min-height: 289mm;
+    /*
+     * 侧栏内容超过一页时浮动盒会延续到续页，深色底必须跟着一起走，
+     * 否则第 2 页是白底白字（实测会整段"消失"）。
+     */
+    background-image: linear-gradient(
+      var(--resume-deep),
+      var(--resume-deep)
+    ) !important;
+    background-repeat: no-repeat !important;
+    background-size: 62mm 100% !important;
+    background-position: 0 0 !important;
   }
 
-  /* 网格跨页时分栏可能失效：续页仍保持首页主栏宽度，避免文字忽然变宽 */
+  /*
+   * 现代模板的左右分栏用的是 CSS Grid：grid 容器整块无法分片，只要放不进
+   * 首页剩余高度，就会被整块推到第 2 页，首页只剩抬头（实测 8 段经历即触发）。
+   * 打印时换成 block + 右侧浮动栏，主栏才能正常跨页。
+   */
+  .resume-columns {
+    display: block !important;
+  }
+
+  .resume-aside-grid > aside {
+    float: right;
+    width: 56mm !important;
+    margin-left: 8.5mm;
+  }
+
   .resume-aside-grid > .resume-main {
-    max-width: 117.5mm !important;
+    max-width: none !important;
+    /* 182mm 内容区 - 117.5mm 主栏 = 64.5mm（56mm 侧栏 + 8.5mm 间距） */
+    margin-right: 64.5mm !important;
   }
 
   /* 打印对比度：浅灰日期 / 链接在纸面上偏淡，统一压深一档 */

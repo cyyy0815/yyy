@@ -310,12 +310,20 @@ export function snoozeBackupReminder(): void {
   }
 }
 
+/** 解析一段原始简历 JSON（storage 事件的 newValue 也能直接用）；失败返回 null。 */
+export function parseStoredResume(raw: string | null): Resume | null {
+  if (!raw) return null;
+  try {
+    return normalizeResume(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
 export function loadResume(): Resume | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return normalizeResume(JSON.parse(raw));
+    return parseStoredResume(window.localStorage.getItem(STORAGE_KEY));
   } catch {
     return null;
   }

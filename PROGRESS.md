@@ -52,11 +52,17 @@
 | 34 | 新模板与字体搭配（追加） | ✅ 完成（极简 / 学术 / 卡片 + 五种字体搭配 + PDF / ATS 校准） |
 | 35 | 中英双语 / 英文简历（追加） | ✅ 完成（语言切换 + 英文内容覆盖 + 八套模板 + ATS + 打印） |
 | 36 | AI 跟随简历语言（追加） | ✅ 完成（单段 / 整份 / 求职信按语言输出 + 双语拆分 + 事实核对同步） |
+| 37 | AI 接口加固（追加） | ✅ 完成（可信 IP + 流式限额 + 同源校验 + 限流桶回收） |
+| 38 | 多标签页一致性与打印分版（追加） | ✅ 完成（未编辑标签页跟随 + 投递记录合并写 + 现代 / 侧栏模板多页） |
+| 39 | 匹配质量：要求分组与可解释打分（追加） | ✅ 完成（同族技能分组 + 抽象要求信号 + 分值构成 + 15 份简历夹具） |
+| 40 | 待投清单与材料准备（追加） | ✅ 完成（批量 JD + 匹配排序 + 按 JD 优化简历 + ATS 下载 + 标记已投） |
+| 41 | 浏览器扩展（追加） | ✅ 完成（5 平台抓 JD + 桥进应用 + 表单填充，不提交） |
 
 ## 关机交接（2026-10-29）
 
 - 阶段 34（新模板与字体搭配）、阶段 35（中英双语 / 英文简历）与阶段 36（AI 跟随简历语言）已完成，并在分支 `feat/stage-34-36` 合并提交为 `be53ccb`（三个阶段的改动共享 `types` / `storage` / `templates` / `AppShell` / QA 与文档文件，拆分提交会破坏各提交的可构建性）。阶段 33 的提交为 `319482b`，阶段 0–32 的历史提交见 `git log`。
-- 阶段 0–36 全部完成；最新验证为 `npx tsc --noEmit`、`npm run lint`、`npm test`（215 passed，22 个文件）、`npm run qa`（生产模式 213 项 / 开发模式 208 项，均通过）、`npm run build` 全部通过。
+- 阶段 0–36 全部完成；最新验证为 `npx tsc --noEmit`、`npm run lint`、`npm test`（215 passed，22 个文件）、`npm run qa`（生产模式 216 项 / 开发模式 211 项，均通过）、`npm run build` 全部通过。
+- 2026-10-29 修复 AI 写入左侧表单的可见性：覆盖确认与错误提示移到固定底栏，整份生成完成后自动滚到预览并在底栏提示点击「生成新简历」；真实 Key 的中文单段 / 整份流程均已验证能写入左侧表单。改动尚未提交。
 - 离线行为只在生产构建验证：`npm run build && npm run start` 后 `npm run qa`；开发模式会主动注销旧 SW 并清理缓存，因此只做「不注册 SW」检查。
 - `/api/ai/full` 已用 `.env.local` 中的真实 DeepSeek Key 验证：长自述返回合法 JSON，`response_format: json_object` 生效，`usage` 为 prompt 1489 / completion 2245，未触发 4000 token 上限，输出不含联系方式。
 - 下次先读本文件的「当前进度 / 下次继续」与 `PLAN.md`，再运行：
@@ -517,6 +523,14 @@
 - [x] 验证：`tsc`、`lint`、`npm test`（215 passed）、生产与开发模式 `npm run qa`、`npm run build` 全部通过
 - [x] 边界：AI 仍只发送当前素材与 JD，不发送姓名 / 联系方式 / 整份简历；中文原文继续作为匹配与事实来源；不新增 Key 或模型
 
+### 阶段 36 修复 — AI 写入左侧表单的可见性 ✅
+- [x] 复现真实 Key 的中文单段与整份生成：内容能写入左侧表单，但「确认覆盖」与错误提示位于弹窗可滚动正文末尾，整份结果也容易落在视野外，用户会误以为没有生效
+- [x] 将「确认覆盖」与错误提示移到固定底部操作栏：点击「采用到简历」后按钮立即变为「确认覆盖」，无需滚动；覆盖提示、失败原因始终可见
+- [x] 整份生成完成后自动把预览滚入视野；底部显示「已生成完整简历，点击下方『生成新简历』写入左侧编辑表单」，预览顶部同步提示当前简历保留、姓名 / 电话 / 邮箱需自行补充
+- [x] 采用成功后提示改为「已生成新简历『…』，内容已写入左侧表单」，便于确认生效位置
+- [x] QA 新增 3 项：覆盖确认按钮无需滚动即可看到、整份完成提示写入左侧表单、整份完成状态在底栏可见；合计生产 216 项 / 开发 211 项
+- [x] 验证：`tsc`、`lint`、`npm test`（215 passed）、生产与开发模式 `npm run qa`、`npm run build` 全部通过
+
 ## 当前进度
 
 - 最近更新：2026-10-29
@@ -565,7 +579,7 @@
 - 阶段 36：整份生成英文模式直接写英文主字段并标记 `language: en`；双语模式要求顶层 `english` 覆盖对象，按生成顺序映射到条目 id，缺英文时逐字段回退
 - 阶段 36：求职信新增「输出语言」，提示词、清理、预览、下载文件名与事实核对同步；英文事实核对跳过会因翻译误报的名称
 - 工程命令：`npm test` 运行单元 / 组件测试（215 个）；CI 覆盖 lint + 类型检查 + 单测 / 组件测试 + 构建 + 生产模式浏览器 QA
-- 自检：`npm run qa` 生产模式 213 项 / 开发模式 208 项，含离线缓存、安全响应头、岗位画像、JD 同义词归一、八套模板 / 字体搭配、中英双语与 AI 跟随语言检查
+- 自检：`npm run qa` 生产模式 216 项 / 开发模式 211 项，含离线缓存、安全响应头、岗位画像、JD 同义词归一、八套模板 / 字体搭配、中英双语、AI 跟随语言与 AI 写入左侧表单可见性检查
 - 本地地址：http://localhost:3000 （推荐页 http://localhost:3000/#jobs）
 - 一键自检：先 `npm run dev`，再 `npm run qa`（截图输出到 `.screenshots/`）
 - 单一方案文档：**`PLAN.md`**
@@ -971,3 +985,46 @@ src/components/resume/AiWriter.tsx               ✅ 按语言预览、采用与
 src/components/jobs/CoverLetterWriter.tsx        ✅ 求职信输出语言
 scripts/qa.mjs                                   ✅ 求职信英文 + 8 项 AI 跟随语言检查
 ```
+
+---
+
+## 阶段 37–41（本轮追加，2026-10-29）
+
+### 37 AI 接口加固
+
+- `src/lib/ai/http.ts`：`clientIp` 只取 `X-Forwarded-For` 最右一跳（`TRUSTED_PROXY_HOPS`，默认 1）；限流桶上限 1 万并回收过期项；新增 `readJsonBody`（边读边计数，超 64KB 立即 cancel）；新增 `isSameOriginRequest`（`Sec-Fetch-Site` + `Origin` / `Host`）。
+- `src/app/api/ai/{generate,full}/route.ts`：同源校验 → 限额读取 → 解析 → 限流；`AiErrorCode` 增加 `forbidden`。
+- `.env.example` / README：补 `TRUSTED_PROXY_HOPS` 与部署说明。
+
+### 38 多标签页一致性与打印
+
+- `useResume`：新增 `dirty` / `edited` 两个 ref；无本地修改的标签页直接跟随其他标签页，有修改才暂停保存并提示冲突；页面挂载不再回写 storage。
+- `useApplications`：写入改为「读最新存储 → 应用改动 → 写回」；`storage` 监听按 key 过滤。
+- `useResumeDocuments`：新增 `appendDocument`，合并导入单份简历不再切走当前文档。
+- `templates.tsx` + `globals.css`：现代模板打印时改 block + 右侧浮动栏（Grid 无法分片，会把整块内容推到第 2 页）；`<aside>` 移到正文前并固定屏幕栅格位置；侧栏模板超过一页时深色底跟随浮动盒跨页；`.resume-paper` 增加 `overflow-wrap: break-word`，长链接不再被纸张裁掉。
+
+### 39 匹配质量
+
+- `jobProfiles.ts`：新增 `CORE_SKILL_GROUPS`（23 个岗位），组内任一命中即满足该项要求；抽象要求配可检测信号（工程化 ← Webpack / Vite / 组件库…）。
+- `matching.ts`：核心要求按组计分；新增 `coreHit` / `coreTotal` / `matchedRequirements` / `missingSkills` / `breakdown`；`missingCore` 改为要求标签。
+- `JobsPanel`：显示「命中核心要求 X/Y」与分值构成；`ResumeForm` 的推荐技能改用 `missingSkills`，不会把「React / Vue」写进技能标签。
+- 新增 `matching-fixtures.test.ts`（15 份真实写法简历）与分组语义 / 完整性用例。
+
+### 40 待投清单
+
+- `src/lib/jobLeads.ts`：批量 JD 解析（`---` 分隔、`公司 | 岗位` 表头、单次 50 条上限、单条 8000 字截断）与 `formatJobLeads`。
+- `src/components/jobs/JobQueuePanel.tsx`：待投清单，按 `analyzeJd` 分数排序；批量导入弹窗；准备弹窗（缺口、跟进日期、JD 原文、标记已投、设为当前 JD 并写求职信、下载 ATS、按 JD 优化简历）。
+- `CoverLetterWriter` 增加 `openRequest`；`AiWriter` 增加 `openRequest` / `onOpenConsumed`，由 `AppShell` 统一调度并切页。
+
+### 41 浏览器扩展
+
+- `extension/`：MV3 manifest、background（找 / 开应用标签页 + 投递重试 + autofill 编排）、content-job（JSON-LD → 站点选择器 → 正文兜底；按标签填表并跳过敏感字段）、content-app（`postMessage` 桥 + 档案读取）、popup（预览 / 发送 / 复制 / 填表 / 应用地址）。
+- `src/lib/jobBridge.ts`：`window.message` 校验、排队与订阅；`JobQueuePanel` 收到后打开导入弹窗预填。
+
+### 本轮验证
+
+- `npx tsc --noEmit`、`npm run lint`：0 错误 0 警告
+- `npm test`：25 个文件 / 249 个用例
+- `npm run build`：通过
+- `npm run qa`（生产模式）：229 项全部通过
+

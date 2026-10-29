@@ -10,6 +10,189 @@ export type JobProfile = {
   searchKeywords: string[];
 };
 
+/**
+ * 同族 / 可替代技能分组：组内任一命中即视为满足该项要求。
+ *
+ * `core` 里的技能并不都是「必须同时具备」：前端只会 React 或 Vue 之一，
+ * HTML 与 CSS 通常一起出现，Spring 与 Spring Boot 是同一件事的两种写法。
+ * 按「每个技能一项要求」算覆盖率会系统性压低分数，也会给出"请补充 Vue"
+ * 这种对 React 开发者毫无意义的建议。未列出的岗位仍按一技能一项计算。
+ */
+export const CORE_SKILL_GROUPS: Record<string, string[][]> = {
+  frontend: [
+    ["JavaScript", "TypeScript"],
+    ["React", "Vue"],
+    ["HTML", "CSS"],
+    ["工程化", "Webpack", "Vite", "Rollup", "组件库", "CI/CD"],
+    ["浏览器", "兼容", "渲染", "首屏", "性能优化"],
+  ],
+  "backend-java": [
+    ["Java"],
+    ["Spring", "Spring Boot"],
+    ["MySQL"],
+    ["Redis"],
+    ["微服务", "Dubbo", "Spring Cloud", "服务治理"],
+    ["MyBatis"],
+  ],
+  "backend-python": [
+    ["Python"],
+    ["Django", "Flask", "FastAPI"],
+    ["MySQL"],
+    ["Redis"],
+    ["Linux"],
+  ],
+  "go-backend": [
+    ["Go"],
+    ["Gin", "gRPC"],
+    ["MySQL"],
+    ["Redis"],
+    ["微服务", "Dubbo", "Spring Cloud", "服务治理"],
+    ["Linux"],
+  ],
+  fullstack: [
+    ["JavaScript", "TypeScript"],
+    ["React"],
+    ["Node.js"],
+    ["MySQL"],
+    ["Redis"],
+  ],
+  product: [
+    ["需求分析", "用户研究"],
+    ["产品设计"],
+    ["原型", "PRD", "Axure", "Figma"],
+    ["数据分析"],
+    ["项目管理", "项目推进", "排期"],
+  ],
+  design: [
+    ["Figma", "Sketch"],
+    ["交互设计", "视觉设计"],
+    ["用户研究"],
+    ["设计规范", "Design System", "组件库"],
+    ["原型"],
+  ],
+  "data-analysis": [
+    ["SQL"],
+    ["Excel"],
+    ["Python"],
+    ["数据分析"],
+    ["数据可视化", "BI"],
+    ["指标体系", "指标", "埋点"],
+  ],
+  qa: [
+    ["测试用例"],
+    ["Python", "Java"],
+    ["Selenium"],
+    ["接口测试"],
+    ["自动化测试", "自动化", "脚本"],
+    ["SQL"],
+  ],
+  algorithm: [
+    ["Python"],
+    ["机器学习", "深度学习"],
+    ["PyTorch", "TensorFlow"],
+    ["数学", "统计"],
+  ],
+  ops: [
+    ["内容运营", "用户运营"],
+    ["活动策划"],
+    ["数据分析"],
+    ["社群", "增长"],
+  ],
+  mobile: [
+    ["Android", "iOS"],
+    ["Swift", "Kotlin", "Java"],
+    ["性能优化"],
+    ["网络", "TCP", "DNS", "负载均衡"],
+  ],
+  devops: [
+    ["Linux"],
+    ["Docker", "Kubernetes"],
+    ["Shell"],
+    ["CI/CD"],
+    ["监控", "Prometheus", "Grafana", "告警"],
+    ["网络", "TCP", "DNS", "负载均衡"],
+  ],
+  sales: [
+    ["客户开发", "市场拓展"],
+    ["商务谈判"],
+    ["销售管理"],
+    ["客户关系"],
+    ["合同"],
+    ["回款"],
+  ],
+  finance: [
+    ["财务报表", "会计准则"],
+    ["税务"],
+    ["预算"],
+    ["成本核算"],
+    ["Excel"],
+    ["审计"],
+  ],
+  "customer-success": [
+    ["客户沟通", "客户维护"],
+    ["问题解决"],
+    ["服务意识"],
+    ["投诉处理"],
+    ["CRM", "工单系统"],
+    ["数据分析"],
+  ],
+  teacher: [
+    ["教学设计", "教案"],
+    ["课堂管理", "学生管理"],
+    ["课程研发", "教研"],
+    ["沟通"],
+  ],
+  "data-engineering": [
+    ["SQL"],
+    ["Python"],
+    ["Spark", "Flink"],
+    ["Hive"],
+    ["ETL", "数据仓库", "数仓", "建模"],
+  ],
+  security: [
+    ["网络安全", "Web安全"],
+    ["渗透测试", "漏洞挖掘"],
+    ["等保", "合规", "测评"],
+    ["Linux"],
+    ["Python"],
+  ],
+  presales: [
+    ["需求调研", "方案设计"],
+    ["客户沟通"],
+    ["产品演示"],
+    ["项目交付"],
+    ["招投标"],
+    ["文档编写"],
+  ],
+  procurement: [
+    ["供应商管理", "采购"],
+    ["成本控制"],
+    ["合同管理"],
+    ["库存管理"],
+    ["物流"],
+    ["谈判"],
+  ],
+  legal: [
+    ["合同审核"],
+    ["法律风险", "合规"],
+    ["诉讼"],
+    ["知识产权"],
+    ["公司法", "劳动法"],
+  ],
+  embedded: [
+    ["C", "C++"],
+    ["单片机", "STM32"],
+    ["RTOS"],
+    ["Linux"],
+    ["硬件", "驱动开发", "外设"],
+  ],
+};
+
+/** 岗位的核心要求分组；未配置分组的岗位按「一个技能一项要求」处理。 */
+export function coreSkillGroups(profile: JobProfile): string[][] {
+  return CORE_SKILL_GROUPS[profile.id] ?? profile.core.map((skill) => [skill]);
+}
+
 export const JOB_PROFILES: JobProfile[] = [
   {
     id: "frontend",

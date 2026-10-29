@@ -1,5 +1,8 @@
 import { JOB_PROFILES } from "./jobProfiles";
-import { resumeHasSkill, textHasSkill } from "./matching";
+import {
+  createResumeSkillMatcher,
+  createTextSkillMatcher,
+} from "./matching";
 import { canonicalSkillKey } from "./skillSynonyms";
 import type { Resume } from "./types";
 
@@ -182,13 +185,13 @@ export type JdAnalysis = {
 /** 从 JD 中识别岗位画像与常见技能库里的关键词。 */
 export function extractJdKeywords(jd: string): string[] {
   const text = jd.trim();
-  return text ? DICTIONARY.filter((skill) => textHasSkill(text, skill)) : [];
+  return text ? DICTIONARY.filter(createTextSkillMatcher(text)) : [];
 }
 
 export function analyzeJd(jd: string, resume: Resume): JdAnalysis {
   const text = jd.trim();
   const jdKeywords = extractJdKeywords(text);
-  const matched = jdKeywords.filter((skill) => resumeHasSkill(resume, skill));
+  const matched = jdKeywords.filter(createResumeSkillMatcher(resume));
   const missing = jdKeywords.filter((skill) => !matched.includes(skill));
   const keywordCount = jdKeywords.length;
   const score =

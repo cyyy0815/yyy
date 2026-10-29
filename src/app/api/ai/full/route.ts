@@ -13,9 +13,9 @@ import {
 } from "@/lib/ai/fullResume";
 import {
   clientIp,
-  jsonByteLength,
+  isSameOriginRequest,
   jsonError,
-  MAX_BODY_BYTES,
+  readJsonBody,
   sse,
   takeRateLimit,
 } from "@/lib/ai/http";
@@ -53,25 +53,20 @@ export async function POST(request: NextRequest) {
     return jsonError(503, "missing_api_key", "未配置 DEEPSEEK_API_KEY");
   }
 
-  const contentLength = Number(request.headers.get("content-length") ?? 0);
-  if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
-    return jsonError(413, "payload_too_large", "请求内容过大");
+  if (!isSameOriginRequest(request)) {
+    return jsonError(403, "forbidden", "请求来源不受信任");
   }
 
-  let raw: string;
-  try {
-    raw = await request.text();
-  } catch {
-    return jsonError(400, "invalid_request", "无法读取请求内容");
-  }
-
-  if (jsonByteLength(raw) > MAX_BODY_BYTES) {
-    return jsonError(413, "payload_too_large", "请求内容过大");
+  const body = await readJsonBody(request);
+  if (!body.ok) {
+    return body.error === "too_large"
+      ? jsonError(413, "payload_too_large", "请求内容过大")
+      : jsonError(400, "invalid_request", "无法读取请求内容");
   }
 
   let input: AiFullResumeRequest;
   try {
-    input = parseFullResumeRequest(JSON.parse(raw));
+    input = parseFullResumeRequest(JSON.parse(body.text));
   } catch (error) {
     if (error instanceof SyntaxError) {
       return jsonError(400, "invalid_request", "请求格式错误");
