@@ -55,7 +55,7 @@
 
 ## 关机交接（2026-10-29）
 
-- 阶段 34（新模板与字体搭配）、阶段 35（中英双语 / 英文简历）与阶段 36（AI 跟随简历语言）已完成；代码与文档待提交（用户确认后再按阶段提交）。阶段 33 的提交为 `319482b`，阶段 0–32 的历史提交见 `git log`。
+- 阶段 34（新模板与字体搭配）、阶段 35（中英双语 / 英文简历）与阶段 36（AI 跟随简历语言）已完成，并在分支 `feat/stage-34-36` 合并提交为 `be53ccb`（三个阶段的改动共享 `types` / `storage` / `templates` / `AppShell` / QA 与文档文件，拆分提交会破坏各提交的可构建性）。阶段 33 的提交为 `319482b`，阶段 0–32 的历史提交见 `git log`。
 - 阶段 0–36 全部完成；最新验证为 `npx tsc --noEmit`、`npm run lint`、`npm test`（215 passed，22 个文件）、`npm run qa`（生产模式 213 项 / 开发模式 208 项，均通过）、`npm run build` 全部通过。
 - 离线行为只在生产构建验证：`npm run build && npm run start` 后 `npm run qa`；开发模式会主动注销旧 SW 并清理缓存，因此只做「不注册 SW」检查。
 - `/api/ai/full` 已用 `.env.local` 中的真实 DeepSeek Key 验证：长自述返回合法 JSON，`response_format: json_object` 生效，`usage` 为 prompt 1489 / completion 2245，未触发 4000 token 上限，输出不含联系方式。
