@@ -6134,6 +6134,66 @@ expect(
 );
 await bossDetailPage.close();
 
+// 猎聘：页面有 26 个推荐企业的 .company-name，必须优先用 JSON-LD 的 JobPosting
+const liepinPage = await browser.newPage();
+await liepinPage.setRequestInterception(true);
+liepinPage.on("request", (request) => {
+  if (request.url().includes("liepin.com")) {
+    request.respond({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<!doctype html><html><head><meta charset="utf-8">
+        <title>【佛山 市政工程师招聘】-壹优教育科技(广东)有限公司佛山招聘信息-猎聘</title>
+        <script type="application/ld+json">${JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "JobPosting",
+          title: "市政工程师",
+          description:
+            "<p>负责市政道路项目的施工管理与协调，跟进进度、质量与安全，整理工程资料并配合验收。</p>",
+          hiringOrganization: {
+            "@type": "Organization",
+            name: "壹优教育科技(广东)有限公司",
+          },
+        })}</script>
+        </head><body>
+        <div class="name-box"><span class="name">市政工程师</span></div>
+        <div class="company-name">佛山市铄伊建设工程有限公司</div>
+        <div class="company-name">另一家推荐企业</div>
+        <div class="job-intro-container">职位介绍（这是推荐位的干扰内容）</div>
+      </body></html>`,
+    });
+    return;
+  }
+  request.continue();
+});
+await liepinPage.goto("https://www.liepin.com/job/1972937897.shtml", {
+  waitUntil: "domcontentloaded",
+});
+await liepinPage.evaluate(() => {
+  window.chrome = {
+    runtime: { onMessage: { addListener: (fn) => { window.__extractHandler = fn; } } },
+  };
+});
+await liepinPage.addScriptTag({
+  path: path.join(process.cwd(), "extension/content-job.js"),
+});
+const liepinResult = await liepinPage.evaluate(
+  () =>
+    new Promise((resolve) => {
+      window.__extractHandler({ type: "extract" }, null, resolve);
+    }),
+);
+expect(
+  "猎聘优先用 JSON-LD 取公司 / 岗位 / 正文",
+  liepinResult?.ok &&
+    liepinResult.lead.company === "壹优教育科技(广东)有限公司" &&
+    liepinResult.trace.sources.company === "jsonld" &&
+    liepinResult.lead.role === "市政工程师" &&
+    liepinResult.lead.jd.includes("市政道路"),
+  JSON.stringify({ lead: liepinResult?.lead, sources: liepinResult?.trace?.sources }),
+);
+await liepinPage.close();
+
 // ATS 纯文本 / Markdown 导出与 JD 关键词覆盖
 const atsPage = await open({ width: 1440, height: 1000 });
 await atsPage.goto(BASE, { waitUntil: "networkidle0" });

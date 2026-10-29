@@ -30,7 +30,8 @@ const SITE_RULES = {
   },
   "www.liepin.com": {
     role: [".name-box .name", ".job-title", "h1"],
-    company: [".company-name", ".company-info .name", ".company-box .name"],
+    // .company-name 在详情页有 26 处（推荐企业），不能用来取当前公司
+    company: [".company-info .name", ".company-box .name"],
     jd: [".job-intro-container", ".describtion", ".job-description"],
   },
   // 智联新版详情页：标题在 summary-planes__title，公司名是 companydetail 链接，
@@ -238,21 +239,25 @@ function extractWithTrace() {
   const rule = SITE_RULES[host] || {};
   const structured = fromJsonLd();
 
-  let company = pickCompany(rule.company, "site");
-  let role = firstTextWithSource(rule.role, "site");
-  let jd = firstTextWithSource(rule.jd, "site");
+  // JSON-LD 里的 JobPosting 是站点给搜索引擎准备的结构化数据，比手写选择器稳定：
+  // 有就优先用，选择器退居兜底（猎聘、部分智联页面都带）。
+  let company = { value: "", source: "" };
+  let role = { value: "", source: "" };
+  let jd = { value: "", source: "" };
 
   if (structured) {
-    if (!company.value && structured.company) {
+    if (structured.company && isLikelyCompany(structured.company)) {
       company = { value: structured.company, source: "jsonld" };
     }
-    if (!role.value && structured.role) {
-      role = { value: structured.role, source: "jsonld" };
-    }
-    if (!jd.value && structured.jd) {
+    if (structured.role) role = { value: structured.role, source: "jsonld" };
+    if (structured.jd && structured.jd.length >= 40) {
       jd = { value: structured.jd, source: "jsonld" };
     }
   }
+
+  if (!company.value) company = pickCompany(rule.company, "site");
+  if (!role.value) role = firstTextWithSource(rule.role, "site");
+  if (!jd.value) jd = firstTextWithSource(rule.jd, "site");
 
   if (!company.value) {
     const byTitle = companyFromTitle();
@@ -335,6 +340,17 @@ function pageKindInfo() {
  * 诊断：不改变页面，只回报「哪条选择器命中、哪些候选存在」。
  * 用户在登录态下点一次，把结果贴回来即可按真实 DOM 精确修正。
  */
+/** 诊断用：JSON-LD 里到底解析出了什么（只截断展示，不参与提取）。 */
+function structuredPreview() {
+  const structured = fromJsonLd();
+  if (!structured) return null;
+  return {
+    company: structured.company,
+    role: structured.role,
+    jdLength: structured.jd.length,
+  };
+}
+
 function diagnose() {
   const { lead, trace } = extractWithTrace();
   const rule = SITE_RULES[location.hostname] || {};
@@ -350,7 +366,7 @@ function diagnose() {
   return {
     ok: true,
     url: location.href,
-    trace,
+    trace: { ...trace, jsonLdValues: structuredPreview() },
     lead: {
       company: lead.company,
       role: lead.role,
