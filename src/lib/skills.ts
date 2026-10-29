@@ -1,3 +1,8 @@
+import {
+  localizeSkillLevel,
+  normalizeResumeLanguage,
+  type ResumeLanguage,
+} from "./language";
 import type { Resume, SkillLevel, SkillMeta } from "./types";
 
 export type SkillEntry = {
@@ -65,9 +70,15 @@ export function hasSkillDetails(resume: SkillSource): boolean {
   );
 }
 
-/** 纯文本模板里使用的展示形式。 */
-export function formatSkill(entry: SkillEntry): string {
-  return entry.level ? `${entry.name}（${entry.level}）` : entry.name;
+/** 纯文本模板里使用的展示形式；英文 / 双语时翻译熟练度。 */
+export function formatSkill(
+  entry: SkillEntry,
+  language: ResumeLanguage = "zh",
+): string {
+  const lang = normalizeResumeLanguage(language);
+  if (!entry.level) return entry.name;
+  const level = localizeSkillLevel(lang, entry.level);
+  return lang === "en" ? `${entry.name} (${level})` : `${entry.name}（${level}）`;
 }
 
 export function skillGroupKey(group: SkillGroupView): string {

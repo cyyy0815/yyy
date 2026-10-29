@@ -7,6 +7,8 @@ import { OnePageFitDialog } from "@/components/resume/OnePageFitDialog";
 import { ResumeDocumentsBar } from "@/components/resume/ResumeDocumentsBar";
 import { ResumeForm } from "@/components/resume/ResumeForm";
 import { ResumePreview } from "@/components/resume/ResumePreview";
+import { FontPicker } from "@/components/resume/FontPicker";
+import { LanguagePicker } from "@/components/resume/LanguagePicker";
 import { ThemePicker } from "@/components/resume/ThemePicker";
 import { Button } from "@/components/ui/Button";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -41,6 +43,9 @@ const TEMPLATES: { id: TemplateId; label: string }[] = [
   { id: "compact", label: "紧凑" },
   { id: "sidebar", label: "侧栏" },
   { id: "timeline", label: "时间轴" },
+  { id: "minimal", label: "极简" },
+  { id: "academic", label: "学术" },
+  { id: "card", label: "卡片" },
 ];
 
 const TEMPLATE_KEY = "resume-workshop:template";
@@ -389,6 +394,14 @@ function ResumeWorkspace() {
 
   const handleAccent = (accent: string) => {
     updateResume((prev) => ({ ...prev, theme: { accent } }));
+  };
+
+  const handleFont = (font: Resume["font"]) => {
+    updateResume((prev) => ({ ...prev, font }));
+  };
+
+  const handleLanguage = (language: Resume["language"]) => {
+    updateResume((prev) => ({ ...prev, language }));
   };
 
   const handleFitHiddenChange = (hidden: ResumeSectionKey[]) => {
@@ -884,11 +897,11 @@ function ResumeWorkspace() {
                 } lg:block`}
               >
                 <div className="print-hide mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <div
                       role="group"
                       aria-label="简历模板"
-                      className="flex items-center rounded-lg border border-zinc-200 bg-white p-0.5"
+                      className="flex min-w-0 max-w-full items-center overflow-x-auto rounded-lg border border-zinc-200 bg-white p-0.5"
                     >
                       {TEMPLATES.map((item) => (
                         <button
@@ -896,7 +909,7 @@ function ResumeWorkspace() {
                           type="button"
                           onClick={() => setTemplate(item.id)}
                           aria-pressed={template === item.id}
-                          className={`rounded-md px-2.5 py-1.5 text-[12px] font-medium transition sm:px-3 ${
+                          className={`shrink-0 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition sm:px-3 ${
                             template === item.id
                               ? "bg-zinc-100 text-zinc-900"
                               : "text-zinc-500 hover:text-zinc-900"
@@ -909,6 +922,11 @@ function ResumeWorkspace() {
                     <ThemePicker
                       accent={resume.theme.accent}
                       onChange={handleAccent}
+                    />
+                    <FontPicker font={resume.font} onChange={handleFont} />
+                    <LanguagePicker
+                      language={resume.language}
+                      onChange={handleLanguage}
                     />
                     <button
                       type="button"

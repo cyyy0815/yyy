@@ -15,8 +15,51 @@ describe("normalizeResume", () => {
       expect(resume.basic.name).toBe("");
       expect(resume.intent.jobType).toBe("全职");
       expect(resume.theme.accent).toBe("#1d4ed8");
+      expect(resume.font).toBe("auto");
       expect(resume.skills).toEqual([]);
     }
+  });
+
+  it("字体搭配：保留合法值，旧数据与非法值回退 auto", () => {
+    expect(normalizeResume({ basic: { name: "林一" } }).font).toBe("auto");
+    expect(normalizeResume({ font: "serif" }).font).toBe("serif");
+    expect(normalizeResume({ font: "editorial" }).font).toBe("editorial");
+    expect(normalizeResume({ font: "comic-sans" }).font).toBe("auto");
+    expect(normalizeResume({ font: 42 }).font).toBe("auto");
+  });
+
+  it("简历语言：保留合法值，旧数据回退中文，英文覆盖层只保留字符串", () => {
+    const legacy = normalizeResume({ basic: { name: "林一" } });
+    expect(legacy.language).toBe("zh");
+    expect(legacy.translation.basic.name).toBe("");
+    expect(normalizeResume({ language: "fr" }).language).toBe("zh");
+
+    const english = normalizeResume({
+      language: "en",
+      translation: {
+        basic: { name: "Lin Yi", headline: 42, summary: "Engineer" },
+        experiences: {
+          exp: { company: "Acme", role: null, description: "Built things" },
+          broken: "not-an-object",
+        },
+        customSections: {
+          custom: { title: "Certificates", items: { item: { title: "CET-6" } } },
+        },
+      },
+    });
+    expect(english.language).toBe("en");
+    expect(english.translation.basic.name).toBe("Lin Yi");
+    expect(english.translation.basic.headline).toBe("");
+    expect(english.translation.basic.summary).toBe("Engineer");
+    expect(english.translation.experiences.exp.company).toBe("Acme");
+    expect(english.translation.experiences.exp.role).toBe("");
+    expect(english.translation.experiences.broken).toBeUndefined();
+    expect(english.translation.customSections.custom.title).toBe(
+      "Certificates",
+    );
+    expect(english.translation.customSections.custom.items.item.title).toBe(
+      "CET-6",
+    );
   });
 
   it("收敛字段、丢弃非法条目并补齐 id", () => {

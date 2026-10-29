@@ -104,6 +104,12 @@ body {
   background-color: var(--resume-deep);
 }
 
+/* ---------------- 简历字体搭配 ---------------- */
+/* 变量由 ResumePaper 的 resumeFontStyle() 注入；未注入时保持模板默认字体 */
+.resume-paper :is(h1, h2) {
+  font-family: var(--resume-font-heading, inherit);
+}
+
 /* 打印时保留主题色与侧栏底色，不依赖浏览器的「背景图形」开关 */
 #resume-print,
 #resume-print * {

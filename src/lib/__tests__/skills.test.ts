@@ -40,6 +40,18 @@ function makeResume(patch: Partial<Resume> = {}): Resume {
     skillGroups: [],
     layout: { order: [...DEFAULT_SECTION_ORDER], hidden: [] },
     theme: { accent: "#1d4ed8" },
+    font: "auto",
+    language: "zh",
+    translation: {
+      basic: { name: "", headline: "", summary: "", city: "" },
+      intent: { targetRole: "", targetCity: "", jobType: "", experience: "" },
+      experiences: {},
+      projects: {},
+      educations: {},
+      customSections: {},
+      skills: {},
+      skillGroups: {},
+    },
     ...patch,
   };
 }
@@ -149,6 +161,16 @@ describe("展示辅助函数", () => {
   it("formatSkill 只在有熟练度时追加括号", () => {
     expect(formatSkill({ name: "React", level: "精通" })).toBe("React（精通）");
     expect(formatSkill({ name: "React", level: "" })).toBe("React");
+  });
+
+  it("formatSkill 英文使用英文熟练度与括号", () => {
+    expect(formatSkill({ name: "React", level: "精通" }, "en")).toBe(
+      "React (Expert)",
+    );
+    expect(formatSkill({ name: "React", level: "熟练" }, "bilingual")).toBe(
+      "React（熟练 / Proficient）",
+    );
+    expect(formatSkill({ name: "React", level: "" }, "en")).toBe("React");
   });
 
   it("skillGroupKey 给未分组一个稳定 key", () => {

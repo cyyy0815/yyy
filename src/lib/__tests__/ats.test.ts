@@ -187,6 +187,78 @@ describe("resumeToMarkdown", () => {
   });
 });
 
+describe("英文 / 双语导出", () => {
+  function buildEnglishResume(): Resume {
+    const resume = buildResume();
+    resume.language = "en";
+    resume.translation = {
+      basic: {
+        name: "Lin Yi",
+        headline: "Frontend Engineer",
+        summary: "Frontend engineer with 5 years of experience.",
+        city: "Shanghai",
+      },
+      intent: {
+        targetRole: "Frontend Engineer",
+        targetCity: "Shanghai",
+        jobType: "Full-time",
+        experience: "3–5 years",
+      },
+      experiences: {
+        "exp-1": {
+          company: "Acme",
+          role: "Frontend Engineer",
+          description: "Built React applications",
+        },
+      },
+      projects: {
+        "proj-1": {
+          name: "Open Source Project",
+          role: "Author",
+          description: "Built with Vite",
+        },
+      },
+      educations: {
+        "edu-1": {
+          school: "Some University",
+          major: "Computer Science",
+          degree: "Bachelor",
+          ranking: "Top 10%",
+          courses: "Data Structures, Operating Systems",
+          honors: "First-class Scholarship",
+        },
+      },
+      customSections: {},
+      skills: {},
+      skillGroups: {},
+    };
+    return resume;
+  }
+
+  it("英文导出使用英文标题、内容与日期", () => {
+    const text = resumeToPlainText(buildEnglishResume());
+    expect(text).toContain("SUMMARY");
+    expect(text).toContain("EXPERIENCE");
+    expect(text).toContain("EDUCATION");
+    expect(text).toContain("SKILLS");
+    expect(text).toContain("Lin Yi");
+    expect(text).toContain("Acme");
+    expect(text).toContain("Present");
+    expect(text).toContain("Full-time");
+    expect(text).not.toContain("工作经历");
+    expect(text).not.toContain("个人简介");
+  });
+
+  it("双语导出并列中英文标题", () => {
+    const resume = buildEnglishResume();
+    resume.language = "bilingual";
+    const text = resumeToMarkdown(resume);
+    expect(text).toContain("## 个人简介 / SUMMARY");
+    expect(text).toContain("## 工作经历 / EXPERIENCE");
+    expect(text).toContain("林一 / Lin Yi");
+  });
+});
+
 describe("analyzeAtsCoverage", () => {
   it("统计导出文本中的 JD 关键词覆盖与缺口", () => {
     const text = resumeToPlainText(buildResume());

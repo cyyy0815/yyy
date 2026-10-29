@@ -20,6 +20,7 @@ import {
   takeRateLimit,
 } from "@/lib/ai/http";
 import {
+  AI_LANGUAGES,
   AI_TONES,
   type AiErrorCode,
   type AiFullResumeRequest,
@@ -206,12 +207,21 @@ function parseFullResumeRequest(body: unknown): AiFullResumeRequest {
     throw new RequestError(400, "invalid_request", "tone 无效");
   }
 
+  const language = input.language ?? "zh";
+  if (
+    typeof language !== "string" ||
+    !(AI_LANGUAGES as readonly string[]).includes(language)
+  ) {
+    throw new RequestError(400, "invalid_request", "language 无效");
+  }
+
   return {
     brief,
     role,
     years,
     jd: jd || undefined,
     tone: tone as AiFullResumeRequest["tone"],
+    language: language as AiFullResumeRequest["language"],
   };
 }
 

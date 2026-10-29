@@ -1,4 +1,9 @@
 import { extractJdKeywords } from "./jdMatch";
+import {
+  localizedResume,
+  resumeLabels,
+  type ResumeLabels,
+} from "./language";
 import { isSectionVisible } from "./layout";
 import { textHasSkill } from "./matching";
 import { groupSkills } from "./skills";
@@ -55,7 +60,10 @@ function salaryText(resume: Resume): string {
   return `${salaryMin || "?"}–${salaryMax || "?"}K`;
 }
 
-function buildHeader(resume: Resume): {
+function buildHeader(
+  resume: Resume,
+  labels: ResumeLabels,
+): {
   name: string;
   headline: string;
   contact: string;
@@ -65,7 +73,7 @@ function buildHeader(resume: Resume): {
     name:
       resume.basic.name.trim() ||
       resume.basic.headline.trim() ||
-      "简历",
+      labels.resumeFallback,
     headline: resume.basic.name.trim() ? resume.basic.headline.trim() : "",
     contact: joinParts(
       [resume.basic.email, resume.basic.phone, resume.basic.city],
@@ -75,32 +83,42 @@ function buildHeader(resume: Resume): {
   };
 }
 
-function buildSections(resume: Resume): AtsSection[] {
+function buildSections(resume: Resume, labels: ResumeLabels): AtsSection[] {
   const sections: AtsSection[] = [];
 
   const intentLines: string[] = [];
   if (resume.intent.targetRole.trim()) {
-    intentLines.push(`目标岗位：${resume.intent.targetRole.trim()}`);
+    intentLines.push(
+      `${labels.targetRole}${labels.colon}${resume.intent.targetRole.trim()}`,
+    );
   }
   if (resume.intent.targetCity.trim()) {
-    intentLines.push(`期望城市：${resume.intent.targetCity.trim()}`);
+    intentLines.push(
+      `${labels.targetCity}${labels.colon}${resume.intent.targetCity.trim()}`,
+    );
   }
   const salary = salaryText(resume);
-  if (salary) intentLines.push(`期望薪资：${salary}`);
+  if (salary) {
+    intentLines.push(`${labels.expectedSalary}${labels.colon}${salary}`);
+  }
   if (resume.intent.jobType.trim()) {
-    intentLines.push(`工作类型：${resume.intent.jobType.trim()}`);
+    intentLines.push(
+      `${labels.jobType}${labels.colon}${resume.intent.jobType.trim()}`,
+    );
   }
   if (resume.intent.experience.trim()) {
-    intentLines.push(`工作年限：${resume.intent.experience.trim()}`);
+    intentLines.push(
+      `${labels.experienceYears}${labels.colon}${resume.intent.experience.trim()}`,
+    );
   }
   if (intentLines.length > 0 && isSectionVisible(resume, "intent")) {
-    sections.push({ title: "求职意向", lines: intentLines, entries: [] });
+    sections.push({ title: labels.intent, lines: intentLines, entries: [] });
   }
 
   const summary = resume.basic.summary.trim();
   if (summary && isSectionVisible(resume, "summary")) {
     sections.push({
-      title: "个人简介",
+      title: labels.summary,
       lines: summary.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
       entries: [],
     });
@@ -117,17 +135,23 @@ function buildSections(resume: Resume): AtsSection[] {
     const details: string[] = [];
     if (education.gpa.trim()) details.push(`GPA：${education.gpa.trim()}`);
     if (education.ranking.trim()) {
-      details.push(`排名：${education.ranking.trim()}`);
+      details.push(
+        `${labels.rank}${labels.colon}${education.ranking.trim()}`,
+      );
     }
     if (education.courses.trim()) {
-      details.push(`主修课程：${education.courses.trim()}`);
+      details.push(
+        `${labels.courses}${labels.colon}${education.courses.trim()}`,
+      );
     }
     if (education.honors.trim()) {
-      details.push(`荣誉：${education.honors.trim()}`);
+      details.push(
+        `${labels.honors}${labels.colon}${education.honors.trim()}`,
+      );
     }
     if (heading || details.length > 0) {
       educations.push({
-        heading: heading || "教育经历",
+        heading: heading || labels.education,
         details,
         link: "",
         description: [],
@@ -135,7 +159,7 @@ function buildSections(resume: Resume): AtsSection[] {
     }
   }
   if (educations.length > 0 && isSectionVisible(resume, "education")) {
-    sections.push({ title: "教育经历", lines: [], entries: educations });
+    sections.push({ title: labels.education, lines: [], entries: educations });
   }
 
   const experiences: AtsEntry[] = [];
@@ -148,7 +172,7 @@ function buildSections(resume: Resume): AtsSection[] {
     const description = descriptionLines(experience.description);
     if (heading || description.length > 0) {
       experiences.push({
-        heading: heading || "工作经历",
+        heading: heading || labels.experience,
         details: [],
         link: "",
         description,
@@ -156,7 +180,7 @@ function buildSections(resume: Resume): AtsSection[] {
     }
   }
   if (experiences.length > 0 && isSectionVisible(resume, "experience")) {
-    sections.push({ title: "工作经历", lines: [], entries: experiences });
+    sections.push({ title: labels.experience, lines: [], entries: experiences });
   }
 
   const projects: AtsEntry[] = [];
@@ -169,7 +193,7 @@ function buildSections(resume: Resume): AtsSection[] {
     const description = descriptionLines(project.description);
     if (heading || description.length > 0 || project.link.trim()) {
       projects.push({
-        heading: heading || "项目经历",
+        heading: heading || labels.projects,
         details: [],
         link: project.link.trim(),
         description,
@@ -177,7 +201,7 @@ function buildSections(resume: Resume): AtsSection[] {
     }
   }
   if (projects.length > 0 && isSectionVisible(resume, "projects")) {
-    sections.push({ title: "项目经历", lines: [], entries: projects });
+    sections.push({ title: labels.projects, lines: [], entries: projects });
   }
 
   for (const custom of resume.customSections) {
@@ -188,7 +212,7 @@ function buildSections(resume: Resume): AtsSection[] {
       const description = descriptionLines(item.description);
       if (heading || description.length > 0 || item.link.trim()) {
         entries.push({
-          heading: heading || custom.title.trim() || "条目",
+          heading: heading || custom.title.trim() || labels.entry,
           details: [],
           link: item.link.trim(),
           description,
@@ -197,7 +221,7 @@ function buildSections(resume: Resume): AtsSection[] {
     }
     if (entries.length > 0) {
       sections.push({
-        title: custom.title.trim() || "其他",
+        title: custom.title.trim() || labels.other,
         lines: [],
         entries,
       });
@@ -208,33 +232,43 @@ function buildSections(resume: Resume): AtsSection[] {
   if (groups.length > 0 && isSectionVisible(resume, "skills")) {
     const onlyUngrouped = groups.length === 1 && !groups[0].title;
     const lines = groups.map((group) => {
-      const names = group.skills.map((skill) => skill.name).join("、");
+      const names = group.skills
+        .map((skill) => skill.name)
+        .join(labels.listSeparator);
       if (onlyUngrouped) return names;
-      return group.title ? `${group.title}：${names}` : `其他：${names}`;
+      return group.title
+        ? `${group.title}${labels.colon}${names}`
+        : `${labels.other}${labels.colon}${names}`;
     });
-    sections.push({ title: "技能", lines, entries: [] });
+    sections.push({ title: labels.skills, lines, entries: [] });
   }
 
   return sections;
 }
 
-function sectionToPlainText(section: AtsSection): string {
+function sectionToPlainText(
+  section: AtsSection,
+  labels: ResumeLabels,
+): string {
   const parts = [section.title, ...section.lines];
   for (const entry of section.entries) {
     parts.push(entry.heading);
     parts.push(...entry.details);
-    if (entry.link) parts.push(`链接：${entry.link}`);
+    if (entry.link) parts.push(`${labels.link}${labels.colon}${entry.link}`);
     parts.push(...entry.description);
   }
   return parts.join("\n");
 }
 
-function sectionToMarkdown(section: AtsSection): string {
+function sectionToMarkdown(
+  section: AtsSection,
+  labels: ResumeLabels,
+): string {
   const lines = [`## ${section.title}`, ...section.lines];
   for (const entry of section.entries) {
     lines.push("", `### ${entry.heading}`);
     lines.push(...entry.details);
-    if (entry.link) lines.push(`链接：${entry.link}`);
+    if (entry.link) lines.push(`${labels.link}${labels.colon}${entry.link}`);
     lines.push(...entry.description);
   }
   return lines.join("\n");
@@ -242,24 +276,32 @@ function sectionToMarkdown(section: AtsSection): string {
 
 /** ATS 友好的纯文本：线性结构、无分栏、无照片、无技能等级装饰。 */
 export function resumeToPlainText(resume: Resume): string {
-  const header = buildHeader(resume);
+  const view = localizedResume(resume, { placeholders: false });
+  const labels = resumeLabels(view.language);
+  const header = buildHeader(view, labels);
   const blocks = [
     [header.name, header.headline, header.contact, header.links]
       .filter(Boolean)
       .join("\n"),
-    ...buildSections(resume).map(sectionToPlainText),
+    ...buildSections(view, labels).map((section) =>
+      sectionToPlainText(section, labels),
+    ),
   ].filter(Boolean);
   return `${blocks.join("\n\n")}\n`;
 }
 
 /** Markdown 版本使用标准标题与条目，适合在线表单或人工阅读。 */
 export function resumeToMarkdown(resume: Resume): string {
-  const header = buildHeader(resume);
+  const view = localizedResume(resume, { placeholders: false });
+  const labels = resumeLabels(view.language);
+  const header = buildHeader(view, labels);
   const blocks = [
     [`# ${header.name}`, header.headline, header.contact, header.links]
       .filter(Boolean)
       .join("\n"),
-    ...buildSections(resume).map(sectionToMarkdown),
+    ...buildSections(view, labels).map((section) =>
+      sectionToMarkdown(section, labels),
+    ),
   ].filter(Boolean);
   return `${blocks.join("\n\n")}\n`;
 }

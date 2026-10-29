@@ -17,6 +17,7 @@ import {
 } from "@/lib/ai/http";
 import { buildChatPayload } from "@/lib/ai/prompt";
 import {
+  AI_LANGUAGES,
   AI_MODES,
   AI_SECTIONS,
   AI_TONES,
@@ -217,6 +218,11 @@ function parseGenerateRequest(body: unknown): AiGenerateRequest {
     throw new RequestError(400, "invalid_request", "工作年限最多 20 字");
   }
 
+  const language = input.language ?? "zh";
+  if (!isOneOf(language, AI_LANGUAGES)) {
+    throw new RequestError(400, "invalid_request", "language 无效");
+  }
+
   return {
     section: input.section,
     mode,
@@ -226,6 +232,7 @@ function parseGenerateRequest(body: unknown): AiGenerateRequest {
     keywords,
     current: current || undefined,
     jd: jd || undefined,
+    language,
   };
 }
 

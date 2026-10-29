@@ -1,4 +1,6 @@
 import { normalizeApplications, type JobApplication } from "./applications";
+import { normalizeResumeFont } from "./fonts";
+import { normalizeResumeLanguage } from "./language";
 import {
   isResumeSectionKey,
   normalizeSectionLayout,
@@ -16,6 +18,7 @@ import {
   isTemplateId,
   newId,
   type Resume,
+  type ResumeTranslation,
   type SkillMeta,
   type TemplateId,
 } from "./types";
@@ -83,6 +86,76 @@ function normalizeSkillDetails(
   }
 
   return { skillMeta, skillGroups: groups };
+}
+
+function translationEntries<T>(
+  value: unknown,
+  map: (item: Record<string, unknown>) => T,
+): Record<string, T> {
+  const source = asRecord(value);
+  const result: Record<string, T> = {};
+  for (const [id, item] of Object.entries(source)) {
+    if (isRecord(item)) result[id] = map(item);
+  }
+  return result;
+}
+
+/** 英文覆盖层只保留字符串字段；旧数据没有该字段时返回空对象。 */
+function normalizeTranslation(value: unknown): ResumeTranslation {
+  const raw = asRecord(value);
+  const basic = asRecord(raw.basic);
+  const intent = asRecord(raw.intent);
+  return {
+    basic: {
+      name: asString(basic.name),
+      headline: asString(basic.headline),
+      summary: asString(basic.summary),
+      city: asString(basic.city),
+    },
+    intent: {
+      targetRole: asString(intent.targetRole),
+      targetCity: asString(intent.targetCity),
+      jobType: asString(intent.jobType),
+      experience: asString(intent.experience),
+    },
+    experiences: translationEntries(raw.experiences, (item) => ({
+      company: asString(item.company),
+      role: asString(item.role),
+      description: asString(item.description),
+    })),
+    projects: translationEntries(raw.projects, (item) => ({
+      name: asString(item.name),
+      role: asString(item.role),
+      description: asString(item.description),
+    })),
+    educations: translationEntries(raw.educations, (item) => ({
+      school: asString(item.school),
+      major: asString(item.major),
+      degree: asString(item.degree),
+      ranking: asString(item.ranking),
+      courses: asString(item.courses),
+      honors: asString(item.honors),
+    })),
+    customSections: translationEntries(raw.customSections, (section) => ({
+      title: asString(section.title),
+      items: translationEntries(section.items, (item) => ({
+        title: asString(item.title),
+        subtitle: asString(item.subtitle),
+        description: asString(item.description),
+      })),
+    })),
+    skills: translationStringMap(raw.skills),
+    skillGroups: translationStringMap(raw.skillGroups),
+  };
+}
+
+function translationStringMap(value: unknown): Record<string, string> {
+  const source = asRecord(value);
+  const result: Record<string, string> = {};
+  for (const [key, item] of Object.entries(source)) {
+    if (typeof item === "string") result[key] = item;
+  }
+  return result;
 }
 
 /** 把任意来源的数据收敛成合法的 Resume，避免旧版本或坏文件导致崩溃。 */
@@ -176,6 +249,9 @@ export function normalizeResume(input: unknown): Resume {
     skillGroups,
     layout: normalizeSectionLayout(raw.layout),
     theme: { accent: normalizeAccent(theme.accent) },
+    font: normalizeResumeFont(raw.font),
+    language: normalizeResumeLanguage(raw.language),
+    translation: normalizeTranslation(raw.translation),
   };
 }
 

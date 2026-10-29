@@ -4,6 +4,12 @@ import {
   isValidElement,
   type ReactNode,
 } from "react";
+import { resumeFontStyle } from "@/lib/fonts";
+import {
+  localizedResume,
+  resumeLabels,
+  type ResumeLabels,
+} from "@/lib/language";
 import {
   customItemHasContent,
   hasVisibleSection,
@@ -38,6 +44,18 @@ const CLASSIC_KEYS = [
 ] as const;
 const ASIDE_KEYS = ["intent", "skills", "education"] as const;
 const FOOTER_KEYS = ["education", "skills"] as const;
+const FULL_KEYS = [
+  "summary",
+  "experience",
+  "projects",
+  "custom",
+  "education",
+  "skills",
+  "intent",
+] as const;
+const SERIF_STACK =
+  'var(--resume-font-body, Georgia, "Songti SC", "SimSun", "Noto Serif SC", serif)';
+const SANS_STACK = "var(--resume-font-body, var(--font-sans))";
 
 type SectionEntry = {
   node: React.ReactElement<{ "data-section"?: unknown }>;
@@ -145,6 +163,7 @@ function SkillText({
   className: string;
   titleClassName?: string;
 }) {
+  const labels = resumeLabels(resume.language);
   if (!hasSkillDetails(resume)) {
     return <p className={className}>{resume.skills.join(separator)}</p>;
   }
@@ -153,9 +172,14 @@ function SkillText({
       {groupSkills(resume).map((group) => (
         <p key={skillGroupKey(group)}>
           {group.title ? (
-            <span className={titleClassName}>{group.title}：</span>
+            <span className={titleClassName}>
+              {group.title}
+              {labels.colon}
+            </span>
           ) : null}
-          {group.skills.map(formatSkill).join(separator)}
+          {group.skills
+            .map((entry) => formatSkill(entry, resume.language))
+            .join(separator)}
         </p>
       ))}
     </div>
@@ -191,7 +215,7 @@ function SkillChips({
           <div className="flex flex-wrap gap-1">
             {group.skills.map((entry) => (
               <span key={entry.name} className={chipClassName}>
-                {formatSkill(entry)}
+                {formatSkill(entry, resume.language)}
               </span>
             ))}
           </div>
@@ -218,14 +242,16 @@ function ContactLink({ item }: { item: ContactItem }) {
 /** GPA / 排名 / 主修课程 / 荣誉，只有填写时才输出。 */
 function EducationDetails({
   item,
+  labels,
   className = "",
 }: {
   item: Education;
+  labels: ResumeLabels;
   className?: string;
 }) {
   const meta = [
     item.gpa ? `GPA ${item.gpa}` : "",
-    item.ranking ? `排名 ${item.ranking}` : "",
+    item.ranking ? `${labels.rank} ${item.ranking}` : "",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -233,8 +259,20 @@ function EducationDetails({
   return (
     <div className={`space-y-0.5 ${className}`}>
       {meta ? <p>{meta}</p> : null}
-      {item.courses ? <p>主修课程：{item.courses}</p> : null}
-      {item.honors ? <p>荣誉：{item.honors}</p> : null}
+      {item.courses ? (
+        <p>
+          {labels.courses}
+          {labels.colon}
+          {item.courses}
+        </p>
+      ) : null}
+      {item.honors ? (
+        <p>
+          {labels.honors}
+          {labels.colon}
+          {item.honors}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -366,12 +404,18 @@ function Bullets({
 }
 
 /** 手动分页符：屏幕预览显示虚线，打印时隐藏并让条目从新页开始。 */
-function PageBreakMarker({ before }: { before?: boolean }) {
+function PageBreakMarker({
+  before,
+  label = "分页",
+}: {
+  before?: boolean;
+  label?: string;
+}) {
   if (!before) return null;
   return (
     <div className="print-hide mb-1.5 flex items-center gap-2 text-[8px] tracking-[0.18em] text-zinc-300">
       <span className="h-px flex-1 border-t border-dashed border-zinc-200" />
-      分页
+      {label}
       <span className="h-px flex-1 border-t border-dashed border-zinc-200" />
     </div>
   );
@@ -429,6 +473,7 @@ function AccentSectionTitle({
 
 function ModernTemplate({ resume }: { resume: Resume }) {
   const customSections = visibleCustomSections(resume);
+  const L = resumeLabels(resume.language);
   const hasAside = hasVisibleSection(resume, ASIDE_KEYS);
 
   return (
@@ -436,7 +481,8 @@ function ModernTemplate({ resume }: { resume: Resume }) {
       className="resume-paper bg-white text-zinc-800"
       style={{
         padding: "14mm",
-        fontFamily: "var(--font-sans)",
+        fontFamily: SANS_STACK,
+        ...resumeFontStyle(resume.font),
         ...accentStyle(resume.theme.accent),
       }}
     >
@@ -470,7 +516,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
           <OrderedSections resume={resume} keys={FLOW_KEYS}>
           {resume.basic.summary ? (
             <section data-section="summary" className="mb-5">
-              <AccentSectionTitle>个人简介</AccentSectionTitle>
+              <AccentSectionTitle>{L.summary}</AccentSectionTitle>
               <p className="text-[11.5px] leading-[1.75] text-zinc-600">
                 {resume.basic.summary}
               </p>
@@ -479,7 +525,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
 
           {resume.experiences.length > 0 ? (
             <section data-section="experience" className="mb-5">
-              <AccentSectionTitle>工作经历</AccentSectionTitle>
+              <AccentSectionTitle>{L.experience}</AccentSectionTitle>
               <div className="space-y-3.5">
                 {resume.experiences.map((item, index) => (
                   <div
@@ -488,7 +534,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
                       index > 0 && item.pageBreakBefore ? "print:break-before-page" : ""
                     }`}
                   >
-                    <PageBreakMarker before={index > 0 && item.pageBreakBefore} />
+                    <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
                     <div className="flex items-baseline justify-between gap-3">
                       <p className="text-[12.5px] leading-snug">
                         <span className="font-semibold text-zinc-900">
@@ -514,7 +560,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
 
           {resume.projects.length > 0 ? (
             <section data-section="projects" className="mb-5">
-              <AccentSectionTitle>项目经历</AccentSectionTitle>
+              <AccentSectionTitle>{L.projects}</AccentSectionTitle>
               <div className="space-y-3">
                 {resume.projects.map((item, index) => (
                   <div
@@ -523,7 +569,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
                       index > 0 && item.pageBreakBefore ? "print:break-before-page" : ""
                     }`}
                   >
-                    <PageBreakMarker before={index > 0 && item.pageBreakBefore} />
+                    <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
                     <div className="flex items-baseline justify-between gap-3">
                       <p className="text-[12.5px] leading-snug">
                         <span className="font-semibold text-zinc-900">
@@ -580,7 +626,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
 
           {!hasVisibleSection(resume, FLOW_KEYS) ? (
             <p className="py-10 text-center text-[12px] text-zinc-300">
-              在左侧填写内容，这里会实时预览
+              {L.emptyPreview}
             </p>
           ) : null}
         </div>
@@ -589,7 +635,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
           <aside className="space-y-5 border-l border-zinc-200 pl-6">
             {isSectionVisible(resume, "intent") ? (
               <section>
-                <AccentSectionTitle>求职意向</AccentSectionTitle>
+                <AccentSectionTitle>{L.intent}</AccentSectionTitle>
                 <div className="space-y-1 text-[10.5px] leading-[1.6] text-zinc-600">
                   {resume.intent.targetRole ? (
                     <p className="text-[11.5px] font-medium text-zinc-800">
@@ -612,7 +658,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
 
             {isSectionVisible(resume, "skills") ? (
               <section>
-                <AccentSectionTitle>技能</AccentSectionTitle>
+                <AccentSectionTitle>{L.skills}</AccentSectionTitle>
                 <SkillChips
                   resume={resume}
                   chipClassName="resume-soft rounded px-1.5 py-0.5 text-[9.5px] leading-[1.5] text-zinc-600"
@@ -623,7 +669,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
 
             {isSectionVisible(resume, "education") ? (
               <section>
-                <AccentSectionTitle>教育经历</AccentSectionTitle>
+                <AccentSectionTitle>{L.education}</AccentSectionTitle>
                 <div className="space-y-2.5">
                   {resume.educations.map((item) => (
                     <div key={item.id} className="break-inside-avoid">
@@ -638,6 +684,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
                       </p>
                       <EducationDetails
                         item={item}
+                        labels={L}
                         className="pt-0.5 text-[9px] leading-[1.55] text-zinc-500"
                       />
                     </div>
@@ -669,6 +716,7 @@ function ClassicSectionTitle({ children }: { children: React.ReactNode }) {
 
 function ClassicTemplate({ resume }: { resume: Resume }) {
   const customSections = visibleCustomSections(resume);
+  const L = resumeLabels(resume.language);
   const contact = contactItems(resume);
 
   return (
@@ -676,7 +724,8 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
       className="resume-paper bg-white text-zinc-800"
       style={{
         padding: "16mm",
-        fontFamily: 'Georgia, "Songti SC", "SimSun", serif',
+        fontFamily: SERIF_STACK,
+        ...resumeFontStyle(resume.font),
         ...accentStyle(resume.theme.accent),
       }}
     >
@@ -713,7 +762,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
       <OrderedSections resume={resume} keys={CLASSIC_KEYS}>
       {resume.basic.summary ? (
         <section data-section="summary" className="mt-5">
-          <ClassicSectionTitle>个人简介</ClassicSectionTitle>
+          <ClassicSectionTitle>{L.summary}</ClassicSectionTitle>
           <p className="text-[11px] leading-[1.8] text-zinc-600">
             {resume.basic.summary}
           </p>
@@ -722,7 +771,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
 
       {resume.experiences.length > 0 ? (
         <section data-section="experience" className="mt-5">
-          <ClassicSectionTitle>工作经历</ClassicSectionTitle>
+          <ClassicSectionTitle>{L.experience}</ClassicSectionTitle>
           <div className="space-y-4">
             {resume.experiences.map((item, index) => (
               <div
@@ -731,7 +780,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
                   index > 0 && item.pageBreakBefore ? "print:break-before-page" : ""
                 }`}
               >
-                <PageBreakMarker before={index > 0 && item.pageBreakBefore} />
+                <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
                 <div className="flex items-baseline justify-between gap-4">
                   <p className="text-[11.5px]">
                     <span className="font-semibold text-zinc-900">
@@ -757,7 +806,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
 
       {resume.projects.length > 0 ? (
         <section data-section="projects" className="mt-5">
-          <ClassicSectionTitle>项目经历</ClassicSectionTitle>
+          <ClassicSectionTitle>{L.projects}</ClassicSectionTitle>
           <div className="space-y-3.5">
             {resume.projects.map((item, index) => (
               <div
@@ -766,7 +815,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
                   index > 0 && item.pageBreakBefore ? "print:break-before-page" : ""
                 }`}
               >
-                <PageBreakMarker before={index > 0 && item.pageBreakBefore} />
+                <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
                 <div className="flex items-baseline justify-between gap-4">
                   <p className="text-[11.5px]">
                     <span className="font-semibold text-zinc-900">
@@ -819,7 +868,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
 
       {resume.educations.length > 0 ? (
         <section data-section="education" className="mt-5">
-          <ClassicSectionTitle>教育经历</ClassicSectionTitle>
+          <ClassicSectionTitle>{L.education}</ClassicSectionTitle>
           <div className="space-y-2">
             {resume.educations.map((item) => (
               <div key={item.id} className="break-inside-avoid">
@@ -840,6 +889,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
                 </div>
                 <EducationDetails
                   item={item}
+                  labels={L}
                   className="mt-0.5 text-[9.5px] leading-[1.65] text-zinc-500"
                 />
               </div>
@@ -850,7 +900,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
 
       {resume.skills.length > 0 ? (
         <section data-section="skills" className="mt-5">
-          <ClassicSectionTitle>专业技能</ClassicSectionTitle>
+          <ClassicSectionTitle>{L.skillsProfessional}</ClassicSectionTitle>
           <SkillText
             resume={resume}
             separator="、"
@@ -879,6 +929,7 @@ function CompactSectionTitle({ children }: { children: React.ReactNode }) {
 
 function CompactTemplate({ resume }: { resume: Resume }) {
   const customSections = visibleCustomSections(resume);
+  const L = resumeLabels(resume.language);
   const contact = contactItems(resume);
 
   return (
@@ -886,8 +937,9 @@ function CompactTemplate({ resume }: { resume: Resume }) {
       className="resume-paper bg-white text-zinc-800"
       style={{
         padding: "12mm",
-        fontFamily: "var(--font-sans)",
+        fontFamily: SANS_STACK,
         fontSize: "10.5px",
+        ...resumeFontStyle(resume.font),
         ...accentStyle(resume.theme.accent),
       }}
     >
@@ -919,7 +971,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
       <OrderedSections resume={resume} keys={FLOW_KEYS}>
       {resume.basic.summary ? (
         <section data-section="summary" className="mt-3">
-          <CompactSectionTitle>个人简介</CompactSectionTitle>
+          <CompactSectionTitle>{L.summary}</CompactSectionTitle>
           <p className="text-[10px] leading-[1.65] text-zinc-600">
             {resume.basic.summary}
           </p>
@@ -928,7 +980,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
 
       {resume.experiences.length > 0 ? (
         <section data-section="experience" className="mt-3">
-          <CompactSectionTitle>工作经历</CompactSectionTitle>
+          <CompactSectionTitle>{L.experience}</CompactSectionTitle>
           <div className="space-y-2.5">
             {resume.experiences.map((item, index) => (
               <div
@@ -937,7 +989,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
                   index > 0 && item.pageBreakBefore ? "print:break-before-page" : ""
                 }`}
               >
-                <PageBreakMarker before={index > 0 && item.pageBreakBefore} />
+                <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="text-[10.5px]">
                     <span className="font-semibold text-zinc-900">
@@ -963,7 +1015,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
 
       {resume.projects.length > 0 ? (
         <section data-section="projects" className="mt-3">
-          <CompactSectionTitle>项目经历</CompactSectionTitle>
+          <CompactSectionTitle>{L.projects}</CompactSectionTitle>
           <div className="space-y-2">
             {resume.projects.map((item, index) => (
               <div
@@ -972,7 +1024,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
                   index > 0 && item.pageBreakBefore ? "print:break-before-page" : ""
                 }`}
               >
-                <PageBreakMarker before={index > 0 && item.pageBreakBefore} />
+                <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="text-[10.5px]">
                     <span className="font-semibold text-zinc-900">
@@ -1030,7 +1082,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
         <OrderedSections resume={resume} keys={FOOTER_KEYS}>
         {resume.educations.length > 0 ? (
           <section data-section="education">
-            <CompactSectionTitle>教育经历</CompactSectionTitle>
+            <CompactSectionTitle>{L.education}</CompactSectionTitle>
             <div className="space-y-1">
               {resume.educations.map((item) => (
                 <div key={item.id} className="break-inside-avoid">
@@ -1045,6 +1097,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
                   </p>
                   <EducationDetails
                     item={item}
+                    labels={L}
                     className="text-[8.5px] leading-[1.5] text-zinc-500"
                   />
                 </div>
@@ -1055,7 +1108,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
 
         {resume.skills.length > 0 ? (
           <section data-section="skills">
-            <CompactSectionTitle>专业技能</CompactSectionTitle>
+            <CompactSectionTitle>{L.skillsProfessional}</CompactSectionTitle>
             <SkillText
               resume={resume}
               separator=" · "
@@ -1085,13 +1138,15 @@ function SidebarHeading({ children }: { children: React.ReactNode }) {
 
 function SidebarTemplate({ resume }: { resume: Resume }) {
   const customSections = visibleCustomSections(resume);
+  const L = resumeLabels(resume.language);
   const contact = contactItems(resume);
 
   return (
     <article
       className="resume-paper resume-paper-sidebar flex min-h-[289mm] bg-white text-zinc-800"
       style={{
-        fontFamily: "var(--font-sans)",
+        fontFamily: SANS_STACK,
+        ...resumeFontStyle(resume.font),
         ...accentStyle(resume.theme.accent),
       }}
     >
@@ -1124,7 +1179,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
 
         {isSectionVisible(resume, "intent") ? (
           <section className="mt-5">
-            <SidebarHeading>求职意向</SidebarHeading>
+            <SidebarHeading>{L.intent}</SidebarHeading>
             <div className="space-y-1 text-[9.5px] leading-[1.6] text-white/75">
               {resume.intent.targetRole ? (
                 <p className="text-[11px] font-medium text-white">
@@ -1143,7 +1198,8 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
               {resume.intent.salaryMin || resume.intent.salaryMax ? (
                 <p>
                   {resume.intent.salaryMin || "?"}
-                  {resume.intent.salaryMax ? `–${resume.intent.salaryMax}` : ""}K / 月
+                  {resume.intent.salaryMax ? `–${resume.intent.salaryMax}` : ""}K /{" "}
+                  {L.month}
                 </p>
               ) : null}
             </div>
@@ -1152,7 +1208,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
 
         {isSectionVisible(resume, "skills") ? (
           <section className="mt-5">
-            <SidebarHeading>技能</SidebarHeading>
+            <SidebarHeading>{L.skills}</SidebarHeading>
             <SkillChips
               resume={resume}
               chipClassName="rounded bg-white/10 px-1.5 py-0.5 text-[9px] leading-[1.5] text-white/80"
@@ -1163,7 +1219,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
 
         {isSectionVisible(resume, "education") ? (
           <section className="mt-5">
-            <SidebarHeading>教育经历</SidebarHeading>
+            <SidebarHeading>{L.education}</SidebarHeading>
             <div className="space-y-2.5">
               {resume.educations.map((item) => (
                 <div key={item.id} className="break-inside-avoid">
@@ -1178,6 +1234,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
                   </p>
                   <EducationDetails
                     item={item}
+                    labels={L}
                     className="text-[8.5px] leading-[1.6] text-white/55"
                   />
                 </div>
@@ -1191,7 +1248,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
         <OrderedSections resume={resume} keys={FLOW_KEYS}>
         {resume.basic.summary ? (
           <section data-section="summary" className="mb-5">
-            <AccentSectionTitle>个人简介</AccentSectionTitle>
+            <AccentSectionTitle>{L.summary}</AccentSectionTitle>
             <p className="text-[11.5px] leading-[1.75] text-zinc-600">
               {resume.basic.summary}
             </p>
@@ -1200,7 +1257,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
 
         {resume.experiences.length > 0 ? (
           <section data-section="experience" className="mb-5">
-            <AccentSectionTitle>工作经历</AccentSectionTitle>
+            <AccentSectionTitle>{L.experience}</AccentSectionTitle>
             <div className="space-y-3.5">
               {resume.experiences.map((item, index) => (
                 <div
@@ -1209,7 +1266,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
                     index > 0 && item.pageBreakBefore ? "print:break-before-page" : ""
                   }`}
                 >
-                  <PageBreakMarker before={index > 0 && item.pageBreakBefore} />
+                  <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="text-[12.5px] leading-snug">
                       <span className="font-semibold text-zinc-900">
@@ -1235,7 +1292,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
 
         {resume.projects.length > 0 ? (
           <section data-section="projects" className="mb-5">
-            <AccentSectionTitle>项目经历</AccentSectionTitle>
+            <AccentSectionTitle>{L.projects}</AccentSectionTitle>
             <div className="space-y-3">
               {resume.projects.map((item, index) => (
                 <div
@@ -1244,7 +1301,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
                     index > 0 && item.pageBreakBefore ? "print:break-before-page" : ""
                   }`}
                 >
-                  <PageBreakMarker before={index > 0 && item.pageBreakBefore} />
+                  <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="text-[12.5px] leading-snug">
                       <span className="font-semibold text-zinc-900">
@@ -1301,7 +1358,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
 
         {!hasVisibleSection(resume, FLOW_KEYS) ? (
           <p className="py-10 text-center text-[12px] text-zinc-300">
-            在左侧填写内容，这里会实时预览
+            {L.emptyPreview}
           </p>
         ) : null}
       </div>
@@ -1315,13 +1372,15 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
 
 function TimelineTemplate({ resume }: { resume: Resume }) {
   const customSections = visibleCustomSections(resume);
+  const L = resumeLabels(resume.language);
   const contact = contactItems(resume);
 
   return (
     <article
       className="resume-paper bg-white px-[15mm] py-[13mm] text-zinc-800"
       style={{
-        fontFamily: "var(--font-sans)",
+        fontFamily: SANS_STACK,
+        ...resumeFontStyle(resume.font),
         ...accentStyle(resume.theme.accent),
       }}
     >
@@ -1352,7 +1411,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
       <OrderedSections resume={resume} keys={FLOW_KEYS}>
       {resume.basic.summary ? (
         <section data-section="summary" className="mt-5">
-          <AccentSectionTitle>个人简介</AccentSectionTitle>
+          <AccentSectionTitle>{L.summary}</AccentSectionTitle>
           <p className="text-[11.5px] leading-[1.75] text-zinc-600">
             {resume.basic.summary}
           </p>
@@ -1361,7 +1420,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
 
       {resume.experiences.length > 0 ? (
         <section data-section="experience" className="mt-5">
-          <AccentSectionTitle className="mb-2.5">工作经历</AccentSectionTitle>
+          <AccentSectionTitle className="mb-2.5">{L.experience}</AccentSectionTitle>
           <div className="space-y-3.5">
             {resume.experiences.map((item, index) => (
               <div
@@ -1370,7 +1429,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
                   index > 0 && item.pageBreakBefore ? "print:break-before-page" : ""
                 }`}
               >
-                <PageBreakMarker before={index > 0 && item.pageBreakBefore} />
+                <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
                 <span className="resume-dot absolute left-0 top-[5px] h-[7px] w-[7px] rounded-full ring-2 ring-white" />
                 {index < resume.experiences.length - 1 ? (
                   <span className="resume-timeline-line absolute left-[3px] top-[16px] h-[calc(100%_+_14px)] w-px" />
@@ -1400,7 +1459,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
 
       {resume.projects.length > 0 ? (
         <section data-section="projects" className="mt-5">
-          <AccentSectionTitle className="mb-2.5">项目经历</AccentSectionTitle>
+          <AccentSectionTitle className="mb-2.5">{L.projects}</AccentSectionTitle>
           <div className="space-y-3">
             {resume.projects.map((item, index) => (
               <div
@@ -1409,7 +1468,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
                   index > 0 && item.pageBreakBefore ? "print:break-before-page" : ""
                 }`}
               >
-                <PageBreakMarker before={index > 0 && item.pageBreakBefore} />
+                <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
                 <span className="resume-dot absolute left-0 top-[5px] h-[7px] w-[7px] rounded-full ring-2 ring-white" />
                 {index < resume.projects.length - 1 ? (
                   <span className="resume-timeline-line absolute left-[3px] top-[16px] h-[calc(100%_+_12px)] w-px" />
@@ -1470,7 +1529,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
           <OrderedSections resume={resume} keys={FOOTER_KEYS}>
           {resume.educations.length > 0 ? (
             <section data-section="education">
-              <AccentSectionTitle>教育经历</AccentSectionTitle>
+              <AccentSectionTitle>{L.education}</AccentSectionTitle>
               <div className="space-y-2">
                 {resume.educations.map((item) => (
                   <div key={item.id} className="break-inside-avoid">
@@ -1490,6 +1549,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
                     </p>
                     <EducationDetails
                       item={item}
+                      labels={L}
                       className="mt-0.5 text-[9px] leading-[1.6] text-zinc-500"
                     />
                   </div>
@@ -1500,7 +1560,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
 
           {resume.skills.length > 0 ? (
             <section data-section="skills">
-              <AccentSectionTitle>专业技能</AccentSectionTitle>
+              <AccentSectionTitle>{L.skillsProfessional}</AccentSectionTitle>
               <SkillChips
                 resume={resume}
                 chipClassName="resume-soft rounded px-1.5 py-0.5 text-[9.5px] leading-[1.5] text-zinc-600"
@@ -1515,6 +1575,754 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* 极简模板：单栏留白，弱化装饰                                           */
+/* ------------------------------------------------------------------ */
+
+function MinimalSectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-2 break-after-avoid text-[9.5px] font-semibold tracking-[0.26em] resume-ink">
+      {children}
+    </h2>
+  );
+}
+
+function MinimalTemplate({ resume }: { resume: Resume }) {
+  const customSections = visibleCustomSections(resume);
+  const L = resumeLabels(resume.language);
+  const contact = contactItems(resume);
+
+  return (
+    <article
+      className="resume-paper bg-white text-zinc-800"
+      style={{
+        padding: "15mm 16mm",
+        fontFamily: SANS_STACK,
+        ...resumeFontStyle(resume.font),
+        ...accentStyle(resume.theme.accent),
+      }}
+    >
+      <header>
+        <div className="flex items-start justify-between gap-6">
+          <div className="min-w-0">
+            <h1 className="text-[31px] font-semibold leading-none tracking-tight text-zinc-900">
+              {resume.basic.name || "你的姓名"}
+            </h1>
+            <p className="resume-ink mt-2.5 text-[12.5px] font-medium">
+              {resume.basic.headline || "求职头衔"}
+            </p>
+          </div>
+          <ResumePhoto
+            src={resume.basic.photo}
+            className="h-[22mm] w-[22mm] rounded-full ring-1 ring-zinc-200"
+          />
+        </div>
+        {contact.length > 0 ? (
+          <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[9.5px] leading-[1.7] text-zinc-500">
+            {contact.map((item, index) => (
+              <span key={item.key} className="flex items-center gap-2">
+                {index > 0 ? (
+                  <span aria-hidden="true" className="text-zinc-300">
+                    ·
+                  </span>
+                ) : null}
+                <ContactLink item={item} />
+              </span>
+            ))}
+          </p>
+        ) : null}
+      </header>
+
+      <div className="mt-5 border-t border-zinc-300" />
+
+      <OrderedSections resume={resume} keys={FULL_KEYS}>
+        {resume.basic.summary ? (
+          <section data-section="summary" className="mt-4">
+            <MinimalSectionTitle>{L.summary}</MinimalSectionTitle>
+            <p className="text-[11px] leading-[1.8] text-zinc-600">
+              {resume.basic.summary}
+            </p>
+          </section>
+        ) : null}
+
+        {resume.experiences.length > 0 ? (
+          <section data-section="experience" className="mt-4">
+            <MinimalSectionTitle>{L.experience}</MinimalSectionTitle>
+            <div className="space-y-3">
+              {resume.experiences.map((item, index) => (
+                <div
+                  key={item.id}
+                  className={`break-inside-avoid ${
+                    index > 0 && item.pageBreakBefore ? "print:break-before-page" : ""
+                  }`}
+                >
+                  <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-[11.5px] leading-snug">
+                      <span className="font-semibold text-zinc-900">
+                        {item.role || "职位"}
+                      </span>
+                      {item.company ? (
+                        <span className="text-zinc-500"> · {item.company}</span>
+                      ) : null}
+                    </p>
+                    <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-400">
+                      {range(item.start, item.end)}
+                    </span>
+                  </div>
+                  <Bullets
+                    text={item.description}
+                    className="mt-1 text-[10.5px] leading-[1.8] text-zinc-600"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {resume.projects.length > 0 ? (
+          <section data-section="projects" className="mt-4">
+            <MinimalSectionTitle>{L.projects}</MinimalSectionTitle>
+            <div className="space-y-3">
+              {resume.projects.map((item, index) => (
+                <div
+                  key={item.id}
+                  className={`break-inside-avoid ${
+                    index > 0 && item.pageBreakBefore ? "print:break-before-page" : ""
+                  }`}
+                >
+                  <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-[11.5px] leading-snug">
+                      <span className="font-semibold text-zinc-900">
+                        {item.name || "项目名称"}
+                      </span>
+                      {item.role ? (
+                        <span className="text-zinc-500"> · {item.role}</span>
+                      ) : null}
+                    </p>
+                    {item.link || item.start || item.end ? (
+                      <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+                        {range(item.start, item.end) ? (
+                          <span className="text-[9px] tabular-nums text-zinc-400">
+                            {range(item.start, item.end)}
+                          </span>
+                        ) : null}
+                        {item.link ? (
+                          <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
+                            <ResumeLink value={item.link} />
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                  <Bullets
+                    text={item.description}
+                    className="mt-1 text-[10.5px] leading-[1.8] text-zinc-600"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {customSections.map((section) => (
+          <section key={section.id} data-section="custom" className="mt-4">
+            <MinimalSectionTitle>
+              {customSectionTitle(section)}
+            </MinimalSectionTitle>
+            <CustomItems
+              section={section}
+              titleClassName="text-[11px] leading-snug"
+              subtitleClassName="text-zinc-500"
+              dateClassName="text-[9px] text-zinc-400"
+              bodyClassName="mt-0.5 text-[10.5px] leading-[1.8] text-zinc-600"
+              linkClassName="mt-0.5 text-[9px] text-zinc-400"
+            />
+          </section>
+        ))}
+
+        {resume.educations.length > 0 ? (
+          <section data-section="education" className="mt-4">
+            <MinimalSectionTitle>{L.education}</MinimalSectionTitle>
+            <div className="space-y-2">
+              {resume.educations.map((item) => (
+                <div key={item.id} className="break-inside-avoid">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-[11px] text-zinc-700">
+                      <span className="font-semibold text-zinc-900">
+                        {item.school || "学校名称"}
+                      </span>
+                      {[item.major, item.degree].filter(Boolean).length > 0 ? (
+                        <span className="text-zinc-500">
+                          {" · "}
+                          {[item.major, item.degree].filter(Boolean).join(" · ")}
+                        </span>
+                      ) : null}
+                    </p>
+                    <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-400">
+                      {range(item.start, item.end)}
+                    </span>
+                  </div>
+                  <EducationDetails
+                    item={item}
+                    labels={L}
+                    className="mt-0.5 text-[9.5px] leading-[1.7] text-zinc-500"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {resume.skills.length > 0 ? (
+          <section data-section="skills" className="mt-4">
+            <MinimalSectionTitle>{L.skillsProfessional}</MinimalSectionTitle>
+            <SkillText
+              resume={resume}
+              separator=" · "
+              className="text-[10.5px] leading-[1.8] text-zinc-600"
+              titleClassName="font-semibold text-zinc-700"
+            />
+          </section>
+        ) : null}
+
+        {isSectionVisible(resume, "intent") ? (
+          <section data-section="intent" className="mt-4">
+            <MinimalSectionTitle>{L.intent}</MinimalSectionTitle>
+            <p className="text-[10.5px] leading-[1.8] text-zinc-600">
+              {[
+                resume.intent.targetRole,
+                resume.intent.targetCity,
+                resume.intent.jobType,
+                resume.intent.experience,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+              {resume.intent.salaryMin || resume.intent.salaryMax ? (
+                <>
+                  {" · "}
+                  <SalaryRange resume={resume} /> / {L.month}
+                </>
+              ) : null}
+            </p>
+          </section>
+        ) : null}
+      </OrderedSections>
+
+      {!hasVisibleSection(resume, FULL_KEYS) ? (
+        <p className="py-10 text-center text-[12px] text-zinc-300">
+          {L.emptyPreview}
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 学术模板：居中抬头、双线分隔，适合科研 / 教育背景                     */
+/* ------------------------------------------------------------------ */
+
+function AcademicSectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-2.5 break-after-avoid">
+      <span className="text-[10px] font-semibold tracking-[0.22em] text-zinc-900">
+        {children}
+      </span>
+      <span className="mt-1 block border-t border-zinc-500" />
+      <span className="mt-[2px] block border-t border-zinc-300" />
+    </h2>
+  );
+}
+
+function AcademicTemplate({ resume }: { resume: Resume }) {
+  const customSections = visibleCustomSections(resume);
+  const L = resumeLabels(resume.language);
+  const contact = contactItems(resume);
+
+  return (
+    <article
+      className="resume-paper bg-white text-zinc-800"
+      style={{
+        padding: "15mm 17mm",
+        fontFamily: SERIF_STACK,
+        ...resumeFontStyle(resume.font),
+        ...accentStyle(resume.theme.accent),
+      }}
+    >
+      <header className="text-center">
+        <ResumePhoto
+          src={resume.basic.photo}
+          className="mx-auto mb-3 h-[20mm] w-[20mm] rounded-sm ring-1 ring-zinc-200"
+        />
+        <h1 className="text-[27px] font-semibold tracking-[0.1em] text-zinc-900">
+          {resume.basic.name || "你的姓名"}
+        </h1>
+        <p className="mt-1.5 text-[11.5px] tracking-[0.14em] text-zinc-600">
+          {resume.basic.headline || "求职头衔"}
+        </p>
+        {contact.length > 0 ? (
+          <p className="mt-2.5 text-[9.5px] leading-relaxed tracking-wide text-zinc-500">
+            {contact.map((item, index) => (
+              <span key={item.key}>
+                {index > 0 ? "  ｜  " : ""}
+                <ContactLink item={item} />
+              </span>
+            ))}
+          </p>
+        ) : null}
+      </header>
+      <div className="mt-4 border-t-2 border-zinc-800" />
+      <div className="mt-[2px] border-t border-zinc-400" />
+
+      <OrderedSections resume={resume} keys={FULL_KEYS}>
+        {resume.basic.summary ? (
+          <section data-section="summary" className="mt-5">
+            <AcademicSectionTitle>{L.summary}</AcademicSectionTitle>
+            <p className="text-justify text-[10.8px] leading-[1.85] text-zinc-600">
+              {resume.basic.summary}
+            </p>
+          </section>
+        ) : null}
+
+        {resume.experiences.length > 0 ? (
+          <section data-section="experience" className="mt-5">
+            <AcademicSectionTitle>{L.experience}</AcademicSectionTitle>
+            <div className="space-y-3.5">
+              {resume.experiences.map((item, index) => (
+                <div
+                  key={item.id}
+                  className={`break-inside-avoid ${
+                    index > 0 && item.pageBreakBefore ? "print:break-before-page" : ""
+                  }`}
+                >
+                  <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
+                  <div className="flex items-baseline justify-between gap-4">
+                    <p className="text-[11px] leading-snug">
+                      <span className="font-semibold text-zinc-900">
+                        {item.company || "公司名称"}
+                      </span>
+                      {item.role ? (
+                        <span className="text-zinc-600"> · {item.role}</span>
+                      ) : null}
+                    </p>
+                    <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-400">
+                      {range(item.start, item.end)}
+                    </span>
+                  </div>
+                  <Bullets
+                    text={item.description}
+                    className="mt-1 text-[10.5px] leading-[1.8] text-zinc-600"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {resume.projects.length > 0 ? (
+          <section data-section="projects" className="mt-5">
+            <AcademicSectionTitle>{L.projects}</AcademicSectionTitle>
+            <div className="space-y-3">
+              {resume.projects.map((item, index) => (
+                <div
+                  key={item.id}
+                  className={`break-inside-avoid ${
+                    index > 0 && item.pageBreakBefore ? "print:break-before-page" : ""
+                  }`}
+                >
+                  <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
+                  <div className="flex items-baseline justify-between gap-4">
+                    <p className="text-[11px] leading-snug">
+                      <span className="font-semibold text-zinc-900">
+                        {item.name || "项目名称"}
+                      </span>
+                      {item.role ? (
+                        <span className="text-zinc-600"> · {item.role}</span>
+                      ) : null}
+                    </p>
+                    {item.link || item.start || item.end ? (
+                      <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+                        {range(item.start, item.end) ? (
+                          <span className="text-[9px] tabular-nums text-zinc-400">
+                            {range(item.start, item.end)}
+                          </span>
+                        ) : null}
+                        {item.link ? (
+                          <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
+                            <ResumeLink value={item.link} />
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                  <Bullets
+                    text={item.description}
+                    className="mt-1 text-[10.5px] leading-[1.8] text-zinc-600"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {customSections.map((section) => (
+          <section key={section.id} data-section="custom" className="mt-5">
+            <AcademicSectionTitle>
+              {customSectionTitle(section)}
+            </AcademicSectionTitle>
+            <CustomItems
+              section={section}
+              titleClassName="text-[10.8px] leading-snug"
+              subtitleClassName="text-zinc-600"
+              dateClassName="text-[9px] text-zinc-400"
+              bodyClassName="mt-0.5 text-[10.5px] leading-[1.8] text-zinc-600"
+              linkClassName="mt-0.5 text-[9px] text-zinc-400"
+            />
+          </section>
+        ))}
+
+        {resume.educations.length > 0 ? (
+          <section data-section="education" className="mt-5">
+            <AcademicSectionTitle>{L.educationAcademic}</AcademicSectionTitle>
+            <div className="space-y-2.5">
+              {resume.educations.map((item) => (
+                <div key={item.id} className="break-inside-avoid">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <p className="text-[10.8px] text-zinc-700">
+                      <span className="font-semibold text-zinc-900">
+                        {item.school || "学校名称"}
+                      </span>
+                      {[item.major, item.degree].filter(Boolean).length > 0 ? (
+                        <span className="text-zinc-600">
+                          {" ｜ "}
+                          {[item.major, item.degree].filter(Boolean).join(" · ")}
+                        </span>
+                      ) : null}
+                    </p>
+                    <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-400">
+                      {range(item.start, item.end)}
+                    </span>
+                  </div>
+                  <EducationDetails
+                    item={item}
+                    labels={L}
+                    className="mt-0.5 text-[9.5px] leading-[1.7] text-zinc-500"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {resume.skills.length > 0 ? (
+          <section data-section="skills" className="mt-5">
+            <AcademicSectionTitle>{L.skillsProfessional}</AcademicSectionTitle>
+            <SkillText
+              resume={resume}
+              separator=" · "
+              className="text-[10.5px] leading-[1.8] text-zinc-600"
+              titleClassName="font-semibold text-zinc-700"
+            />
+          </section>
+        ) : null}
+
+        {isSectionVisible(resume, "intent") ? (
+          <section data-section="intent" className="mt-5">
+            <AcademicSectionTitle>{L.intent}</AcademicSectionTitle>
+            <p className="text-[10.5px] leading-[1.8] text-zinc-600">
+              {[
+                resume.intent.targetRole,
+                resume.intent.targetCity,
+                resume.intent.jobType,
+                resume.intent.experience,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+              {resume.intent.salaryMin || resume.intent.salaryMax ? (
+                <>
+                  {" · "}
+                  <SalaryRange resume={resume} /> / {L.month}
+                </>
+              ) : null}
+            </p>
+          </section>
+        ) : null}
+      </OrderedSections>
+
+      {!hasVisibleSection(resume, FULL_KEYS) ? (
+        <p className="py-10 text-center text-[12px] text-zinc-300">
+          {L.emptyPreview}
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 卡片模板：内容分区成卡片，适合屏幕阅读与中小型项目                    */
+/* ------------------------------------------------------------------ */
+
+function CardSectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-2 flex break-after-avoid items-center gap-2 text-[9.5px] font-semibold tracking-[0.18em] resume-ink">
+      <span className="resume-soft rounded px-1.5 py-1">{children}</span>
+    </h2>
+  );
+}
+
+function CardTemplate({ resume }: { resume: Resume }) {
+  const customSections = visibleCustomSections(resume);
+  const L = resumeLabels(resume.language);
+  const contact = contactItems(resume);
+
+  return (
+    <article
+      className="resume-paper bg-white text-zinc-800"
+      style={{
+        padding: "10mm",
+        fontFamily: SANS_STACK,
+        ...resumeFontStyle(resume.font),
+        ...accentStyle(resume.theme.accent),
+      }}
+    >
+      <header className="resume-soft rounded-2xl border border-black/[0.06] p-5">
+        <div className="flex items-start justify-between gap-5">
+          <div className="min-w-0">
+            <h1 className="text-[27px] font-bold leading-none tracking-tight text-zinc-900">
+              {resume.basic.name || "你的姓名"}
+            </h1>
+            <p className="resume-ink mt-2 text-[11.5px] font-medium">
+              {resume.basic.headline || "求职头衔"}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-start gap-3">
+            <div className="max-w-[62mm] text-right text-[9px] leading-[1.6] text-zinc-500">
+              {contact.map((item) => (
+                <p key={item.key} className="break-all">
+                  <ContactLink item={item} />
+                </p>
+              ))}
+            </div>
+            <ResumePhoto
+              src={resume.basic.photo}
+              className="h-[20mm] w-[20mm] rounded-lg ring-1 ring-black/10"
+            />
+          </div>
+        </div>
+      </header>
+
+      <div className="mt-3 space-y-3">
+        <OrderedSections resume={resume} keys={FULL_KEYS}>
+          {resume.basic.summary ? (
+            <section
+              data-section="summary"
+              className="rounded-xl border border-zinc-200 bg-white p-4"
+            >
+              <CardSectionTitle>{L.summary}</CardSectionTitle>
+              <p className="text-[10.5px] leading-[1.75] text-zinc-600">
+                {resume.basic.summary}
+              </p>
+            </section>
+          ) : null}
+
+          {resume.experiences.length > 0 ? (
+            <section
+              data-section="experience"
+              className="rounded-xl border border-zinc-200 bg-white p-4"
+            >
+              <CardSectionTitle>{L.experience}</CardSectionTitle>
+              <div className="space-y-3">
+                {resume.experiences.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className={`break-inside-avoid ${
+                      index > 0 && item.pageBreakBefore
+                        ? "print:break-before-page"
+                        : ""
+                    }`}
+                  >
+                    <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-[10.8px] leading-snug">
+                        <span className="font-semibold text-zinc-900">
+                          {item.role || "职位"}
+                        </span>
+                        {item.company ? (
+                          <span className="text-zinc-500"> · {item.company}</span>
+                        ) : null}
+                      </p>
+                      <span className="shrink-0 text-[9px] tabular-nums text-zinc-400">
+                        {range(item.start, item.end)}
+                      </span>
+                    </div>
+                    <Bullets
+                      text={item.description}
+                      className="mt-1 text-[10px] leading-[1.7] text-zinc-600"
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {resume.projects.length > 0 ? (
+            <section
+              data-section="projects"
+              className="rounded-xl border border-zinc-200 bg-white p-4"
+            >
+              <CardSectionTitle>{L.projects}</CardSectionTitle>
+              <div className="space-y-2.5">
+                {resume.projects.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className={`break-inside-avoid ${
+                      index > 0 && item.pageBreakBefore
+                        ? "print:break-before-page"
+                        : ""
+                    }`}
+                  >
+                    <PageBreakMarker before={index > 0 && item.pageBreakBefore} label={L.pageBreak} />
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-[10.8px] leading-snug">
+                        <span className="font-semibold text-zinc-900">
+                          {item.name || "项目名称"}
+                        </span>
+                        {item.role ? (
+                          <span className="text-zinc-500"> · {item.role}</span>
+                        ) : null}
+                      </p>
+                      {item.link || item.start || item.end ? (
+                        <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+                          {range(item.start, item.end) ? (
+                            <span className="text-[8.5px] tabular-nums text-zinc-400">
+                              {range(item.start, item.end)}
+                            </span>
+                          ) : null}
+                          {item.link ? (
+                            <span className="max-w-[45mm] break-all text-[8.5px] text-zinc-400">
+                              <ResumeLink value={item.link} />
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                    <Bullets
+                      text={item.description}
+                      className="mt-0.5 text-[10px] leading-[1.7] text-zinc-600"
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {customSections.map((section) => (
+            <section
+              key={section.id}
+              data-section="custom"
+              className="rounded-xl border border-zinc-200 bg-white p-4"
+            >
+              <CardSectionTitle>{customSectionTitle(section)}</CardSectionTitle>
+              <CustomItems
+                section={section}
+                titleClassName="text-[10.8px] leading-snug"
+                subtitleClassName="text-zinc-500"
+                dateClassName="text-[8.5px] text-zinc-400"
+                bodyClassName="mt-0.5 text-[10px] leading-[1.7] text-zinc-600"
+                linkClassName="mt-0.5 text-[8.5px] text-zinc-400"
+                gapClassName="space-y-2"
+              />
+            </section>
+          ))}
+
+          {resume.educations.length > 0 ? (
+            <section
+              data-section="education"
+              className="rounded-xl border border-zinc-200 bg-white p-4"
+            >
+              <CardSectionTitle>{L.education}</CardSectionTitle>
+              <div className="space-y-1.5">
+                {resume.educations.map((item) => (
+                  <div key={item.id} className="break-inside-avoid">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-[10.5px] text-zinc-700">
+                        <span className="font-semibold text-zinc-900">
+                          {item.school || "学校名称"}
+                        </span>
+                        <span className="text-zinc-500">
+                          {[item.major, item.degree].filter(Boolean).length > 0
+                            ? ` · ${[item.major, item.degree]
+                                .filter(Boolean)
+                                .join(" · ")}`
+                            : ""}
+                        </span>
+                      </p>
+                      <span className="shrink-0 text-[9px] tabular-nums text-zinc-400">
+                        {range(item.start, item.end)}
+                      </span>
+                    </div>
+                    <EducationDetails
+                      item={item}
+                      labels={L}
+                      className="mt-0.5 text-[9px] leading-[1.6] text-zinc-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {resume.skills.length > 0 ? (
+            <section
+              data-section="skills"
+              className="rounded-xl border border-zinc-200 bg-white p-4"
+            >
+              <CardSectionTitle>{L.skillsProfessional}</CardSectionTitle>
+              <SkillChips
+                resume={resume}
+                chipClassName="resume-soft rounded px-1.5 py-0.5 text-[9.5px] leading-[1.5] text-zinc-700"
+                titleClassName="mb-1 text-[8.5px] font-medium tracking-wide text-zinc-400"
+              />
+            </section>
+          ) : null}
+
+          {isSectionVisible(resume, "intent") ? (
+            <section
+              data-section="intent"
+              className="rounded-xl border border-zinc-200 bg-white p-4"
+            >
+              <CardSectionTitle>{L.intent}</CardSectionTitle>
+              <p className="text-[10px] leading-[1.7] text-zinc-600">
+                {[
+                  resume.intent.targetRole,
+                  resume.intent.targetCity,
+                  resume.intent.jobType,
+                  resume.intent.experience,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+                {resume.intent.salaryMin || resume.intent.salaryMax ? (
+                  <>
+                    {" · "}
+                    <SalaryRange resume={resume} /> / {L.month}
+                  </>
+                ) : null}
+              </p>
+            </section>
+          ) : null}
+        </OrderedSections>
+      </div>
+
+      {!hasVisibleSection(resume, FULL_KEYS) ? (
+        <p className="py-10 text-center text-[12px] text-zinc-300">
+          {L.emptyPreview}
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
 export function ResumePaper({
   resume,
   template,
@@ -1522,9 +2330,14 @@ export function ResumePaper({
   resume: Resume;
   template: TemplateId;
 }) {
-  if (template === "classic") return <ClassicTemplate resume={resume} />;
-  if (template === "compact") return <CompactTemplate resume={resume} />;
-  if (template === "sidebar") return <SidebarTemplate resume={resume} />;
-  if (template === "timeline") return <TimelineTemplate resume={resume} />;
-  return <ModernTemplate resume={resume} />;
+  // 预览 / 打印只消费英文合并后的视图，原始中文数据保持不变。
+  const view = localizedResume(resume);
+  if (template === "classic") return <ClassicTemplate resume={view} />;
+  if (template === "compact") return <CompactTemplate resume={view} />;
+  if (template === "sidebar") return <SidebarTemplate resume={view} />;
+  if (template === "timeline") return <TimelineTemplate resume={view} />;
+  if (template === "minimal") return <MinimalTemplate resume={view} />;
+  if (template === "academic") return <AcademicTemplate resume={view} />;
+  if (template === "card") return <CardTemplate resume={view} />;
+  return <ModernTemplate resume={view} />;
 }

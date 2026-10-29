@@ -7,6 +7,16 @@ export type AiMode = (typeof AI_MODES)[number];
 export const AI_TONES = ["professional", "concise", "result"] as const;
 export type AiTone = (typeof AI_TONES)[number];
 
+/** AI 输出语言，与简历语言共用取值；缺省按中文处理。 */
+export const AI_LANGUAGES = ["zh", "en", "bilingual"] as const;
+export type AiLanguage = (typeof AI_LANGUAGES)[number];
+
+/**
+ * 双语输出时中英文之间的分隔标记。
+ * 提示词要求它独占一行，客户端据此把结果拆回中文与英文两个字段。
+ */
+export const AI_BILINGUAL_MARKER = "===EN===";
+
 export type AiGenerateRequest = {
   section: AiSection;
   mode: AiMode;
@@ -17,6 +27,8 @@ export type AiGenerateRequest = {
   /** 可选的目标 JD，只用于调整表述重点，不写入简历。 */
   jd?: string;
   tone: AiTone;
+  /** 输出语言；缺省中文，保持旧客户端兼容。 */
+  language?: AiLanguage;
 };
 
 /**
@@ -29,6 +41,7 @@ export type AiFullResumeRequest = {
   years: string;
   jd?: string;
   tone: AiTone;
+  language?: AiLanguage;
 };
 
 export type AiUsage = {

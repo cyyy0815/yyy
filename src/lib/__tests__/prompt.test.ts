@@ -5,7 +5,7 @@ import {
   buildUserPrompt,
   cleanAiText,
 } from "../ai/prompt";
-import type { AiGenerateRequest } from "../ai/types";
+import { AI_BILINGUAL_MARKER, type AiGenerateRequest } from "../ai/types";
 
 function coverRequest(patch: Partial<AiGenerateRequest> = {}): AiGenerateRequest {
   return {
@@ -36,6 +36,36 @@ describe("buildSystemPrompt", () => {
     const prompt = buildSystemPrompt("cover", true);
     expect(prompt).toContain("9. 参考 JD");
     expect(prompt).toContain("不得把 JD 中用户未提供的");
+  });
+});
+
+describe("多语言提示词", () => {
+  it("英文模式使用英文规则与英文求职信格式", () => {
+    const prompt = buildSystemPrompt("cover", false, "en");
+    expect(prompt).toContain("Write a formal cover letter in English");
+    expect(prompt).toContain("Dear Hiring Manager");
+    expect(prompt).toContain("Sincerely");
+    expect(prompt).toContain("natural, professional English");
+    expect(prompt).not.toContain("尊敬的招聘负责人");
+  });
+
+  it("双语模式要求分隔行并保留两种格式", () => {
+    const prompt = buildSystemPrompt("experience", false, "bilingual");
+    expect(prompt).toContain(AI_BILINGUAL_MARKER);
+    expect(prompt).toContain("中文版与英文版");
+    expect(prompt).toContain("10–25 词");
+    expect(prompt).toContain("3–5 条要点");
+  });
+
+  it("用户提示词与语气按语言本地化", () => {
+    const en = buildUserPrompt(coverRequest({ language: "en" }));
+    expect(en).toContain("Target role：");
+    expect(en).toContain("Materials：");
+    expect(en).toContain("Professional and reliable");
+
+    const bilingual = buildUserPrompt(coverRequest({ language: "bilingual" }));
+    expect(bilingual).toContain("目标岗位 / Target role：");
+    expect(bilingual).toContain("专业稳重 / Professional and reliable");
   });
 });
 
@@ -84,6 +114,18 @@ describe("cleanAiText", () => {
   it("经历文本仍按行清理列表符号", () => {
     expect(cleanAiText("1. 第一件事\n- 第二件事\n\n第三件事", "experience")).toBe(
       "第一件事\n第二件事\n第三件事",
+    );
+  });
+
+  it("英文简介按空格合并行，避免单词粘连", () => {
+    expect(
+      cleanAiText(
+        "Frontend engineer with 4 years of experience.\nLed design system work.",
+        "summary",
+        "en",
+      ),
+    ).toBe(
+      "Frontend engineer with 4 years of experience. Led design system work.",
     );
   });
 });

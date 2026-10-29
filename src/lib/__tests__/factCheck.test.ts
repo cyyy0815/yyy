@@ -136,4 +136,16 @@ describe("checkFullResumeFacts", () => {
   it("空简历与空自述不产生提示", () => {
     expect(checkFullResumeFacts(createEmptyResume(), "")).toEqual([]);
   });
+
+  it("英文模式跳过会因翻译而误报的名称，仍核对数字与技能", () => {
+    const resume = buildFullResume();
+    resume.language = "en";
+    resume.experiences[0].company = "Xinghe Technology";
+    resume.basic.summary = "Product manager with 3 years of experience.";
+
+    const warnings = checkFullResumeFacts(resume, brief, { language: "en" });
+    expect(nameValues(warnings)).toEqual([]);
+    expect(numberValues(warnings)).toContain("30%");
+    expect(skillValues(warnings)).toContain("需求分析");
+  });
 });

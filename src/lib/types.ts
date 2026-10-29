@@ -1,3 +1,9 @@
+import { DEFAULT_RESUME_FONT, type ResumeFontId } from "./fonts";
+import {
+  createEmptyTranslation,
+  DEFAULT_RESUME_LANGUAGE,
+  type ResumeLanguage,
+} from "./language";
 import { RESUME_SCHEMA_VERSION } from "./schema";
 import { DEFAULT_ACCENT } from "./theme";
 
@@ -83,6 +89,68 @@ export type ResumeTheme = {
   accent: string;
 };
 
+export type EnglishBasic = {
+  name: string;
+  headline: string;
+  summary: string;
+  /** 联系方式里的城市；留空时保留中文 */
+  city: string;
+};
+
+export type EnglishExperience = {
+  company: string;
+  role: string;
+  description: string;
+};
+
+export type EnglishProject = {
+  name: string;
+  role: string;
+  description: string;
+};
+
+export type EnglishEducation = {
+  school: string;
+  major: string;
+  degree: string;
+  ranking: string;
+  courses: string;
+  honors: string;
+};
+
+export type EnglishCustomItem = {
+  title: string;
+  subtitle: string;
+  description: string;
+};
+
+export type EnglishCustomSection = {
+  title: string;
+  items: Record<string, EnglishCustomItem>;
+};
+
+/**
+ * 英文内容按条目 id 存放，避免改数据模型；缺失或空字符串时回退中文。
+ * 只覆盖会出现在简历上的字段，联系方式与技能名保持原样。
+ */
+export type ResumeTranslation = {
+  basic: EnglishBasic;
+  intent: {
+    targetRole: string;
+    targetCity: string;
+    jobType: string;
+    experience: string;
+  };
+  experiences: Record<string, EnglishExperience>;
+  projects: Record<string, EnglishProject>;
+  educations: Record<string, EnglishEducation>;
+  customSections: Record<string, EnglishCustomSection>;
+  /** 技能名 → 英文展示名；不影响匹配与 AI 使用的原始技能名 */
+  skills: Record<string, string>;
+  /** 技能分组名 → 英文展示名 */
+  skillGroups: Record<string, string>;
+};
+
 export const SKILL_LEVELS = ["", "了解", "熟练", "精通"] as const;
 
 export type SkillLevel = (typeof SKILL_LEVELS)[number];
@@ -140,6 +208,12 @@ export type Resume = {
   /** 内置板块的显示顺序与隐藏状态；旧数据没有时按默认补齐 */
   layout: ResumeLayout;
   theme: ResumeTheme;
+  /** 字体搭配；auto 表示沿用模板默认字体，旧数据默认 auto */
+  font: ResumeFontId;
+  /** 简历语言；双语模板标题并列显示中英文。旧数据默认中文。 */
+  language: ResumeLanguage;
+  /** 英文内容覆盖层；只影响预览 / 打印 / ATS 导出，不改变中文原文。 */
+  translation: ResumeTranslation;
 };
 
 export const TEMPLATE_IDS = [
@@ -148,6 +222,9 @@ export const TEMPLATE_IDS = [
   "compact",
   "sidebar",
   "timeline",
+  "minimal",
+  "academic",
+  "card",
 ] as const;
 
 export type TemplateId = (typeof TEMPLATE_IDS)[number];
@@ -197,5 +274,8 @@ export function createEmptyResume(): Resume {
     skillGroups: [],
     layout: { order: [...DEFAULT_SECTION_ORDER], hidden: [] },
     theme: { accent: DEFAULT_ACCENT },
+    font: DEFAULT_RESUME_FONT,
+    language: DEFAULT_RESUME_LANGUAGE,
+    translation: createEmptyTranslation(),
   };
 }

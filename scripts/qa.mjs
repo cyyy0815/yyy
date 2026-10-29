@@ -333,6 +333,21 @@ await shot("qa-template-timeline", {
   height: 1200,
   template: "timeline",
 });
+await shot("qa-template-minimal", {
+  width: 1440,
+  height: 1100,
+  template: "minimal",
+});
+await shot("qa-template-academic", {
+  width: 1440,
+  height: 1100,
+  template: "academic",
+});
+await shot("qa-template-card", {
+  width: 1440,
+  height: 1100,
+  template: "card",
+});
 await shot("qa-jobs-mobile", {
   url: `${BASE}/#jobs`,
   width: 390,
@@ -876,6 +891,17 @@ const COVER_TEXT = [
   "此致",
   "敬礼",
 ].join("\n");
+const COVER_TEXT_EN = [
+  "Dear Hiring Manager,",
+  "",
+  "I am writing to apply for the Frontend Engineer role. I bring 4 years of frontend experience, leading a platform refactor that improved first-paint performance by 40%.",
+  "",
+  "At Xingye Technology I built a React and TypeScript component library covering 12 business lines, reducing duplicate development effort by about 30%.",
+  "",
+  "I would welcome the opportunity to discuss how I can contribute.",
+  "",
+  "Sincerely,",
+].join("\n");
 const coverResume = {
   basic: {
     name: "林一",
@@ -914,7 +940,9 @@ const coverResume = {
 };
 
 const coverPage = await open({ width: 1440, height: 1000 });
-await interceptAi(coverPage, { text: COVER_TEXT });
+await interceptAi(coverPage, {
+  text: (payload) => (payload.language === "en" ? COVER_TEXT_EN : COVER_TEXT),
+});
 await coverPage.goto(`${BASE}/#jobs`, { waitUntil: "networkidle0" });
 await coverPage.evaluate((resume) => {
   localStorage.clear();
@@ -1007,6 +1035,7 @@ const coverPayloadRaw = JSON.stringify(coverPayload ?? {});
 expect(
   "求职信请求只发送素材、岗位、年限与 JD",
   coverPayload?.section === "cover" &&
+    coverPayload?.language === "zh" &&
     coverPayload?.role === "前端工程师" &&
     coverPayload?.years === "3-5 年" &&
     String(coverPayload?.keywords).includes("首屏性能提升 40%") &&
@@ -1029,6 +1058,47 @@ expect(
   "求职信不会写入简历",
   coverStored === "4 年前端经验，主导中后台重构，首屏性能提升 40%。",
   String(coverStored),
+);
+
+// 求职信跟随语言：切到英文后重新生成，输出与请求都应变为英文
+await coverPage.evaluate(() => {
+  const select = document.querySelector('[data-qa="cover-language"]');
+  if (!(select instanceof HTMLSelectElement)) return;
+  Object.getOwnPropertyDescriptor(
+    HTMLSelectElement.prototype,
+    "value",
+  )?.set?.call(select, "en");
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+});
+await pause(200);
+await clickText(coverPage, "重新生成", '[role="dialog"]');
+await coverPage.waitForFunction(
+  () => {
+    const output = document.querySelector('[data-qa="cover-output"]');
+    return (
+      output instanceof HTMLTextAreaElement &&
+      output.value.includes("Dear Hiring Manager") &&
+      output.value.includes("Sincerely")
+    );
+  },
+  { timeout: 20000 },
+);
+const coverEnglish = await coverPage.evaluate(() => ({
+  text: document.querySelector('[data-qa="cover-output"]')?.value ?? "",
+  language: document.querySelector('[data-qa="cover-language"]')?.value ?? "",
+}));
+const coverEnglishPayload = coverPage.aiPayloads.at(-1) ?? {};
+expect(
+  "求职信可切换英文输出并携带 language",
+  coverEnglish.language === "en" &&
+    coverEnglishPayload.language === "en" &&
+    coverEnglish.text.includes("Dear Hiring Manager") &&
+    !coverEnglish.text.includes("尊敬的招聘负责人"),
+  JSON.stringify({
+    language: coverEnglish.language,
+    payload: coverEnglishPayload.language,
+    length: coverEnglish.text.length,
+  }),
 );
 
 const coverDialog = await coverPage.$('[role="dialog"]');
@@ -1525,7 +1595,7 @@ await importCheckPage.evaluate(() => {
 });
 await importCheckPage.close();
 
-// P2 证件照：上传后压缩保存、五套模板展示、JSON 备份包含、可移除
+// P2 证件照：上传后压缩保存、八套模板展示、JSON 备份包含、可移除
 const photoFixture = path.join(OUT, "qa-photo-fixture.svg");
 await writeFile(
   photoFixture,
@@ -1595,6 +1665,9 @@ const photoTemplates = [
   { label: "紧凑", id: "compact" },
   { label: "侧栏", id: "sidebar" },
   { label: "时间轴", id: "timeline" },
+  { label: "极简", id: "minimal" },
+  { label: "学术", id: "academic" },
+  { label: "卡片", id: "card" },
 ];
 const photoLayout = {};
 for (const { label, id } of photoTemplates) {
@@ -1621,7 +1694,7 @@ for (const { label, id } of photoTemplates) {
   await paper?.screenshot({ path: `${OUT}/qa-photo-${id}.png` });
 }
 expect(
-  "五套模板展示证件照",
+  "八套模板展示证件照",
   Object.values(photoLayout).every(
     (item) => item.count === 1 && item.width > 10,
   ),
@@ -1711,7 +1784,7 @@ await photoPage.evaluate(() => {
 });
 await photoPage.close();
 
-// P2 自定义板块：添加、编辑、排序、显隐、删除撤销、五套模板、JSON 备份
+// P2 自定义板块：添加、编辑、排序、显隐、删除撤销、八套模板、JSON 备份
 const customPage = await open({ width: 1440, height: 1000 });
 await customPage.goto(BASE, { waitUntil: "networkidle0" });
 await customPage.evaluate(() => {
@@ -2002,6 +2075,9 @@ const customTemplates = [
   { label: "紧凑", id: "compact" },
   { label: "侧栏", id: "sidebar" },
   { label: "时间轴", id: "timeline" },
+  { label: "极简", id: "minimal" },
+  { label: "学术", id: "academic" },
+  { label: "卡片", id: "card" },
 ];
 const customTemplateResult = {};
 for (const { label, id } of customTemplates) {
@@ -2033,7 +2109,7 @@ for (const { label, id } of customTemplates) {
   await paper?.screenshot({ path: `${OUT}/qa-custom-${id}.png` });
 }
 expect(
-  "五套模板渲染自定义板块、项目时间与教育增强",
+  "八套模板渲染自定义板块、项目时间与教育增强",
   Object.values(customTemplateResult).every(
     (item) =>
       item.certificate && item.language && item.projectDates && item.education,
@@ -3315,6 +3391,855 @@ await themePage.screenshot({ path: `${OUT}/qa-theme-timeline.png` });
 await themePage.evaluate(() => localStorage.removeItem("resume-workshop:v1"));
 await themePage.close();
 
+// 字体搭配：默认跟随模板、切换后作用于标题/正文、八套模板一致、刷新/撤销/导出保留
+const fontPage = await open({ width: 1440, height: 1100 });
+await fontPage.goto(BASE, { waitUntil: "networkidle0" });
+await fontPage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await fontPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+
+const readFontState = () =>
+  fontPage.evaluate(() => {
+    const group = document.querySelector('[aria-label="简历字体"]');
+    const buttons = [...(group?.querySelectorAll("button") ?? [])];
+    const paper = document.querySelector(".resume-paper");
+    const heading = paper?.querySelector("h1");
+    const body = paper?.querySelector("section p");
+    return {
+      labels: buttons.map((button) => button.textContent?.trim() ?? ""),
+      pressed:
+        buttons
+          .find((button) => button.getAttribute("aria-pressed") === "true")
+          ?.textContent?.trim() ?? "",
+      stored: (() => {
+        try {
+          return (
+            JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}")
+              .font ?? "none"
+          );
+        } catch {
+          return "invalid";
+        }
+      })(),
+      paper: paper ? getComputedStyle(paper).fontFamily : "",
+      heading: heading ? getComputedStyle(heading).fontFamily : "",
+      body: body ? getComputedStyle(body).fontFamily : "",
+    };
+  });
+
+const clickFont = async (label) => {
+  await fontPage.evaluate((text) => {
+    const group = document.querySelector('[aria-label="简历字体"]');
+    [...(group?.querySelectorAll("button") ?? [])]
+      .find((button) => button.textContent?.trim() === text)
+      ?.click();
+  }, label);
+  await pause(400);
+};
+
+const fontDefault = await readFontState();
+expect(
+  "字体选择器提供五种搭配且默认沿用模板字体",
+  fontDefault.labels.join("、") === "默认、无衬线、衬线、报刊、等宽" &&
+    fontDefault.pressed === "默认" &&
+    /system-ui|ui-sans-serif/.test(fontDefault.heading) &&
+    /system-ui|ui-sans-serif/.test(fontDefault.body),
+  JSON.stringify(fontDefault),
+);
+
+await clickFont("衬线");
+await fontPage.waitForFunction(
+  () => {
+    try {
+      return (
+        JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}").font ===
+        "serif"
+      );
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 5000 },
+);
+const fontSerif = await readFontState();
+expect(
+  "选择衬线后标题与正文同时切换并保存",
+  fontSerif.stored === "serif" &&
+    fontSerif.pressed === "衬线" &&
+    /Georgia|Songti/.test(fontSerif.heading) &&
+    /Georgia|Songti/.test(fontSerif.body),
+  JSON.stringify(fontSerif),
+);
+
+await clickFont("报刊");
+const fontEditorial = await readFontState();
+expect(
+  "报刊搭配只让标题使用衬线",
+  fontEditorial.stored === "editorial" &&
+    /Georgia|Songti/.test(fontEditorial.heading) &&
+    /system-ui|ui-sans-serif/.test(fontEditorial.body),
+  JSON.stringify(fontEditorial),
+);
+
+await clickFont("等宽");
+const fontMono = await readFontState();
+expect(
+  "等宽搭配使用等宽标题与无衬线正文",
+  fontMono.stored === "mono" &&
+    /mono/i.test(fontMono.heading) &&
+    /system-ui|ui-sans-serif/.test(fontMono.body),
+  JSON.stringify(fontMono),
+);
+
+await clickFont("衬线");
+const fontTemplates = [];
+for (const label of [
+  "现代",
+  "经典",
+  "紧凑",
+  "侧栏",
+  "时间轴",
+  "极简",
+  "学术",
+  "卡片",
+]) {
+  await clickText(fontPage, label);
+  await pause(300);
+  const state = await fontPage.evaluate(() => {
+    const paper = document.querySelector(".resume-paper");
+    const heading = paper?.querySelector("h1");
+    const body = paper?.querySelector("section p");
+    return {
+      heading: heading ? getComputedStyle(heading).fontFamily : "",
+      body: body ? getComputedStyle(body).fontFamily : "",
+      name: paper?.textContent?.includes("林一") ?? false,
+    };
+  });
+  fontTemplates.push({ label, ...state });
+}
+expect(
+  "八套模板都应用所选字体",
+  fontTemplates.every(
+    (item) =>
+      item.name &&
+      /Georgia|Songti/.test(item.heading) &&
+      /Georgia|Songti/.test(item.body),
+  ),
+  JSON.stringify(fontTemplates),
+);
+await clickText(fontPage, "现代");
+await pause(300);
+
+await fontPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+const fontReloaded = await readFontState();
+expect(
+  "字体搭配刷新后保留",
+  fontReloaded.stored === "serif" &&
+    fontReloaded.pressed === "衬线" &&
+    /Georgia|Songti/.test(fontReloaded.heading),
+  JSON.stringify(fontReloaded),
+);
+
+await fontPage.evaluate(() => {
+  window.__fontExport = null;
+  const originalCreate = URL.createObjectURL.bind(URL);
+  URL.createObjectURL = (blob) => {
+    window.__fontExport = blob;
+    return originalCreate(blob);
+  };
+  HTMLAnchorElement.prototype.click = function () {};
+});
+await clickText(fontPage, "导出");
+await fontPage.waitForFunction(() => Boolean(window.__fontExport), {
+  timeout: 5000,
+});
+const exportedFont = await fontPage.evaluate(async () => {
+  const payload = JSON.parse(await window.__fontExport.text());
+  return (
+    payload.documents?.find((document) => document.id === payload.activeId)
+      ?.resume?.font ?? "none"
+  );
+});
+expect("导出 JSON 保留字体搭配", exportedFont === "serif", exportedFont);
+
+await pause(900);
+await clickFont("等宽");
+const monoBeforeUndo = await readFontState();
+await fontPage.evaluate(() => {
+  const root = document.querySelector('[data-qa="history-controls"]');
+  [...(root?.querySelectorAll("button") ?? [])]
+    .find((button) => button.getAttribute("aria-label") === "撤销")
+    ?.click();
+});
+await fontPage.waitForFunction(
+  () => {
+    try {
+      return (
+        JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}").font ===
+        "serif"
+      );
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 5000 },
+);
+const fontUndone = await readFontState();
+expect(
+  "字体切换可撤销",
+  monoBeforeUndo.stored === "mono" &&
+    fontUndone.stored === "serif" &&
+    fontUndone.pressed === "衬线",
+  JSON.stringify({ before: monoBeforeUndo.stored, after: fontUndone.stored }),
+);
+
+await fontPage.setViewport({
+  width: 390,
+  height: 844,
+  deviceScaleFactor: 1,
+  isMobile: true,
+  hasTouch: true,
+});
+await pause(300);
+await clickText(fontPage, "预览");
+await pause(300);
+const fontMobile = await fontPage.evaluate(() => {
+  const group = document.querySelector('[aria-label="简历字体"]');
+  const templates = document.querySelector('[aria-label="简历模板"]');
+  return {
+    viewport: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    fontButtons: group?.querySelectorAll("button").length ?? 0,
+    templateButtons: templates?.querySelectorAll("button").length ?? 0,
+    paper: Boolean(document.querySelector(".resume-paper")),
+  };
+});
+expect(
+  "390px 下八套模板与字体选择器无横向溢出",
+  fontMobile.fontButtons === 5 &&
+    fontMobile.templateButtons === 8 &&
+    fontMobile.paper &&
+    fontMobile.scrollWidth <= fontMobile.viewport + 1,
+  JSON.stringify(fontMobile),
+);
+expect(
+  "字体选择页面无控制台错误",
+  fontPage.qaErrors.length === 0,
+  fontPage.qaErrors.join("; "),
+);
+await fontPage.evaluate(() => localStorage.removeItem("resume-workshop:v1"));
+await fontPage.close();
+
+// 简历语言：中文 / 英文 / 双语、英文内容覆盖、跨模板、刷新、撤销与移动端
+const languagePage = await open({ width: 1440, height: 1100 });
+await languagePage.goto(BASE, { waitUntil: "networkidle0" });
+await languagePage.evaluate(() => {
+  localStorage.removeItem("resume-workshop:v1");
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await languagePage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+
+const readLanguageState = () =>
+  languagePage.evaluate(() => {
+    const group = document.querySelector('[aria-label="简历语言"]');
+    const buttons = [...(group?.querySelectorAll("button") ?? [])];
+    const paper = document.querySelector(".resume-paper");
+    return {
+      labels: buttons.map((button) => button.textContent?.trim() ?? ""),
+      pressed:
+        buttons
+          .find((button) => button.getAttribute("aria-pressed") === "true")
+          ?.textContent?.trim() ?? "",
+      stored: (() => {
+        try {
+          return (
+            JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}")
+              .language ?? "none"
+          );
+        } catch {
+          return "invalid";
+        }
+      })(),
+      headings: [...(paper?.querySelectorAll("h2") ?? [])].map(
+        (heading) => heading.textContent?.trim() ?? "",
+      ),
+      text: paper?.textContent ?? "",
+    };
+  });
+
+const clickLanguage = async (label) => {
+  await languagePage.evaluate((text) => {
+    const group = document.querySelector('[aria-label="简历语言"]');
+    [...(group?.querySelectorAll("button") ?? [])]
+      .find((button) => button.textContent?.trim() === text)
+      ?.click();
+  }, label);
+  await pause(400);
+};
+
+const languageDefault = await readLanguageState();
+expect(
+  "语言选择器提供中文 / 英文 / 双语且默认中文",
+  languageDefault.labels.join("、") === "中文、英文、双语" &&
+    languageDefault.pressed === "中文" &&
+    languageDefault.headings.includes("个人简介") &&
+    languageDefault.headings.includes("工作经历") &&
+    languageDefault.text.includes("林一"),
+  JSON.stringify({
+    labels: languageDefault.labels,
+    pressed: languageDefault.pressed,
+    headings: languageDefault.headings,
+  }),
+);
+
+await clickLanguage("英文");
+await languagePage.waitForFunction(
+  () => {
+    try {
+      return (
+        JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}")
+          .language === "en"
+      );
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 5000 },
+);
+const languageEnglish = await readLanguageState();
+expect(
+  "切换英文后标题与英文内容生效并保存",
+  languageEnglish.pressed === "英文" &&
+    languageEnglish.stored === "en" &&
+    ["SUMMARY", "EXPERIENCE", "PROJECTS", "EDUCATION", "SKILLS"].every(
+      (label) => languageEnglish.headings.includes(label),
+    ) &&
+    languageEnglish.text.includes("Lin Yi") &&
+    languageEnglish.text.includes("Xingye Technology") &&
+    languageEnglish.text.includes("Present") &&
+    languageEnglish.text.includes("Full-time") &&
+    !languageEnglish.text.includes("个人简介"),
+  JSON.stringify({
+    pressed: languageEnglish.pressed,
+    headings: languageEnglish.headings,
+  }),
+);
+const languagePaperEnglish = await languagePage.$(".resume-paper");
+if (languagePaperEnglish) {
+  await languagePaperEnglish.screenshot({
+    path: `${OUT}/qa-language-en.png`,
+  });
+}
+
+const languageTemplates = [];
+for (const label of [
+  "现代",
+  "经典",
+  "紧凑",
+  "侧栏",
+  "时间轴",
+  "极简",
+  "学术",
+  "卡片",
+]) {
+  await clickText(languagePage, label);
+  await pause(250);
+  const state = await languagePage.evaluate(() => {
+    const paper = document.querySelector(".resume-paper");
+    const headings = [...(paper?.querySelectorAll("h2") ?? [])].map(
+      (heading) => heading.textContent?.trim() ?? "",
+    );
+    return {
+      text: paper?.textContent ?? "",
+      headings,
+    };
+  });
+  languageTemplates.push({
+    label,
+    englishHeadings: ["EXPERIENCE", "EDUCATION"].every((heading) =>
+      state.headings.includes(heading),
+    ),
+    englishContent: state.text.includes("Lin Yi") && state.text.includes("Present"),
+  });
+}
+expect(
+  "八套模板都应用英文标题与内容",
+  languageTemplates.every((item) => item.englishHeadings && item.englishContent),
+  JSON.stringify(languageTemplates),
+);
+await clickText(languagePage, "现代");
+await pause(250);
+
+await clickLanguage("双语");
+const languageBilingual = await readLanguageState();
+expect(
+  "双语模式并列中英文标题与内容",
+  languageBilingual.stored === "bilingual" &&
+    languageBilingual.headings.includes("个人简介 / SUMMARY") &&
+    languageBilingual.headings.includes("工作经历 / EXPERIENCE") &&
+    languageBilingual.text.includes("林一 / Lin Yi") &&
+    languageBilingual.text.includes("至今 / Present"),
+  JSON.stringify({
+    pressed: languageBilingual.pressed,
+    headings: languageBilingual.headings,
+  }),
+);
+const languagePaperBilingual = await languagePage.$(".resume-paper");
+if (languagePaperBilingual) {
+  await languagePaperBilingual.screenshot({
+    path: `${OUT}/qa-language-bilingual.png`,
+  });
+}
+
+await clickLanguage("英文");
+await languagePage.evaluate(() => {
+  const input = document.querySelector('[data-qa="translation-name"]');
+  if (!input) return;
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value",
+  )?.set;
+  setter?.call(input, "QA Tester");
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await pause(500);
+const languageEdited = await languagePage.evaluate(() => {
+  const stored = JSON.parse(
+    localStorage.getItem("resume-workshop:v1") ?? "{}",
+  );
+  return {
+    translated: stored.translation?.basic?.name ?? "",
+    text: document.querySelector(".resume-paper")?.textContent ?? "",
+  };
+});
+expect(
+  "英文内容编辑器写入覆盖层并立即更新预览",
+  languageEdited.translated === "QA Tester" &&
+    languageEdited.text.includes("QA Tester"),
+  JSON.stringify(languageEdited),
+);
+
+await languagePage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+const languageReloaded = await readLanguageState();
+expect(
+  "英文语言与英文内容刷新后保留",
+  languageReloaded.pressed === "英文" &&
+    languageReloaded.stored === "en" &&
+    languageReloaded.text.includes("QA Tester") &&
+    languageReloaded.headings.includes("EXPERIENCE"),
+  JSON.stringify({
+    pressed: languageReloaded.pressed,
+    stored: languageReloaded.stored,
+  }),
+);
+
+await pause(900);
+await clickLanguage("双语");
+const bilingualBeforeUndo = await readLanguageState();
+await languagePage.evaluate(() => {
+  const root = document.querySelector('[data-qa="history-controls"]');
+  [...(root?.querySelectorAll("button") ?? [])]
+    .find((button) => button.getAttribute("aria-label") === "撤销")
+    ?.click();
+});
+await languagePage.waitForFunction(
+  () => {
+    try {
+      return (
+        JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}")
+          .language === "en"
+      );
+    } catch {
+      return false;
+    }
+  },
+  { timeout: 5000 },
+);
+const languageUndone = await readLanguageState();
+expect(
+  "切换简历语言可撤销",
+  bilingualBeforeUndo.stored === "bilingual" &&
+    languageUndone.stored === "en" &&
+    languageUndone.pressed === "英文",
+  JSON.stringify({
+    before: bilingualBeforeUndo.stored,
+    after: languageUndone.stored,
+  }),
+);
+
+await languagePage.setViewport({
+  width: 390,
+  height: 844,
+  deviceScaleFactor: 1,
+  isMobile: true,
+  hasTouch: true,
+});
+await pause(300);
+await clickText(languagePage, "预览");
+await pause(300);
+const languageMobile = await languagePage.evaluate(() => {
+  const group = document.querySelector('[aria-label="简历语言"]');
+  return {
+    viewport: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    languageButtons: group?.querySelectorAll("button").length ?? 0,
+    fontButtons:
+      document
+        .querySelector('[aria-label="简历字体"]')
+        ?.querySelectorAll("button").length ?? 0,
+    templateButtons:
+      document
+        .querySelector('[aria-label="简历模板"]')
+        ?.querySelectorAll("button").length ?? 0,
+    paper: Boolean(document.querySelector(".resume-paper")),
+  };
+});
+expect(
+  "390px 下语言选择器与其余工具栏无横向溢出",
+  languageMobile.languageButtons === 3 &&
+    languageMobile.fontButtons === 5 &&
+    languageMobile.templateButtons === 8 &&
+    languageMobile.paper &&
+    languageMobile.scrollWidth <= languageMobile.viewport + 1,
+  JSON.stringify(languageMobile),
+);
+expect(
+  "简历语言页面无控制台错误",
+  languagePage.qaErrors.length === 0,
+  languagePage.qaErrors.join("; "),
+);
+await languagePage.evaluate(() =>
+  localStorage.removeItem("resume-workshop:v1"),
+);
+await languagePage.close();
+
+// AI 跟随简历语言：英文单段写英文覆盖层、双语拆成原文 + 覆盖层、英文整份写入英文主数据
+const AI_TEXT_EN =
+  "Frontend engineer with 4 years of experience specializing in React and performance optimization. Led a platform refactor that cut first-paint time by 40%.";
+const AI_TEXT_BILINGUAL = [
+  "4 年前端开发经验，专注 React 技术栈与性能优化。主导中后台平台重构，首屏加载时间降低 40%。",
+  "===EN===",
+  "Frontend engineer with 4 years of experience specializing in React and performance optimization. Led a platform refactor that cut first-paint time by 40%.",
+].join("\n");
+const FULL_RESUME_EN = {
+  headline: "Frontend Engineer",
+  city: "Shanghai",
+  summary: "Frontend engineer with 4 years of experience.",
+  intent: {
+    targetRole: "Frontend Engineer",
+    targetCity: "Shanghai",
+    experience: "3–5 years",
+  },
+  educations: [
+    {
+      school: "East China University of Science and Technology",
+      major: "Computer Science",
+      degree: "Bachelor",
+      start: "2017-09",
+      end: "2021-06",
+    },
+  ],
+  experiences: [
+    {
+      company: "Xinghe Technology",
+      role: "Senior Frontend Engineer",
+      start: "2023-03",
+      end: "Present",
+      description: [
+        "Led the frontend architecture upgrade to React 18 and TypeScript",
+        "Cut build time by 55%",
+      ],
+    },
+  ],
+  projects: [
+    {
+      name: "Visual Operations Console",
+      role: "Tech Lead",
+      start: "2023-05",
+      end: "2024-06",
+      description: "Built a drag-and-drop reporting platform.",
+    },
+  ],
+  skills: ["React", "TypeScript"],
+};
+const aiLangPage = await open({ width: 1440, height: 1100 });
+await interceptAi(aiLangPage, {
+  text: (payload) =>
+    payload.language === "en"
+      ? AI_TEXT_EN
+      : payload.language === "bilingual"
+        ? AI_TEXT_BILINGUAL
+        : AI_TEXT,
+  fullText: (payload) =>
+    payload.language === "en"
+      ? JSON.stringify(FULL_RESUME_EN)
+      : JSON.stringify(FULL_RESUME_JSON),
+});
+await aiLangPage.goto(BASE, { waitUntil: "networkidle0" });
+await aiLangPage.evaluate(() => {
+  localStorage.clear();
+  localStorage.setItem("resume-workshop:template", "modern");
+});
+await aiLangPage.reload({ waitUntil: "networkidle0" });
+await pause(600);
+
+const clickAiLanguage = async (label) => {
+  await aiLangPage.evaluate((text) => {
+    const group = document.querySelector('[aria-label="简历语言"]');
+    [...(group?.querySelectorAll("button") ?? [])]
+      .find((button) => button.textContent?.trim() === text)
+      ?.click();
+  }, label);
+  await aiLangPage.waitForFunction(
+    (language) => {
+      try {
+        return (
+          JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}")
+            .language === language
+        );
+      } catch {
+        return false;
+      }
+    },
+    { timeout: 5000 },
+    label === "英文" ? "en" : "bilingual",
+  );
+  await pause(300);
+};
+
+const openAiDialog = async () => {
+  await aiLangPage.evaluate(() => {
+    [...document.querySelectorAll("button")]
+      .find((button) => button.textContent?.includes("开始生成"))
+      ?.click();
+  });
+  await aiLangPage.waitForSelector('[data-qa="ai-keywords"]', {
+    timeout: 15000,
+  });
+};
+
+const generateSummary = async () => {
+  await setQaValue(
+    aiLangPage,
+    '[data-qa="ai-keywords"]',
+    "4 年前端经验；主导中后台重构；首屏性能提升 40%",
+  );
+  await aiLangPage.waitForFunction(
+    () => {
+      const dialog = document.querySelector('[role="dialog"]');
+      const generate = [...(dialog?.querySelectorAll("button") ?? [])].find(
+        (button) => button.textContent?.trim() === "生成",
+      );
+      return Boolean(generate && !generate.disabled);
+    },
+    { timeout: 15000 },
+  );
+  await clickText(aiLangPage, "生成", '[role="dialog"]');
+};
+
+const adoptSummary = async () => {
+  await clickText(aiLangPage, "采用到简历", '[role="dialog"]');
+  await pause(200);
+  const needsConfirm = await aiLangPage.evaluate(() =>
+    [...document.querySelectorAll('[role="dialog"] button')].some(
+      (button) => button.textContent?.trim() === "确认覆盖",
+    ),
+  );
+  if (needsConfirm) {
+    await clickText(aiLangPage, "确认覆盖", '[role="dialog"]');
+  }
+  await aiLangPage.waitForFunction(
+    () => !document.querySelector('[role="dialog"]'),
+    { timeout: 10000 },
+  );
+  await pause(500);
+};
+
+await clickAiLanguage("英文");
+await openAiDialog();
+const aiLangHint = await aiLangPage.$eval(
+  '[data-qa="ai-language-hint"]',
+  (element) => element.textContent ?? "",
+);
+expect(
+  "英文模式下 AI 输出语言提示跟随简历",
+  aiLangHint.includes("英文") && aiLangHint.includes("跟随简历语言"),
+  aiLangHint,
+);
+
+await generateSummary();
+await aiLangPage.waitForSelector('[aria-label="生成预览，可直接修改"]', {
+  timeout: 15000,
+});
+await aiLangPage.waitForFunction(
+  (expected) =>
+    document.querySelector('[aria-label="生成预览，可直接修改"]')?.value ===
+    expected,
+  { timeout: 15000 },
+  AI_TEXT_EN,
+);
+const aiEnPreview = await aiLangPage.$eval(
+  '[aria-label="生成预览，可直接修改"]',
+  (element) => element.value,
+);
+const aiEnPayload = aiLangPage.aiPayloads.at(-1) ?? {};
+expect(
+  "英文模式生成英文预览且请求携带 language",
+  aiEnPreview === AI_TEXT_EN &&
+    aiEnPayload.language === "en" &&
+    !JSON.stringify(aiEnPayload).includes("linyi@example.com") &&
+    !JSON.stringify(aiEnPayload).includes("138-0000-0000"),
+  JSON.stringify({ language: aiEnPayload.language, preview: aiEnPreview }),
+);
+const aiLangDialog = await aiLangPage.$('[role="dialog"]');
+if (aiLangDialog) {
+  await aiLangDialog.screenshot({ path: `${OUT}/qa-ai-language-en.png` });
+}
+
+await adoptSummary();
+const aiEnAdopted = await aiLangPage.evaluate(() => {
+  const data = JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}");
+  return {
+    summaryZh: data.basic?.summary ?? "",
+    summaryEn: data.translation?.basic?.summary ?? "",
+    language: data.language,
+  };
+});
+expect(
+  "英文采用只写英文覆盖层，中文原文不变",
+  aiEnAdopted.language === "en" &&
+    aiEnAdopted.summaryEn === AI_TEXT_EN &&
+    aiEnAdopted.summaryZh !== AI_TEXT_EN &&
+    aiEnAdopted.summaryZh.includes("4 年前端开发经验"),
+  JSON.stringify(aiEnAdopted),
+);
+
+await clickAiLanguage("双语");
+await openAiDialog();
+await generateSummary();
+await aiLangPage.waitForSelector('[data-qa="ai-bilingual-preview"]', {
+  timeout: 15000,
+});
+const aiBilingualPreview = await aiLangPage.evaluate(() => ({
+  zh:
+    document.querySelector('[aria-label="中文预览，可直接修改"]')?.value ?? "",
+  en:
+    document.querySelector('[aria-label="英文预览，可直接修改"]')?.value ?? "",
+}));
+const aiBilingualPayload = aiLangPage.aiPayloads.at(-1) ?? {};
+expect(
+  "双语模式拆分中文与英文预览并携带 language",
+  aiBilingualPayload.language === "bilingual" &&
+    aiBilingualPreview.zh.includes("4 年前端开发经验") &&
+    aiBilingualPreview.en === AI_TEXT_EN &&
+    !aiBilingualPreview.zh.includes("===EN===") &&
+    !aiBilingualPreview.en.includes("===EN==="),
+  JSON.stringify({
+    language: aiBilingualPayload.language,
+    zh: aiBilingualPreview.zh.slice(0, 40),
+    en: aiBilingualPreview.en.slice(0, 40),
+  }),
+);
+
+await adoptSummary();
+const aiBilingualAdopted = await aiLangPage.evaluate(() => {
+  const data = JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}");
+  return {
+    summaryZh: data.basic?.summary ?? "",
+    summaryEn: data.translation?.basic?.summary ?? "",
+    language: data.language,
+  };
+});
+expect(
+  "双语采用同时写入原文与英文覆盖层",
+  aiBilingualAdopted.language === "bilingual" &&
+    aiBilingualAdopted.summaryZh.includes("4 年前端开发经验") &&
+    aiBilingualAdopted.summaryEn === AI_TEXT_EN,
+  JSON.stringify(aiBilingualAdopted),
+);
+
+await clickAiLanguage("英文");
+await openAiDialog();
+await clickText(aiLangPage, "整份简历", '[role="dialog"]');
+await aiLangPage.waitForSelector('[data-qa="ai-resume-brief"]', {
+  timeout: 5000,
+});
+await setQaValue(
+  aiLangPage,
+  '[data-qa="ai-resume-brief"]',
+  "2021 年本科毕业，计算机专业；在星河科技做前端 3 年，负责中后台重构；会用 React 与 TypeScript。",
+);
+await clickText(aiLangPage, "生成整份简历", '[role="dialog"]');
+await aiLangPage.waitForSelector('[data-qa="ai-full-preview"]', {
+  timeout: 20000,
+});
+await aiLangPage.waitForFunction(
+  () =>
+    (document.querySelector('[data-qa="ai-full-preview"]')?.textContent ?? "")
+      .includes("Xinghe Technology"),
+  { timeout: 15000 },
+);
+const aiFullEnPayload = aiLangPage.aiPayloads.at(-1) ?? {};
+const aiFullEnPreview = await aiLangPage.$eval(
+  '[data-qa="ai-full-preview"]',
+  (element) => element.textContent ?? "",
+);
+expect(
+  "英文整份生成输出英文预览并携带 language",
+  aiFullEnPayload.language === "en" &&
+    aiFullEnPreview.includes("Frontend Engineer") &&
+    aiFullEnPreview.includes("Xinghe Technology") &&
+    !aiFullEnPreview.includes("星野科技"),
+  JSON.stringify({
+    language: aiFullEnPayload.language,
+    preview: aiFullEnPreview.slice(0, 100),
+  }),
+);
+
+await clickText(aiLangPage, "生成新简历", '[role="dialog"]');
+await aiLangPage.waitForFunction(
+  () => !document.querySelector('[role="dialog"]'),
+  { timeout: 10000 },
+);
+await pause(1300);
+const aiFullEnAdopted = await aiLangPage.evaluate(() => {
+  const data = JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}");
+  const library = JSON.parse(
+    localStorage.getItem("resume-workshop:library:v1") ?? "{}",
+  );
+  return {
+    language: data.language,
+    summary: data.basic?.summary ?? "",
+    headline: data.basic?.headline ?? "",
+    name: data.basic?.name ?? "",
+    company: data.experiences?.[0]?.company ?? "",
+    activeTitle: library.activeTitle,
+  };
+});
+expect(
+  "英文整份生成写入英文主数据并标记语言",
+  aiFullEnAdopted.language === "en" &&
+    aiFullEnAdopted.summary === FULL_RESUME_EN.summary &&
+    aiFullEnAdopted.headline === "Frontend Engineer" &&
+    aiFullEnAdopted.company === "Xinghe Technology" &&
+    aiFullEnAdopted.name === "" &&
+    aiFullEnAdopted.activeTitle === "Frontend Engineer",
+  JSON.stringify(aiFullEnAdopted),
+);
+expect(
+  "AI 跟随语言页面无控制台错误",
+  aiLangPage.qaErrors.length === 0,
+  aiLangPage.qaErrors.join("; "),
+);
+await aiLangPage.evaluate(() => localStorage.clear());
+await aiLangPage.close();
+
 // P3 页码开关与可访问性：命名页关闭页码、主题色圆点加大、移动端 aria-pressed
 const printSettingsPage = await open({ width: 1440, height: 1000 });
 await printSettingsPage.goto(BASE, { waitUntil: "networkidle0" });
@@ -4176,7 +5101,7 @@ expect(
 );
 await historyPage.close();
 
-// P2：技能分组 / 熟练度：旧数据兼容、表单保存与五种模板展示
+// P2：技能分组 / 熟练度：旧数据兼容、表单保存与八种模板展示
 const skillPage = await open({ width: 1440, height: 1000 });
 await skillPage.goto(BASE, { waitUntil: "networkidle0" });
 await skillPage.evaluate(() => {
@@ -4297,7 +5222,16 @@ const detailedSkillsResume = {
 };
 
 const templateSkillResults = [];
-for (const template of ["modern", "classic", "compact", "sidebar", "timeline"]) {
+for (const template of [
+  "modern",
+  "classic",
+  "compact",
+  "sidebar",
+  "timeline",
+  "minimal",
+  "academic",
+  "card",
+]) {
   await skillPage.evaluate(
     ({ resume, templateId }) => {
       localStorage.setItem("resume-workshop:v1", JSON.stringify(resume));
@@ -4317,7 +5251,7 @@ for (const template of ["modern", "classic", "compact", "sidebar", "timeline"]) 
   });
 }
 expect(
-  "五种模板都渲染技能分组与熟练度",
+  "八种模板都渲染技能分组与熟练度",
   templateSkillResults.every((item) => item.groups && item.levels),
   JSON.stringify(templateSkillResults),
 );
@@ -4937,7 +5871,16 @@ expect(
 await layoutPage.click('[data-qa="layout-toggle-experience"]');
 await pause(300);
 const hiddenAcrossTemplates = [];
-for (const label of ["现代", "经典", "紧凑", "侧栏", "时间轴"]) {
+for (const label of [
+  "现代",
+  "经典",
+  "紧凑",
+  "侧栏",
+  "时间轴",
+  "极简",
+  "学术",
+  "卡片",
+]) {
   await clickText(layoutPage, label);
   await pause(250);
   const paperText = await layoutPage.evaluate(
@@ -4948,7 +5891,7 @@ for (const label of ["现代", "经典", "紧凑", "侧栏", "时间轴"]) {
 await clickText(layoutPage, "现代");
 await pause(200);
 expect(
-  "五种模板都遵守板块隐藏",
+  "八种模板都遵守板块隐藏",
   hiddenAcrossTemplates.length === 0,
   hiddenAcrossTemplates.join("、"),
 );

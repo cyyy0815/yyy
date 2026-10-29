@@ -1,6 +1,7 @@
 import { extractJdKeywords } from "../jdMatch";
 import { textHasSkill } from "../matching";
 import type { Resume } from "../types";
+import type { AiLanguage } from "./types";
 
 export type FactWarningKind = "number" | "skill" | "name";
 
@@ -209,6 +210,7 @@ export function checkGeneratedText(
 export function checkFullResumeFacts(
   resume: Resume,
   brief: string,
+  options: { language?: AiLanguage } = {},
 ): FactWarning[] {
   const claims: NameClaim[] = [
     ...resume.educations.map((item) => ({
@@ -250,7 +252,9 @@ export function checkFullResumeFacts(
   ].join("\n");
 
   return [
-    ...nameWarnings(claims, brief, "自述"),
+    // 英文模式下公司/学校名会被翻译，与中文自述做字面比对必然误报；
+    // 数字与技能仍可核对，因此只跳过名称。
+    ...(options.language === "en" ? [] : nameWarnings(claims, brief, "自述")),
     ...numberWarnings(generatedText, brief, "自述"),
     ...skillWarnings(generatedText, resume.skills, brief, "自述"),
   ];

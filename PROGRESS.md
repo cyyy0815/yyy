@@ -49,11 +49,14 @@
 | 31 | 安全响应头（追加） | ✅ 完成（CSP + HSTS + COOP / CORP + 关闭 X-Powered-By） |
 | 32 | 岗位库与技能同义词（追加） | ✅ 完成（26 类画像 + JS/TS/K8s 等别名归一 + C 系边界） |
 | 33 | 离线缓存 / PWA（追加） | ✅ 完成（应用外壳 SW + 更新提示 + 离线提示 + QA） |
+| 34 | 新模板与字体搭配（追加） | ✅ 完成（极简 / 学术 / 卡片 + 五种字体搭配 + PDF / ATS 校准） |
+| 35 | 中英双语 / 英文简历（追加） | ✅ 完成（语言切换 + 英文内容覆盖 + 八套模板 + ATS + 打印） |
+| 36 | AI 跟随简历语言（追加） | ✅ 完成（单段 / 整份 / 求职信按语言输出 + 双语拆分 + 事实核对同步） |
 
 ## 关机交接（2026-10-29）
 
-- 阶段 33（离线缓存 / PWA）已完成并提交，提交为 `319482b`；阶段 0–32 的历史提交见 `git log`。
-- 阶段 0–33 全部完成；最新验证为 `npx tsc --noEmit`、`npm run lint`、`npm test`（176 passed，19 个文件）、`npm run qa`（生产模式 185 项 / 开发模式 180 项，均通过）、`npm run build` 全部通过。
+- 阶段 34（新模板与字体搭配）、阶段 35（中英双语 / 英文简历）与阶段 36（AI 跟随简历语言）已完成；代码与文档待提交（用户确认后再按阶段提交）。阶段 33 的提交为 `319482b`，阶段 0–32 的历史提交见 `git log`。
+- 阶段 0–36 全部完成；最新验证为 `npx tsc --noEmit`、`npm run lint`、`npm test`（215 passed，22 个文件）、`npm run qa`（生产模式 213 项 / 开发模式 208 项，均通过）、`npm run build` 全部通过。
 - 离线行为只在生产构建验证：`npm run build && npm run start` 后 `npm run qa`；开发模式会主动注销旧 SW 并清理缓存，因此只做「不注册 SW」检查。
 - `/api/ai/full` 已用 `.env.local` 中的真实 DeepSeek Key 验证：长自述返回合法 JSON，`response_format: json_object` 生效，`usage` 为 prompt 1489 / completion 2245，未触发 4000 token 上限，输出不含联系方式。
 - 下次先读本文件的「当前进度 / 下次继续」与 `PLAN.md`，再运行：
@@ -63,7 +66,7 @@
   ```
 
   打开 http://localhost:3000 ；AI 功能依赖 `.env.local` 中的 DeepSeek 配置，改动环境变量后需重启 dev server。
-- 下一优先级：双语 / 英文输出、更多模板变体、职位聚合 API 等可选项；开始前先确认需求与范围。
+- 下一优先级：职位聚合 API、PWA 细节打磨等可选项；AI 多语言输出已由阶段 36 补齐，开始前先确认需求与范围。
 
 ## 阶段明细
 
@@ -470,10 +473,54 @@
 - [x] 验证：`tsc`、`lint`、`npm test`（176 passed）、开发与生产模式 `npm run qa`、`npm run build` 通过
 - [x] 边界：首次访问必须联网；缓存不含简历数据、导入文件与 AI 请求；只在生产环境注册，离线行为需用 `npm run build && npm run start` 验证
 
+### 阶段 34 — 新模板与字体搭配（追加）✅
+- [x] 新增「极简」模板：单栏大留白、细线分隔、弱化装饰，信息密度适中
+- [x] 新增「学术」模板：居中抬头、双线分隔、正文整段两端对齐，默认衬线，适合科研 / 教育背景
+- [x] 新增「卡片」模板：抬头与每个板块独立成卡片，打印保留描边与浅色底，适合中小型项目
+- [x] `TEMPLATE_IDS` 扩到 8 套；现代 / 经典 / 紧凑 / 侧栏 / 时间轴 / 极简 / 学术 / 卡片都遵守板块排序与隐藏、照片、自定义板块、技能分组、项目时间、教育增强与手动分页
+- [x] 新增 `src/lib/fonts.ts`：`Resume.font` 支持 auto / sans / serif / editorial / mono；auto 不注入变量、沿用各模板默认字体，旧数据与非法值回退 auto
+- [x] 字体通过 `--resume-font-heading` / `--resume-font-body` 注入：模板根节点使用正文字体，`h1` / `h2` 使用标题字体；只改字体，不改字号 / 行高 / 边距，保持分页稳定
+- [x] 新增 `FontPicker`：预览工具栏五种搭配，选中态 `aria-pressed`；小屏时模板与字体选择器各自横向滚动，不撑宽页面
+- [x] 字体随简历保存：进入撤销 / 重做、JSON 单份 / 整库备份、多份简历隔离与导入兼容；ATS 导出不受影响
+- [x] 单测新增 8 个（fonts 7 个 + 存储回退 1 个，合计 184 passed，20 个文件）
+- [x] QA 新增 10 项：默认搭配、衬线、报刊、等宽、八套模板生效、刷新保留、导出 JSON、撤销、390px 无溢出、无控制台错误；照片 / 自定义板块 / 技能分组 / 板块隐藏的模板循环同步扩到 8 套（生产 195 项 / 开发 190 项）
+- [x] 验证：`tsc`、`lint`、`npm test`（184 passed）、生产与开发模式 `npm run qa`、`npm run build` 全部通过
+- [x] 边界：不引入外部字体文件，只用系统无衬线 / 衬线 / 等宽栈；字体搭配不替代模板排版，切换模板仍决定整体结构
+
+### 阶段 35 — 中英双语 / 英文简历（追加）✅
+- [x] 新增 `Resume.language`：`zh` / `en` / `bilingual`，旧数据与非法值回退 `zh`
+- [x] 新增 `Resume.translation` 英文覆盖层：基本信息（姓名 / 头衔 / 简介 / 城市）、求职意向、工作（公司 / 职位 / 描述）、项目（名称 / 角色 / 描述）、教育（学校 / 专业 / 学历 / 排名 / 课程 / 荣誉）、自定义板块与条目、技能名与技能分组名
+- [x] `src/lib/language.ts` 提供 `localizedResume()`：英文为空时逐字段回退中文；双语按“中文 / English”并列，正文多行按中英顺序输出
+- [x] 八套模板统一使用英文标题（SUMMARY / EXPERIENCE / PROJECTS / EDUCATION / SKILLS / OBJECTIVE 等），双语标题为“中文 / 英文”
+- [x] 静态值本地化：`至今 → Present`、全职 / 实习等岗位类型、学历（本科 / 硕士 / 博士…）、工作年限（3-5年 → 3–5 years）、熟练度（精通 → Expert）、月份、排名 / 课程 / 荣誉 / 分页 / 空预览提示
+- [x] 新增 `LanguagePicker`（预览工具栏，中文 / 英文 / 双语）与 `TranslationEditor`（仅非中文模式显示，英文未填时回退中文）
+- [x] 技能翻译只影响展示：`localizedResume` 重命名展示用技能与分组并同步 `skillMeta`，匹配、AI、事实核对仍读原始中文技能名
+- [x] ATS 纯文本 / Markdown 与打印同步使用英文视图；ATS 关闭占位文字，避免把表单提示导出成内容
+- [x] 语言与英文覆盖层随简历保存，进入撤销 / 重做、单份 / 整库备份、多份简历隔离；`schemaVersion` 仍为 1（纯加法字段）
+- [x] 单测新增 13 个（语言 9 + 存储 1 + ATS 2 + 技能熟练度 1，合计 197 passed，21 个文件）
+- [x] QA 新增 9 项：默认中文、英文标题与内容、八套模板英文、双语并列、英文编辑器写入、刷新保留、语言撤销、390px 无溢出、无控制台错误（生产 204 项 / 开发 199 项）
+- [x] 验证：`tsc`、`lint`、`npm test`（197 passed）、生产与开发模式 `npm run qa`、`npm run build` 全部通过
+- [x] 边界：英文内容完全手动填写，不做机器翻译；联系方式中的姓名 / 城市需在英文字段中单独填写；自定义条目日期与链接保持原样；匹配与 AI 仍按中文原文工作
+
+### 阶段 36 — AI 跟随简历语言（追加）✅
+- [x] `AiGenerateRequest` / `AiFullResumeRequest` 增加可选 `language`；`/api/ai/generate` 与 `/api/ai/full` 校验 `zh` / `en` / `bilingual` 并透传
+- [x] 新增 `src/lib/ai/aiLanguage.ts`：按 `===EN===` 分隔行拆解双语输出，按语言清理文本，判断是否包含可采用的输出
+- [x] `prompt.ts` 拆分中文 / 英文 / 双语系统提示词，用户提示词、标签与语气本地化；英文简介按空格合并行，避免单词粘连
+- [x] 单段英文生成只写 `translation` 覆盖层；双语同时写中文原文与英文覆盖层，两个预览均可直接修改
+- [x] `AiWriter` 的预览、采用、覆盖确认与撤销按语言分支；撤销同时恢复中文原文与英文覆盖层
+- [x] 整份英文生成把英文写入主字段并标记 `language: "en"`；双语要求顶层 `english` 覆盖对象，按生成顺序映射条目 id 与技能中文名
+- [x] 双语整份 `max_tokens` 提升到 6000；缺少 `english` 或部分英文时逐字段回退中文，不阻塞采用
+- [x] `CoverLetterWriter` 新增「输出语言」，默认跟随简历；英文 / 双语求职信按语言清理、预览与命名下载文件
+- [x] 事实核对读取按语言清理后的草稿；英文模式跳过会因翻译误报的名称，数字与技能仍按中文素材核对
+- [x] 单测新增 18 个（aiLanguage 8 + 提示词 4 + 整份 5 + 事实核对 1，合计 215 passed，22 个文件）
+- [x] QA 新增 9 项：求职信英文切换、AI 语言提示、英文预览 / 请求、英文覆盖层写入、双语拆分 / 双写、英文整份预览 / 主数据、无控制台错误（生产 213 项 / 开发 208 项）
+- [x] 验证：`tsc`、`lint`、`npm test`（215 passed）、生产与开发模式 `npm run qa`、`npm run build` 全部通过
+- [x] 边界：AI 仍只发送当前素材与 JD，不发送姓名 / 联系方式 / 整份简历；中文原文继续作为匹配与事实来源；不新增 Key 或模型
+
 ## 当前进度
 
 - 最近更新：2026-10-29
-- 状态：**阶段 0–33 全部完成；P1–P4、AI 功能完善、可点击链接、整份结构化生成、整库备份、全局撤销 / 重做、技能分组、AI 求职信、投递看板、单份导出 / 合并导入、ATS 文本导出、AI 事实核对、板块显隐 / 排序 / 一页适配、统一 Dialog / 可访问性、数据版本 / 持久化历史、QA 进 CI / 组件测试、安全响应头、岗位库 / 技能同义词与离线缓存全部完成**
+- 状态：**阶段 0–36 全部完成；P1–P4、AI 功能完善、可点击链接、整份结构化生成、整库备份、全局撤销 / 重做、技能分组、AI 求职信、投递看板、单份导出 / 合并导入、ATS 文本导出、AI 事实核对、板块显隐 / 排序 / 一页适配、统一 Dialog / 可访问性、数据版本 / 持久化历史、QA 进 CI / 组件测试、安全响应头、岗位库 / 技能同义词、离线缓存、八套模板 / 字体搭配、中英双语与 AI 跟随语言全部完成**
 - 代码状态：
   - M0：git 仓库、`.env.example`、`scripts/mock-deepseek.mjs` 完成
   - M1：`/api/ai/status`、`/api/ai/generate`、SSE 转换完成
@@ -484,7 +531,7 @@
 - P3 进度：4.1 多标签页防覆盖、4.2 输入校验、4.3 保存时间与备份提醒、4.4 导入校验、4.5 错误边界、4.6 页码开关/打印对比度/可访问性、4.7 推荐门槛与 JD 缺口一键补、4.8 岗位库与城市覆盖全部完成
 - AI 增强：参考 JD 定制、优化模式空关键词完成；原「串行生成三段文字」已由阶段 18 的结构化整份生成取代
 - P4 进度：Vitest 单元 / 组件测试、GitHub Actions CI（含生产模式浏览器 QA）、SEO/OG、manifest 与图标、静态资源清理全部完成；离线缓存已在阶段 33 补齐
-- P2 收尾：网站 / GitHub / 项目 / 自定义板块链接在五套模板与 PDF 中可点击，危险协议降级为纯文本
+- P2 收尾：网站 / GitHub / 项目 / 自定义板块链接在全部模板与 PDF 中可点击，危险协议降级为纯文本
 - 阶段 18：AI 整份生成改为一段自述 → 结构化 JSON（教育/工作/项目/技能），采用时新建简历、旧简历保留
 - 阶段 19：JSON 导出升级为整库备份（当前文档 + 其他快照 + activeId），导入兼容旧版单份文件；整库导入整体替换并恢复当前文档
 - 阶段 20：新增 `src/lib/history.ts` 与 `useResume` 撤销 / 重做；编辑区顶部按钮与 `Ctrl/Cmd+Z` / `Ctrl/Cmd+Shift+Z` 快捷键，切换简历时清空历史
@@ -495,7 +542,7 @@
 - 阶段 24：简历栏新增「导出当前」与「合并导入」；单份文件只含当前简历，合并整库时追加简历与投递记录而不覆盖当前文档
 - 阶段 25：预览工具栏新增「ATS 文本」；导出线性纯文本 / Markdown，并按当前 JD 显示关键词覆盖与缺口
 - 阶段 26：AI 单段 / 整份 / 求职信预览下新增事实核对；提示素材里没有的数字、技能与学校 / 公司 / 项目名，JD 不作为事实来源
-- 阶段 27：编辑区新增「板块显示与排序」；`layout` 保存七个内置板块的顺序与隐藏项，五套模板与 ATS 导出同步遵守
+- 阶段 27：编辑区新增「板块显示与排序」；`layout` 保存七个内置板块的顺序与隐藏项，全部模板与 ATS 导出同步遵守
 - 阶段 27：预览工具栏新增「一页适配」，可隐藏建议项并实时观察页数，支持恢复打开时状态与一键换用紧凑模板
 - 阶段 28：新增统一 `Dialog`，五个弹窗共享 Portal、焦点陷阱、焦点归还、Escape / 遮罩关闭与背景滚动锁
 - 阶段 28：补全模态 ARIA、全局键盘焦点环、跳转主内容链接、移动端切换分组语义与 reduced motion 降级
@@ -510,8 +557,15 @@
 - 阶段 33：新增 `public/sw.js` 与生产环境注册组件；应用外壳、构建静态资源、manifest 与图标离线可用，`/api/*` 永远不进缓存
 - 阶段 33：离线时顶部提示「编辑、预览与导出仍可使用」，AI 与招聘站链接需联网；新版本就绪时底部提示刷新
 - 阶段 33：开发模式主动注销旧 SW 并清理缓存；`/sw.js` 以 `no-store` 下发，CSP 增加 `worker-src 'self'`
-- 工程命令：`npm test` 运行单元 / 组件测试（176 个）；CI 覆盖 lint + 类型检查 + 单测 / 组件测试 + 构建 + 生产模式浏览器 QA
-- 自检：`npm run qa` 生产模式 185 项 / 开发模式 180 项，含离线缓存、安全响应头、岗位画像与 JD 同义词归一检查
+- 阶段 34：新增极简 / 学术 / 卡片三套模板，模板总数 8 套；新增 `Resume.font` 与五种字体搭配（默认 / 无衬线 / 衬线 / 报刊 / 等宽），只改标题与正文字体，不改字号与分页
+- 阶段 34：预览工具栏加入字体选择器；字体随简历保存并进入撤销、JSON 单份 / 整库备份与多份简历隔离，旧数据自动回退 auto
+- 阶段 35：新增 `Resume.language`（中文 / 英文 / 双语）与英文覆盖层；`localizedResume()` 统一生成预览 / 打印 / ATS 视图，英文留空逐字段回退中文
+- 阶段 35：八套模板标题、日期、学历、岗位类型、年限、熟练度等静态文字本地化；英文内容编辑器只影响展示，匹配与 AI 仍读中文原文
+- 阶段 36：AI 输出语言跟随 `Resume.language`；英文单段写入英文覆盖层，双语单段按 `===EN===` 拆成原文 + 覆盖层，中文原文继续作为匹配 / 事实来源
+- 阶段 36：整份生成英文模式直接写英文主字段并标记 `language: en`；双语模式要求顶层 `english` 覆盖对象，按生成顺序映射到条目 id，缺英文时逐字段回退
+- 阶段 36：求职信新增「输出语言」，提示词、清理、预览、下载文件名与事实核对同步；英文事实核对跳过会因翻译误报的名称
+- 工程命令：`npm test` 运行单元 / 组件测试（215 个）；CI 覆盖 lint + 类型检查 + 单测 / 组件测试 + 构建 + 生产模式浏览器 QA
+- 自检：`npm run qa` 生产模式 213 项 / 开发模式 208 项，含离线缓存、安全响应头、岗位画像、JD 同义词归一、八套模板 / 字体搭配、中英双语与 AI 跟随语言检查
 - 本地地址：http://localhost:3000 （推荐页 http://localhost:3000/#jobs）
 - 一键自检：先 `npm run dev`，再 `npm run qa`（截图输出到 `.screenshots/`）
 - 单一方案文档：**`PLAN.md`**
@@ -526,6 +580,22 @@
 - 阶段 33：`securityHeaders` 增加 `worker-src 'self'` 与 `serviceWorkerHeaders()`；实测 `/sw.js` 返回 `Cache-Control: no-cache, no-store, must-revalidate`、`Service-Worker-Allowed: /`
 - 阶段 33：新增 5 个单测（合计 176 passed，19 个文件）与 8 / 3 项 QA 检查；生产模式实际断网回放通过，编辑写入 localStorage、恢复联网后提示消失
 - 阶段 33 验证：`tsc`、`lint`、`npm test`（176 passed）、生产模式 `npm run qa`、开发模式 `npm run qa`、`npm run build` 全部通过
+- 阶段 34：新增 `src/lib/fonts.ts` 与 `FontPicker`；`Resume.font` 默认 auto，模板根节点改为 `var(--resume-font-body, 模板默认)`，标题通过 `--resume-font-heading` 统一接管
+- 阶段 34：新增极简 / 学术 / 卡片模板，复用 `OrderedSections`、`ContactList`、`SkillText` / `SkillChips`、`CustomItems`、`EducationDetails` 与分页标记，保持八套模板行为一致
+- 阶段 34：QA 增加字体选择、跨模板生效、刷新、导出、撤销与 390px 溢出检查，并把照片 / 自定义板块 / 技能分组 / 板块隐藏循环扩到 8 套
+- 阶段 34 验证：`tsc`、`lint`、`npm test`（184 passed）、生产模式 `npm run qa`（195 项）、开发模式 `npm run qa`（190 项）、`npm run build` 全部通过
+- 阶段 35：新增 `src/lib/language.ts`；`localizedResume()` 在不改原始中文数据的前提下合并英文覆盖层，模板、打印与 ATS 只消费合并后的视图
+- 阶段 35：八套模板的板块标题、日期、岗位类型、学历、年限、熟练度、月份等静态文字统一走 `resumeLabels()`；双语标题为“中文 / 英文”
+- 阶段 35：预览工具栏新增语言选择器，编辑区在英文 / 双语模式显示英文内容覆盖层；技能翻译只重命名展示键，匹配与 AI 仍读中文
+- 阶段 35：ATS 导出关闭占位文字并复用英文视图；旧数据缺少语言与覆盖层时自动补 `zh` 与空对象，`schemaVersion` 保持 1
+- 阶段 35 验证：`tsc`、`lint`、`npm test`（197 passed）、生产模式 `npm run qa`（204 项）、开发模式 `npm run qa`（199 项）、`npm run build` 全部通过
+- 阶段 36：新增 `src/lib/ai/aiLanguage.ts`，统一 `splitBilingualOutput` / `cleanAiOutput` / `hasAiOutputText`；`/api/ai/generate` 与 `/api/ai/full` 校验并透传 `language`
+- 阶段 36：`prompt.ts` 拆分中文 / 英文 / 双语系统提示词，中英文用户提示词与语气本地化；英文简介按空格合并行，避免单词粘连
+- 阶段 36：`fullResume.ts` 新增英文 / 双语输出 schema（双语 `max_tokens` 6000），解析后把 `english` 映射到 `translation`，中文主数据不变
+- 阶段 36：`AiWriter` 按语言预览与采用：英文只写覆盖层，双语同时写原文与覆盖层，撤销同时恢复两边；整份英文直接写主数据
+- 阶段 36：`CoverLetterWriter` 新增输出语言选择，英文 / 双语求职信按语言清理与命名；英文事实核对跳过翻译导致的名称误报
+- 阶段 36：新增 2 个文件 / 18 个单测（合计 215 passed，22 个文件）；QA 新增求职信英文与 8 项 AI 跟随语言检查（合计生产 213 / 开发 208）
+- 阶段 36 验证：`tsc`、`lint`、`npm test`（215 passed）、生产模式 `npm run qa`（213 项）、开发模式 `npm run qa`（208 项）、`npm run build` 全部通过
 
 ## 本次会话日志（2026-10-28）
 
@@ -705,15 +775,15 @@
 ### 下次继续
 
 1. 先读 `PLAN.md` 与 `PROGRESS.md`「当前进度」
-2. 阶段 0–33 全部完成；P1–P4、AI 增强、可点击链接、整份结构化生成、整库备份、全局撤销 / 重做、技能分组、AI 求职信、投递看板、单份导出 / 合并导入、ATS 文本导出、AI 事实核对、板块显隐 / 排序 / 一页适配、统一 Dialog / 可访问性、数据版本 / 持久化历史、QA 进 CI / 组件测试、安全响应头、岗位库 / 技能同义词与离线缓存均已完成
-3. 后续可选：双语 / 英文输出、更多模板与字体搭配、职位聚合 API；开始前先确认需求与范围
+2. 阶段 0–36 全部完成；P1–P4、AI 增强、可点击链接、整份结构化生成、整库备份、全局撤销 / 重做、技能分组、AI 求职信、投递看板、单份导出 / 合并导入、ATS 文本导出、AI 事实核对、板块显隐 / 排序 / 一页适配、统一 Dialog / 可访问性、数据版本 / 持久化历史、QA 进 CI / 组件测试、安全响应头、岗位库 / 技能同义词、离线缓存、新模板 / 字体搭配、中英双语 / 英文简历与 AI 跟随语言均已完成
+3. 后续可选：职位聚合 API、PWA 细节打磨；更多模板 / 字体与 AI 多语言输出已完成，开始前先确认需求与范围
 4. 离线相关改动必须在生产构建下验证：`npm run build && npm run start` 后再跑 `npm run qa`
 5. 每完成一项跑 `npm run lint`、`npm test`、`npm run build`、`npm run qa` 并更新本文件
 
 ## 可选后续
 
 - [x] AI 写简历（DeepSeek）— M0–M4 完成；详见 `PLAN.md`
-- [ ] AI 润色 / JD 匹配改写 / 多语言翻译（AI 首版跑通后再考虑）
+- [x] AI 润色 / JD 匹配改写（已随 P0 / AI 增强完成；多语言输出由阶段 36 补齐）
 - [ ] 接入职位聚合 API（JSearch / Adzuna），用 Next.js Route Handler 隐藏 key
 - [ ] 更多字体搭配 / 模板变体（配色已支持）
 - [ ] 拖拽排序替换上下按钮（注：阶段 8 已实现拖拽手柄，此处仅剩纯鼠标拖拽体验优化）
@@ -725,7 +795,7 @@
 - [x] 全局撤销 / 重做（按钮 + 快捷键，连续输入合并，切换简历时清空）
 - [x] 真实 DeepSeek Key 验证 `/api/ai/full`（JSON 输出与长文本 token 上限）
 - [x] 技能分组与熟练度（分组增删改排序、逐技能熟练度、五套模板展示、旧 JSON 兼容）
-- [x] AI 求职信（素材 / 岗位 / JD → 中文求职信，可编辑、复制与下载，不写入简历）
+- [x] AI 求职信（素材 / 岗位 / JD → 按简历语言输出，可编辑、复制与下载，不写入简历）
 - [x] 投递看板与多 JD（五种状态、独立 JD / 求职信 / 备注、设为当前 JD、整库备份）
 - [x] 单份简历导出与合并导入（单份分享文件不含其他简历 / 投递记录；整库合并追加而非覆盖）
 - [x] ATS 文本导出与关键词覆盖（纯文本 / Markdown 下载；读取当前 JD 显示覆盖率与缺口）
@@ -740,7 +810,7 @@
 1. 读「当前进度」和 `PLAN.md` 的「P0：AI 写简历」
 2. 确认 `.env.local` 里的 `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL`
 3. `npm run dev`
-4. AI（P0）、AI 增强、P1、P2（3.1–3.5、阶段 17 可点击链接、阶段 20 全局撤销、阶段 21 技能分组）、P3（4.1–4.8）、P4、阶段 18 整份生成、阶段 19 整库备份、阶段 22 AI 求职信、阶段 23 投递看板、阶段 24 单份导出 / 合并导入、阶段 25 ATS 文本导出、阶段 26 AI 事实核对、阶段 27 板块显隐 / 排序 / 一页适配、阶段 28 统一 Dialog / 可访问性、阶段 29 数据版本 / 持久化历史、阶段 30 QA 进 CI / 组件测试、阶段 31 安全响应头、阶段 32 岗位库 / 技能同义词与阶段 33 离线缓存均已完成
+4. AI（P0）、AI 增强、P1、P2（3.1–3.5、阶段 17 可点击链接、阶段 20 全局撤销、阶段 21 技能分组）、P3（4.1–4.8）、P4、阶段 18 整份生成、阶段 19 整库备份、阶段 22 AI 求职信、阶段 23 投递看板、阶段 24 单份导出 / 合并导入、阶段 25 ATS 文本导出、阶段 26 AI 事实核对、阶段 27 板块显隐 / 排序 / 一页适配、阶段 28 统一 Dialog / 可访问性、阶段 29 数据版本 / 持久化历史、阶段 30 QA 进 CI / 组件测试、阶段 31 安全响应头、阶段 32 岗位库 / 技能同义词、阶段 33 离线缓存、阶段 34 新模板 / 字体搭配、阶段 35 中英双语 / 英文简历与阶段 36 AI 跟随简历语言均已完成
 5. 每完成一步更新本文件，尤其是「当前进度」「关机交接」与对应阶段勾选项
 
 ## 文件地图
@@ -764,7 +834,10 @@ src/
       OnePageFitDialog.tsx 一页适配：隐藏建议项、实时页数与回滚
       ResumePreview.tsx A4 容器与自动缩放、分页估算、页数上报
       ThemePicker.tsx   主题色预设与自定义取色
-      templates.tsx     现代 / 经典 / 紧凑 / 侧栏 / 时间轴
+      FontPicker.tsx    五种字体搭配（默认 / 无衬线 / 衬线 / 报刊 / 等宽）
+      LanguagePicker.tsx 中文 / 英文 / 双语
+      TranslationEditor.tsx 英文内容覆盖层（未填回退中文）
+      templates.tsx     现代 / 经典 / 紧凑 / 侧栏 / 时间轴 / 极简 / 学术 / 卡片
     jobs/
       JobsPanel.tsx     匹配结果、建议、招聘站入口
       JdMatcher.tsx     粘贴 JD 测匹配度
@@ -798,8 +871,10 @@ src/
     links.ts            安全链接判断与展示用短链接
     jobBoards.ts        招聘站 URL 与城市编码
     theme.ts            主题色校验、可读性压暗与 CSS 变量
-    ai/                 types / config / prompt / fullResume / factCheck / http / deepseek / client
-    __tests__/          Vitest：storage / matching / skillSynonyms / jdMatch / validate / links / SSE / 整份解析 / 撤销栈与会话持久化 / 技能分组 / 提示词 / 投递 / ATS / 事实核对 / 板块布局 / 安全响应头（176 个，19 个文件）
+    fonts.ts            字体搭配预设、校验与标题 / 正文 CSS 变量
+    language.ts         语言 / 标题文案、英文覆盖层合并、日期与枚举本地化
+    ai/                 types / config / prompt / aiLanguage / fullResume / factCheck / http / deepseek / client
+    __tests__/          Vitest：storage / matching / skillSynonyms / jdMatch / validate / links / SSE / 整份解析 / 撤销栈与会话持久化 / 技能分组 / 提示词 / AI 输出语言 / 投递 / ATS / 事实核对 / 板块布局 / 字体搭配 / 简历语言 / 安全响应头（215 个，22 个文件）
   components/resume/__tests__/  SectionLayoutEditor 隐藏 / 排序 / 恢复默认
   components/ui/__tests__/      Dialog 模态语义 / 焦点陷阱 / 关闭与焦点归还
   components/__tests__/         OfflineBanner 在线隐藏 / 离线提示 / 网络恢复
@@ -850,4 +925,49 @@ src/hooks/useOnlineStatus.ts              ✅ online / offline 事件订阅
 src/components/__tests__/OfflineBanner.test.tsx ✅ 3 个在线 / 离线 / 恢复用例
 src/lib/securityHeaders.ts                ✅ 增加 worker-src 与 serviceWorkerHeaders()
 scripts/qa.mjs                            ✅ 生产 8 项 / 开发 3 项离线缓存检查
+```
+
+### 阶段 34 新增文件
+
+```
+src/lib/fonts.ts                           ✅ 五种字体搭配、校验、CSS 变量注入
+src/components/resume/FontPicker.tsx       ✅ 预览工具栏字体选择器（aria-pressed）
+src/lib/__tests__/fonts.test.ts            ✅ 7 个字体校验 / 变量 / 预设用例
+src/components/resume/templates.tsx        ✅ 新增极简 / 学术 / 卡片，共 8 套
+src/lib/types.ts                           ✅ Resume.font 与 TEMPLATE_IDS 扩到 8
+src/lib/storage.ts                         ✅ normalizeResume 补齐 / 回退字体
+scripts/qa.mjs                             ✅ 10 项字体检查，模板循环扩到 8 套
+```
+
+### 阶段 35 新增文件
+
+```
+src/lib/language.ts                              ✅ 语言 / 标题文案、英文覆盖层合并、日期与枚举本地化
+src/components/resume/LanguagePicker.tsx         ✅ 预览工具栏中文 / 英文 / 双语选择器
+src/components/resume/TranslationEditor.tsx      ✅ 英文内容覆盖层编辑器（按条目 id 写入）
+src/lib/__tests__/language.test.ts               ✅ 9 个语言、回退、双语与本地化用例
+src/lib/types.ts                                 ✅ Resume.language / translation 与英文条目类型
+src/lib/storage.ts                               ✅ 语言与英文覆盖层的收敛 / 回退
+src/lib/ats.ts                                   ✅ 英文 / 双语标题与关闭占位文字
+src/lib/skills.ts                                ✅ 英文熟练度格式化
+src/components/resume/templates.tsx              ✅ 八套模板统一语言标题与本地化静态值
+src/components/resume/ResumeForm.tsx             ✅ 接入英文内容编辑器
+src/components/AppShell.tsx                      ✅ 语言选择器与保存
+scripts/qa.mjs                                   ✅ 9 项语言检查，八套模板英文循环
+```
+
+### 阶段 36 新增文件
+
+```
+src/lib/ai/aiLanguage.ts                         ✅ 双语分隔拆解、按语言清理、可采用判断
+src/lib/__tests__/aiLanguage.test.ts             ✅ 8 个分隔容错 / 清理 / 空输出用例
+src/lib/ai/types.ts                              ✅ AiLanguage 与 ===EN=== 标记
+src/lib/ai/prompt.ts                             ✅ 中文 / 英文 / 双语提示词与清理
+src/lib/ai/fullResume.ts                         ✅ 英文 / 双语 schema、english 覆盖映射
+src/lib/ai/factCheck.ts                          ✅ 英文模式跳过翻译名称误报
+src/app/api/ai/generate/route.ts                 ✅ language 校验与透传
+src/app/api/ai/full/route.ts                     ✅ language 校验与透传
+src/components/resume/AiWriter.tsx               ✅ 按语言预览、采用与撤销
+src/components/jobs/CoverLetterWriter.tsx        ✅ 求职信输出语言
+scripts/qa.mjs                                   ✅ 求职信英文 + 8 项 AI 跟随语言检查
 ```

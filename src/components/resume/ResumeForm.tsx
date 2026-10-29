@@ -34,6 +34,7 @@ import { groupSkills } from "@/lib/skills";
 import { AiWriter } from "@/components/resume/AiWriter";
 import { CustomSectionsEditor } from "@/components/resume/CustomSectionsEditor";
 import { SectionLayoutEditor } from "@/components/resume/SectionLayoutEditor";
+import { TranslationEditor } from "@/components/resume/TranslationEditor";
 import {
   deleteTargetLabel,
   type DeleteTarget,
@@ -1322,6 +1323,8 @@ export function ResumeForm({ resume, onChange, onCreateDocument }: Props) {
         onChange={onChange}
         onCreateDocument={onCreateDocument}
       />
+
+      <TranslationEditor resume={resume} onChange={onChange} />
 
       <SectionCard title="基本信息" description="让 HR 第一眼知道你是谁">
         <div className="mb-4 flex items-center gap-4 rounded-xl border border-zinc-100 bg-zinc-50/70 p-3">

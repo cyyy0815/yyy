@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { FactCheckPanel } from "@/components/ui/FactCheckPanel";
 import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
+import { cleanAiOutput } from "@/lib/ai/aiLanguage";
 import { streamGenerate } from "@/lib/ai/client";
 import { checkGeneratedText } from "@/lib/ai/factCheck";
-import { cleanAiText } from "@/lib/ai/prompt";
 import type { AiStatus, AiTone } from "@/lib/ai/types";
 import { JD_MAX_LENGTH, readSavedJd } from "@/lib/jdStorage";
+import { RESUME_LANGUAGES, type ResumeLanguage } from "@/lib/language";
 import type { Resume } from "@/lib/types";
 
 const TONES: { value: AiTone; label: string }[] = [
@@ -74,6 +75,7 @@ export function CoverLetterWriter({ resume }: { resume: Resume }) {
   const [jd, setJd] = useState("");
   const [jdFromSaved, setJdFromSaved] = useState(false);
   const [tone, setTone] = useState<AiTone>("professional");
+  const [language, setLanguage] = useState<ResumeLanguage>("zh");
 
   const [output, setOutput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -123,6 +125,7 @@ export function CoverLetterWriter({ resume }: { resume: Resume }) {
     );
     setYears((current) => current || resume.intent.experience.trim());
     setMaterial((current) => current || buildMaterial(resume));
+    setLanguage(resume.language);
     const savedJd = readSavedJd().trim().slice(0, JD_MAX_LENGTH);
     setJd(savedJd);
     setJdFromSaved(Boolean(savedJd));
@@ -158,6 +161,7 @@ export function CoverLetterWriter({ resume }: { resume: Resume }) {
         years: years.trim(),
         keywords: trimmedMaterial,
         jd: jd.trim() || undefined,
+        language,
       },
       controller.signal,
       {
@@ -166,10 +170,20 @@ export function CoverLetterWriter({ resume }: { resume: Resume }) {
           setOutput(outputRef.current);
         },
         onDone: () => {
-          const cleaned = cleanAiText(outputRef.current, "cover");
+          const cleaned = cleanAiOutput(outputRef.current, "cover", language);
+          const text =
+            language === "bilingual"
+              ? [cleaned.zh, cleaned.en].filter(Boolean).join("\n\n")
+              : language === "en"
+                ? cleaned.en
+                : cleaned.zh;
           setStreaming(false);
-          setOutput(cleaned);
-          if (!cleaned) setError("生成内容为空，请重新生成");
+          setOutput(text);
+          if (!text) {
+            setError("生成内容为空，请重新生成");
+          } else if (language !== "zh" && !cleaned.en) {
+            setError("AI 没有返回英文部分，请重试");
+          }
         },
         onError: (_code, message) => {
           setError(message);
@@ -213,11 +227,19 @@ export function CoverLetterWriter({ resume }: { resume: Resume }) {
 
   const handleDownload = () => {
     if (!letter) return;
+    const prefix =
+      language === "bilingual"
+        ? "Cover-Letter-Bilingual"
+        : language === "en"
+          ? "Cover-Letter"
+          : "求职信";
+    const rolePart =
+      safeFilePart(role) || (language === "en" ? "Untitled Role" : "未命名岗位");
     const blob = new Blob([letter], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `求职信-${safeFilePart(role) || "未命名岗位"}.txt`;
+    anchor.download = `${prefix}-${rolePart}.txt`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -239,7 +261,7 @@ export function CoverLetterWriter({ resume }: { resume: Resume }) {
               </span>
             </div>
             <p className="mt-1.5 max-w-2xl text-[12.5px] leading-6 text-zinc-500">
-              用简历摘要、核心技能与参考 JD 生成一封中文求职信；可编辑后复制或下载，不会写入简历。
+              用简历摘要、核心技能与参考 JD 生成求职信，默认跟随简历语言（中文 / 英文 / 双语）；可编辑后复制或下载，不会写入简历。
             </p>
           </div>
           <Button
@@ -257,7 +279,13 @@ export function CoverLetterWriter({ resume }: { resume: Resume }) {
       {open ? (
         <Dialog
           title="AI 求职信"
-          description="中文求职信 · 内容会发送到 DeepSeek"
+          description={`${
+            language === "en"
+              ? "英文"
+              : language === "bilingual"
+                ? "中英双语"
+                : "中文"
+          }求职信 · 内容会发送到 DeepSeek`}
           size="lg"
           dataQa="cover-dialog"
           closeDataQa="cover-close"
@@ -404,20 +432,37 @@ export function CoverLetterWriter({ resume }: { resume: Resume }) {
                     />
                   </Field>
 
-                  <Field label="风格">
-                    <Select
-                      value={tone}
-                      onChange={(event) =>
-                        setTone(event.target.value as AiTone)
-                      }
-                    >
-                      {TONES.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="输出语言" hint="默认跟随简历">
+                      <Select
+                        data-qa="cover-language"
+                        value={language}
+                        onChange={(event) =>
+                          setLanguage(event.target.value as ResumeLanguage)
+                        }
+                      >
+                        {RESUME_LANGUAGES.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Field label="风格">
+                      <Select
+                        value={tone}
+                        onChange={(event) =>
+                          setTone(event.target.value as AiTone)
+                        }
+                      >
+                        {TONES.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  </div>
 
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
