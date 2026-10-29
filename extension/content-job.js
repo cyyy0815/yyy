@@ -9,10 +9,11 @@ const MAX_JD_CHARS = 8000;
 const SITE_RULES = {
   "www.zhipin.com": {
     role: [".job-banner .name h1", ".job-name", ".job-banner h1", "h1"],
+    // 注意：不要用 .company-name —— 详情页里它命中的是「相似职位」卡片的公司，
+    // 真实公司名在 <title> 的「岗位招聘_公司名招聘-BOSS直聘」里。
     company: [
       ".company-info .name",
       ".job-banner .company-info a",
-      ".company-name",
       ".sider-company .name",
     ],
     jd: [
@@ -196,6 +197,9 @@ function companyFromTitle() {
     .replace(/招聘.*$/, "")
     .replace(/^[「【\[]+|[」】\]]+$/g, "")
     .trim();
+  if (/^(BOSS直聘|智联招聘|前程无忧|猎聘|拉勾|51job|智联)$/i.test(candidate)) {
+    return "";
+  }
   return isLikelyCompany(candidate) ? candidate : "";
 }
 

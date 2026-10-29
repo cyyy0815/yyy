@@ -6096,6 +6096,10 @@ bossDetailPage.on("request", (request) => {
         <div class="job-sec-text">工作周期：长期兼职；每周工期：5 天及以上；工作时间 14:00-18:00；
           结算方式：周结。负责染厂订单的跟进与协调，核对工艺单、跟进生产进度、安排出货，
           等整段描述足够长以模拟真实岗位正文。</div>
+        <div class="similar-jobs">
+          <div class="company-name">福州沐辰新材料科技</div>
+          <div class="company-name">另一家相似职位公司</div>
+        </div>
       </body></html>`,
     });
     return;
