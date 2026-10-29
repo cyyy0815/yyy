@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
-import { securityHeaders } from "./src/lib/securityHeaders";
+import {
+  securityHeaders,
+  serviceWorkerHeaders,
+} from "./src/lib/securityHeaders";
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -9,6 +12,10 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: securityHeaders(process.env.NODE_ENV !== "production"),
+      },
+      {
+        source: "/sw.js",
+        headers: serviceWorkerHeaders(),
       },
     ];
   },

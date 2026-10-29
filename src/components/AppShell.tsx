@@ -9,6 +9,8 @@ import { ResumeForm } from "@/components/resume/ResumeForm";
 import { ResumePreview } from "@/components/resume/ResumePreview";
 import { ThemePicker } from "@/components/resume/ThemePicker";
 import { Button } from "@/components/ui/Button";
+import { OfflineBanner } from "@/components/OfflineBanner";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { useResume } from "@/hooks/useResume";
 import { useResumeDocuments } from "@/hooks/useResumeDocuments";
 import {
@@ -577,6 +579,7 @@ function ResumeWorkspace() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <ServiceWorkerRegister />
       <a
         href="#main-content"
         className="print-hide fixed left-4 top-4 z-[70] -translate-y-24 rounded-lg bg-white px-4 py-2 text-[13px] font-medium text-zinc-900 shadow-lg transition focus:translate-y-0"
@@ -674,6 +677,7 @@ function ResumeWorkspace() {
         tabIndex={-1}
         className="print-root mx-auto w-full max-w-[1500px] flex-1 scroll-mt-20 px-4 py-6 outline-none lg:px-6"
       >
+        <OfflineBanner />
         {tab === "edit" ? (
           <>
             <div

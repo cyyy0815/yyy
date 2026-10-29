@@ -48,11 +48,13 @@
 | 30 | QA 进 CI 与组件测试（追加） | ✅ 完成（生产模式浏览器 QA + Dialog / 布局组件测试） |
 | 31 | 安全响应头（追加） | ✅ 完成（CSP + HSTS + COOP / CORP + 关闭 X-Powered-By） |
 | 32 | 岗位库与技能同义词（追加） | ✅ 完成（26 类画像 + JS/TS/K8s 等别名归一 + C 系边界） |
+| 33 | 离线缓存 / PWA（追加） | ✅ 完成（应用外壳 SW + 更新提示 + 离线提示 + QA） |
 
-## 关机交接（2026-10-28）
+## 关机交接（2026-10-29）
 
-- 阶段 20–22 的代码（撤销 / 重做、技能分组、AI 求职信）已提交，代码提交为 `bff465b`；阶段 23–32（投递看板、单份导出 / 合并导入、ATS、事实核对、板块布局、Dialog / 可访问性、数据版本 / 持久化历史、QA 进 CI、安全响应头、岗位库 / 技能同义词）及文档已提交，提交为 `2e55ba9`，工作区干净。
-- 阶段 0–32 全部完成；最新验证为 `tsc`、`lint`、`npm test`（171 passed，18 个文件）、`npm run qa`（177 项检查，开发与生产模式均通过）、`npm run build` 全部通过。
+- 阶段 0–32 已提交（最近为 `2e55ba9`）；阶段 33（离线缓存 / PWA）在本次会话完成，代码与文档待提交。
+- 阶段 0–33 全部完成；最新验证为 `npx tsc --noEmit`、`npm run lint`、`npm test`（176 passed，19 个文件）、`npm run qa`（生产模式 185 项 / 开发模式 180 项，均通过）、`npm run build` 全部通过。
+- 离线行为只在生产构建验证：`npm run build && npm run start` 后 `npm run qa`；开发模式会主动注销旧 SW 并清理缓存，因此只做「不注册 SW」检查。
 - `/api/ai/full` 已用 `.env.local` 中的真实 DeepSeek Key 验证：长自述返回合法 JSON，`response_format: json_object` 生效，`usage` 为 prompt 1489 / completion 2245，未触发 4000 token 上限，输出不含联系方式。
 - 下次先读本文件的「当前进度 / 下次继续」与 `PLAN.md`，再运行：
 
@@ -61,7 +63,7 @@
   ```
 
   打开 http://localhost:3000 ；AI 功能依赖 `.env.local` 中的 DeepSeek 配置，改动环境变量后需重启 dev server。
-- 下一优先级：双语 / 英文输出 / 离线缓存等可选项；开始前先确认需求与范围。
+- 下一优先级：双语 / 英文输出、更多模板变体、职位聚合 API 等可选项；开始前先确认需求与范围。
 
 ## 阶段明细
 
@@ -457,10 +459,21 @@
 - [x] 验证：开发与生产模式 `npm run qa`（177 项）均通过；`npx tsc --noEmit`、`npm run lint`、`npm test`（171 passed）、`npm run build` 通过
 - [x] 边界：同义词只收录含义明确的写法，不合并 `Java` / `JavaScript`、`C` / `C++` / `C#`；岗位画像按目标岗位与技能命中挑选，不替代真实招聘数据
 
+### 阶段 33 — 离线缓存 / PWA（追加）✅
+- [x] 新增 `public/sw.js`：安装时预缓存 `/`、解析首页 HTML 得到的构建静态资源、manifest 与图标；导航请求网络优先，断网回退预缓存外壳
+- [x] `/_next/static/*` 缓存优先（文件名带内容哈希）；同源图标 / manifest / 字体 stale-while-revalidate；`/api/*`、非 GET、跨域与 `_rsc` 请求完全不拦截
+- [x] 新版本就绪时底部提示「新版本已就绪」，点击后 `SKIP_WAITING` 并刷新；首次安装没有 controller，不打扰用户
+- [x] 新增 `ServiceWorkerRegister` 与 `OfflineBanner` / `useOnlineStatus`：生产环境注册，开发环境主动注销旧 SW 并清空 `resume-workshop-*` 缓存
+- [x] `securityHeaders()` 增加 `worker-src 'self'`；新增 `serviceWorkerHeaders()`，`/sw.js` 以 `no-store` 与 `Service-Worker-Allowed: /` 下发
+- [x] 单测新增 5 个（3 个 OfflineBanner 组件 + 2 个 SW 响应头，合计 176 passed，19 个文件）
+- [x] QA 生产模式新增 8 项（SW 头、注册、缓存内容、接口不入缓存、离线刷新、离线编辑、恢复联网、无控制台错误）；开发模式新增 3 项（SW 头、不注册、无错误）
+- [x] 验证：`tsc`、`lint`、`npm test`（176 passed）、开发与生产模式 `npm run qa`、`npm run build` 通过
+- [x] 边界：首次访问必须联网；缓存不含简历数据、导入文件与 AI 请求；只在生产环境注册，离线行为需用 `npm run build && npm run start` 验证
+
 ## 当前进度
 
-- 最近更新：2026-10-28
-- 状态：**阶段 0–32 全部完成；P1–P4、AI 功能完善、可点击链接、整份结构化生成、整库备份、全局撤销 / 重做、技能分组、AI 求职信、投递看板、单份导出 / 合并导入、ATS 文本导出、AI 事实核对、板块显隐 / 排序 / 一页适配、统一 Dialog / 可访问性、数据版本 / 持久化历史、QA 进 CI / 组件测试、安全响应头与岗位库 / 技能同义词全部完成**
+- 最近更新：2026-10-29
+- 状态：**阶段 0–33 全部完成；P1–P4、AI 功能完善、可点击链接、整份结构化生成、整库备份、全局撤销 / 重做、技能分组、AI 求职信、投递看板、单份导出 / 合并导入、ATS 文本导出、AI 事实核对、板块显隐 / 排序 / 一页适配、统一 Dialog / 可访问性、数据版本 / 持久化历史、QA 进 CI / 组件测试、安全响应头、岗位库 / 技能同义词与离线缓存全部完成**
 - 代码状态：
   - M0：git 仓库、`.env.example`、`scripts/mock-deepseek.mjs` 完成
   - M1：`/api/ai/status`、`/api/ai/generate`、SSE 转换完成
@@ -470,7 +483,7 @@
 - P2 进度：3.1 证件照、3.2 自定义板块、3.3 项目起止时间、3.4 教育增强、3.5 多份简历全部完成
 - P3 进度：4.1 多标签页防覆盖、4.2 输入校验、4.3 保存时间与备份提醒、4.4 导入校验、4.5 错误边界、4.6 页码开关/打印对比度/可访问性、4.7 推荐门槛与 JD 缺口一键补、4.8 岗位库与城市覆盖全部完成
 - AI 增强：参考 JD 定制、优化模式空关键词完成；原「串行生成三段文字」已由阶段 18 的结构化整份生成取代
-- P4 进度：Vitest 单元 / 组件测试、GitHub Actions CI（含生产模式浏览器 QA）、SEO/OG、manifest 与图标、静态资源清理全部完成；离线缓存未实现
+- P4 进度：Vitest 单元 / 组件测试、GitHub Actions CI（含生产模式浏览器 QA）、SEO/OG、manifest 与图标、静态资源清理全部完成；离线缓存已在阶段 33 补齐
 - P2 收尾：网站 / GitHub / 项目 / 自定义板块链接在五套模板与 PDF 中可点击，危险协议降级为纯文本
 - 阶段 18：AI 整份生成改为一段自述 → 结构化 JSON（教育/工作/项目/技能），采用时新建简历、旧简历保留
 - 阶段 19：JSON 导出升级为整库备份（当前文档 + 其他快照 + activeId），导入兼容旧版单份文件；整库导入整体替换并恢复当前文档
@@ -494,13 +507,27 @@
 - 阶段 31：CSP 开发模式放行 React 调试 eval 与 HMR WebSocket，生产不含 `unsafe-eval`；图片允许 data / blob
 - 阶段 32：新增技能同义词层；`JS` / `TS` / `K8s` / `Golang` / `Postgres` / `SpringBoot` 等归一到规范标签，并保留 `C` / `C++` / `C#` 与 `Java` / `JavaScript` 边界
 - 阶段 32：岗位画像扩到 26 类，新增 Go 后端、数据工程、网络安全、售前 / 实施、供应链 / 采购、法务 / 合规、行政 / 助理与嵌入式
-- 工程命令：`npm test` 运行单元 / 组件测试（171 个）；CI 覆盖 lint + 类型检查 + 单测 / 组件测试 + 构建 + 生产模式浏览器 QA
-- 自检：`npm run qa` 共 177 项，含安全响应头、新增岗位画像与 JD 同义词归一检查
+- 阶段 33：新增 `public/sw.js` 与生产环境注册组件；应用外壳、构建静态资源、manifest 与图标离线可用，`/api/*` 永远不进缓存
+- 阶段 33：离线时顶部提示「编辑、预览与导出仍可使用」，AI 与招聘站链接需联网；新版本就绪时底部提示刷新
+- 阶段 33：开发模式主动注销旧 SW 并清理缓存；`/sw.js` 以 `no-store` 下发，CSP 增加 `worker-src 'self'`
+- 工程命令：`npm test` 运行单元 / 组件测试（176 个）；CI 覆盖 lint + 类型检查 + 单测 / 组件测试 + 构建 + 生产模式浏览器 QA
+- 自检：`npm run qa` 生产模式 185 项 / 开发模式 180 项，含离线缓存、安全响应头、岗位画像与 JD 同义词归一检查
 - 本地地址：http://localhost:3000 （推荐页 http://localhost:3000/#jobs）
 - 一键自检：先 `npm run dev`，再 `npm run qa`（截图输出到 `.screenshots/`）
 - 单一方案文档：**`PLAN.md`**
 
-### 本次会话日志（2026-10-28）
+#### 本次会话日志（2026-10-29）
+
+- 阶段 33：读完 Next 16 的 `progressive-web-apps` 与 `offline-support` 文档，确认 `public/sw.js` + 专用响应头的官方做法，不引入 Serwist 等额外依赖
+- 阶段 33：`sw.js` 安装时缓存 `/` 并从 HTML 解析 `/_next/static/*`，保证「访问一次后断网也能打开」；同时解析 CSS 里的 `url()`（当前无字体引用，为后续 next/font 预留）
+- 阶段 33：导航网络优先、静态资源缓存优先、图标 stale-while-revalidate；`/api/*`、非 GET、跨域与 `_rsc` 一律不拦截
+- 阶段 33：更新采用 `SKIP_WAITING` + 提示刷新，不做静默强制刷新，避免打断编辑
+- 阶段 33：开发环境注销旧 SW 并清空 `resume-workshop-*` 缓存；页面用 `data-service-worker` 标记注册状态，供 QA 区分开发 / 生产
+- 阶段 33：`securityHeaders` 增加 `worker-src 'self'` 与 `serviceWorkerHeaders()`；实测 `/sw.js` 返回 `Cache-Control: no-cache, no-store, must-revalidate`、`Service-Worker-Allowed: /`
+- 阶段 33：新增 5 个单测（合计 176 passed，19 个文件）与 8 / 3 项 QA 检查；生产模式实际断网回放通过，编辑写入 localStorage、恢复联网后提示消失
+- 阶段 33 验证：`tsc`、`lint`、`npm test`（176 passed）、生产模式 `npm run qa`、开发模式 `npm run qa`、`npm run build` 全部通过
+
+## 本次会话日志（2026-10-28）
 
 - 阶段 18：新增 `src/lib/ai/fullResume.ts`，整份提示词要求 JSON、白名单解析、缺失字段统计
 - 阶段 18：新增 `/api/ai/full`，复用 SSE、限流与上游重试；公共响应工具抽到 `src/lib/ai/http.ts`
@@ -678,9 +705,10 @@
 ### 下次继续
 
 1. 先读 `PLAN.md` 与 `PROGRESS.md`「当前进度」
-2. 阶段 0–32 全部完成；P1–P4、AI 增强、可点击链接、整份结构化生成、整库备份、全局撤销 / 重做、技能分组、AI 求职信、投递看板、单份导出 / 合并导入、ATS 文本导出、AI 事实核对、板块显隐 / 排序 / 一页适配、统一 Dialog / 可访问性、数据版本 / 持久化历史、QA 进 CI / 组件测试、安全响应头与岗位库 / 技能同义词均已完成
-3. 后续可选：双语、英文输出、离线缓存；开始前先确认需求与范围
-4. 每完成一项跑 `npm run lint`、`npm test`、`npm run build`、`npm run qa` 并更新本文件
+2. 阶段 0–33 全部完成；P1–P4、AI 增强、可点击链接、整份结构化生成、整库备份、全局撤销 / 重做、技能分组、AI 求职信、投递看板、单份导出 / 合并导入、ATS 文本导出、AI 事实核对、板块显隐 / 排序 / 一页适配、统一 Dialog / 可访问性、数据版本 / 持久化历史、QA 进 CI / 组件测试、安全响应头、岗位库 / 技能同义词与离线缓存均已完成
+3. 后续可选：双语 / 英文输出、更多模板与字体搭配、职位聚合 API；开始前先确认需求与范围
+4. 离线相关改动必须在生产构建下验证：`npm run build && npm run start` 后再跑 `npm run qa`
+5. 每完成一项跑 `npm run lint`、`npm test`、`npm run build`、`npm run qa` 并更新本文件
 
 ## 可选后续
 
@@ -690,7 +718,8 @@
 - [ ] 更多字体搭配 / 模板变体（配色已支持）
 - [ ] 拖拽排序替换上下按钮（注：阶段 8 已实现拖拽手柄，此处仅剩纯鼠标拖拽体验优化）
 - [x] P1 数据安全与打印交付（侧栏跨页、保存失败、覆盖保护、PDF 文件名等；详见 `PLAN.md`）
-- [x] P4 工程化与分发（Vitest、CI、SEO/OG、manifest、图标清理；离线缓存未做）
+- [x] P4 工程化与分发（Vitest、CI、SEO/OG、manifest、图标清理）
+- [x] 离线缓存 / PWA（应用外壳与静态资源缓存、更新提示、离线提示、生产模式离线 QA）
 - [x] 简历链接可点击（网站 / GitHub / 项目 / 自定义板块；危险协议过滤）
 - [x] AI 整份简历结构化生成（一段自述 → 教育 / 工作 / 项目 / 技能；采用时新建简历）
 - [x] 全局撤销 / 重做（按钮 + 快捷键，连续输入合并，切换简历时清空）
@@ -711,7 +740,7 @@
 1. 读「当前进度」和 `PLAN.md` 的「P0：AI 写简历」
 2. 确认 `.env.local` 里的 `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL`
 3. `npm run dev`
-4. AI（P0）、AI 增强、P1、P2（3.1–3.5、阶段 17 可点击链接、阶段 20 全局撤销、阶段 21 技能分组）、P3（4.1–4.8）、P4、阶段 18 整份生成、阶段 19 整库备份、阶段 22 AI 求职信、阶段 23 投递看板、阶段 24 单份导出 / 合并导入、阶段 25 ATS 文本导出、阶段 26 AI 事实核对、阶段 27 板块显隐 / 排序 / 一页适配、阶段 28 统一 Dialog / 可访问性、阶段 29 数据版本 / 持久化历史、阶段 30 QA 进 CI / 组件测试、阶段 31 安全响应头与阶段 32 岗位库 / 技能同义词均已完成
+4. AI（P0）、AI 增强、P1、P2（3.1–3.5、阶段 17 可点击链接、阶段 20 全局撤销、阶段 21 技能分组）、P3（4.1–4.8）、P4、阶段 18 整份生成、阶段 19 整库备份、阶段 22 AI 求职信、阶段 23 投递看板、阶段 24 单份导出 / 合并导入、阶段 25 ATS 文本导出、阶段 26 AI 事实核对、阶段 27 板块显隐 / 排序 / 一页适配、阶段 28 统一 Dialog / 可访问性、阶段 29 数据版本 / 持久化历史、阶段 30 QA 进 CI / 组件测试、阶段 31 安全响应头、阶段 32 岗位库 / 技能同义词与阶段 33 离线缓存均已完成
 5. 每完成一步更新本文件，尤其是「当前进度」「关机交接」与对应阶段勾选项
 
 ## 文件地图
@@ -725,6 +754,8 @@ src/
     icon.svg / apple-icon.png / favicon.ico
   components/
     AppShell.tsx        顶栏、标签页、导入导出、打印、客户端挂载门控
+    OfflineBanner.tsx   离线提示（编辑可用，AI / 招聘链接需联网）
+    ServiceWorkerRegister.tsx 生产环境注册 SW、更新提示、开发环境清理旧缓存
     resume/
       ResumeForm.tsx    编辑表单与重复条目
       ResumeDocumentsBar.tsx 多份简历切换、导出当前与合并导入
@@ -744,10 +775,11 @@ src/
   hooks/useResume.ts    初始化、自动保存、清空、示例、撤销 / 重做与会话恢复
   hooks/useResumeDocuments.ts 多份简历快照、切换、合并导入与删除
   hooks/useApplications.ts 投递记录状态、跨标签页同步
+  hooks/useOnlineStatus.ts 浏览器在线 / 离线状态订阅
   lib/
     types.ts            类型、板块 key 与空白工厂
     schema.ts           简历 schema 版本与未来版本判断
-    securityHeaders.ts  全站安全响应头、CSP 开发 / 生产差异
+    securityHeaders.ts  全站安全响应头、CSP（含 worker-src）与 /sw.js 缓存头
     historyStorage.ts   撤销 / 重做栈的会话持久化、裁剪与配额兜底
     layout.ts           板块布局收敛、排序、显隐与一页适配建议
     defaultResume.ts    示例数据
@@ -767,14 +799,16 @@ src/
     jobBoards.ts        招聘站 URL 与城市编码
     theme.ts            主题色校验、可读性压暗与 CSS 变量
     ai/                 types / config / prompt / fullResume / factCheck / http / deepseek / client
-    __tests__/          Vitest：storage / matching / skillSynonyms / jdMatch / validate / links / SSE / 整份解析 / 撤销栈与会话持久化 / 技能分组 / 提示词 / 投递 / ATS / 事实核对 / 板块布局 / 安全响应头（171 个）
+    __tests__/          Vitest：storage / matching / skillSynonyms / jdMatch / validate / links / SSE / 整份解析 / 撤销栈与会话持久化 / 技能分组 / 提示词 / 投递 / ATS / 事实核对 / 板块布局 / 安全响应头（176 个，19 个文件）
   components/resume/__tests__/  SectionLayoutEditor 隐藏 / 排序 / 恢复默认
   components/ui/__tests__/      Dialog 模态语义 / 焦点陷阱 / 关闭与焦点归还
+  components/__tests__/         OfflineBanner 在线隐藏 / 离线提示 / 网络恢复
   test/setup.ts         jest-dom 匹配器与每例 cleanup
 public/
+  sw.js                   Service Worker：外壳 / 静态资源离线缓存、更新与缓存清理
   icon-192.png / icon-512.png  安装清单图标
-next.config.ts          全站 headers、关闭 X-Powered-By、Turbopack / Cache Components
-scripts/qa.mjs          无头浏览器截图、溢出检查、分页 / PDF 页数、弹窗焦点、安全响应头与可访问性自检
+next.config.ts          全站 headers、/sw.js no-store、关闭 X-Powered-By、Turbopack / Cache Components
+scripts/qa.mjs          无头浏览器截图、溢出检查、分页 / PDF 页数、弹窗焦点、安全响应头、可访问性与离线缓存自检
 .github/workflows/ci.yml lint + 类型检查 + 单测 / 组件测试 + 构建 + 生产模式浏览器 QA
 vitest.config.mts       jsdom + React 插件 + tsconfig paths
 PLAN.md                单一优化方案（AI 为 P0；数据安全、内容能力、路线图）
@@ -804,4 +838,16 @@ src/lib/ai/fullResume.ts           ✅ 整份提示词、JSON 白名单解析、
 src/lib/ai/http.ts                 ✅ SSE 编码、限流、错误响应
 src/lib/__tests__/fullResume.test.ts ✅ 6 个解析与 payload 用例
 scripts/qa.mjs                     ✅ 改为拦截 /api/ai/full，验证新建简历与旧简历保留
+```
+
+### 阶段 33 新增文件
+
+```
+public/sw.js                              ✅ 安装预缓存、导航 / 静态资源 / 图标策略、版本清理
+src/components/ServiceWorkerRegister.tsx  ✅ 生产环境注册、更新提示、开发环境注销与清缓存
+src/components/OfflineBanner.tsx          ✅ 离线状态提示
+src/hooks/useOnlineStatus.ts              ✅ online / offline 事件订阅
+src/components/__tests__/OfflineBanner.test.tsx ✅ 3 个在线 / 离线 / 恢复用例
+src/lib/securityHeaders.ts                ✅ 增加 worker-src 与 serviceWorkerHeaders()
+scripts/qa.mjs                            ✅ 生产 8 项 / 开发 3 项离线缓存检查
 ```

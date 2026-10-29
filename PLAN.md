@@ -517,11 +517,11 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 ## 5. P4：工程化与分发（已完成）
 
 - **git**：P0 前置已完成；后续每个阶段独立提交。
-- **单元 / 组件测试**：已接入 Vitest，171 个用例（18 个文件）覆盖 `normalizeResume`、`parseResumeJSON` / `parseImportFile`、数据版本与未来备份拒绝、技能匹配与评分、技能同义词归一与 `C` / `C++` / `C#` 边界、新增岗位画像、JD 关键词/年限/学历、输入校验、安全链接、AI 整份 JSON 解析、AI 提示词与求职信清理、SSE 分片与中止、撤销 / 重做栈与会话持久化、技能分组与旧数据兼容、投递记录收敛、整库备份与单份导出解析、ATS 文本生成与关键词覆盖、AI 事实核对、板块布局收敛 / 排序 / 显隐与适配建议、安全响应头，以及 Dialog 焦点 / 关闭行为与 `SectionLayoutEditor` 布局交互。命令：`npm test` / `npm run test:watch`。
+- **单元 / 组件测试**：已接入 Vitest，176 个用例（19 个文件）覆盖 `normalizeResume`、`parseResumeJSON` / `parseImportFile`、数据版本与未来备份拒绝、技能匹配与评分、技能同义词归一与 `C` / `C++` / `C#` 边界、新增岗位画像、JD 关键词/年限/学历、输入校验、安全链接、AI 整份 JSON 解析、AI 提示词与求职信清理、SSE 分片与中止、撤销 / 重做栈与会话持久化、技能分组与旧数据兼容、投递记录收敛、整库备份与单份导出解析、ATS 文本生成与关键词覆盖、AI 事实核对、板块布局收敛 / 排序 / 显隐与适配建议、安全响应头与 `sw.js` 缓存头，以及 Dialog 焦点 / 关闭行为、`SectionLayoutEditor` 布局交互与 `OfflineBanner` 在线状态。命令：`npm test` / `npm run test:watch`。
 - **CI**：`.github/workflows/ci.yml` 在 push / PR 时执行 lint、`tsc --noEmit`、单元 / 组件测试、生产构建，再启动 `next start` 跑完整浏览器 QA；失败时上传 `.screenshots`。
 - **SEO/分享**：`layout.tsx` 已补 Open Graph、Twitter Card、keywords、theme-color 与 `formatDetection`；`opengraph-image.tsx` 生成 1200×630 分享图；`manifest.ts` 提供安装清单；自定义 `icon.svg` / `apple-icon.png` / `favicon.ico`。分享图文案用英文，避免 `ImageResponse` 默认字体缺中文字形。
 - **部署地址**：支持 `NEXT_PUBLIC_SITE_URL`；Vercel 自动使用 `VERCEL_PROJECT_PRODUCTION_URL`，本地回退 `http://localhost:3000`。
-- **PWA/离线**：只提供 manifest 与 192/512 图标，不注册 Service Worker，没有离线缓存。
+- **PWA/离线**：manifest 与 192/512 图标已就绪；阶段 33 在生产环境注册 `public/sw.js`，缓存应用外壳、构建静态资源、manifest 与图标，断网仍可编辑、预览与导出。首次访问需联网，`/api/*` 与简历数据不进缓存；开发模式不注册并主动清理旧缓存。
 - **清理**：已删除 `public/` 里未使用的 Next 默认 SVG。
 
 ---
@@ -538,7 +538,7 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 | 5 | P1 | 侧栏跨页、保存失败、覆盖保护、PDF 文件名、手机导入、模板随 JSON | 数据安全与打印交付达标 |
 | 6 | P2 | 照片、自定义板块、项目时间、教育增强、多份简历、技能分组 | 内容模型完善 |
 | 7 | P3 | 跨标签页、校验、错误边界、打印兼容、可访问性 | 体验与健壮性达标 |
-| 8 | P4 ✅ | 单元测试、CI、OG/manifest、图标清理 | 工程化完善；离线缓存未做 |
+| 8 | P4 ✅ | 单元测试、CI、OG/manifest、图标清理 | 工程化完善；离线缓存已由阶段 33 补齐 |
 | 9 | 阶段 23 ✅ | 投递看板与多 JD、整库备份 v3 | 求职流程闭环 |
 | 10 | 阶段 24 ✅ | 单份导出、单份 / 整库合并导入 | 简历可单独分享与合并 |
 | 11 | 阶段 25 ✅ | ATS 纯文本 / Markdown、JD 关键词覆盖 | 可直接粘贴或上传到招聘系统 |
@@ -549,6 +549,7 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 | 16 | 阶段 30 ✅ | QA 进 CI 与组件测试 | 生产模式 QA 自动运行，弹窗 / 布局有组件测试 |
 | 17 | 阶段 31 ✅ | 安全响应头 | CSP / HSTS / COOP / CORP 生效，隐藏技术栈 |
 | 18 | 阶段 32 ✅ | 岗位库与技能同义词 | 26 类别画像；JS/TS/K8s 等别名归一且不混淆 C 系 |
+| 19 | 阶段 33 ✅ | 离线缓存 / PWA | 访问一次后断网可打开并编辑，AI 与接口不缓存 |
 
 ---
 
@@ -570,6 +571,7 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 14. **测试与 CI**：阶段 30 在 CI 的生产构建上启动 `next start` 并跑完整浏览器 QA，失败上传截图；组件测试使用 jsdom + Testing Library 覆盖 Dialog 与板块布局，不替代整页 QA。
 15. **安全响应头**：阶段 31 全站启用 CSP、HSTS、COOP / CORP、Permissions-Policy、Referrer-Policy、nosniff 与 DENY frame，并关闭 `X-Powered-By`；CSP 按开发 / 生产区分 eval 与 WebSocket，保留 inline 以兼容静态页面，严格 nonce CSP 需动态渲染，暂不启用。
 16. **岗位库与同义词**：阶段 32 将岗位画像扩到 26 类，并新增技能同义词层；`JS` / `TS` / `K8s` / `Golang` / `Postgres` / `SpringBoot` 等归一到规范标签，同时保留 `Java` / `JavaScript` 与 `C` / `C++` / `C#` 的边界。JD 词库按规范键去重，岗位匹配仍是本地启发式。
+17. **离线缓存**：阶段 33 在生产环境注册 `public/sw.js`。安装时预缓存首页 HTML、本次构建的 `/_next/static/*`、manifest 与图标；导航网络优先、静态资源缓存优先、图标 stale-while-revalidate。`/api/*`、非 GET、跨域与 `_rsc` 请求完全不拦截。新版本通过 `SKIP_WAITING` 与底部提示由用户决定何时刷新；开发模式注销旧 SW 并清理 `resume-workshop-*` 缓存。离线行为只用生产构建验证。
 
 ---
 
@@ -579,6 +581,7 @@ scripts/mock-deepseek.mjs            本地 mock 上游（开发自测）
 - 不做账号体系、云同步、多人协作。
 - 不做 AI 自动投递、AI 面试；整份生成已在阶段 18 支持教育、工作、项目与技能，但不生成自定义板块、姓名与联系方式。
 - 不做英文简历（除非后续明确需要）。
+- 离线缓存只覆盖应用外壳与构建静态资源，不含 AI 接口、招聘站列表或简历内容；首次访问必须联网。不做 Web Push、后台同步或跨设备缓存共享。清空站点数据会同时清掉缓存，需要重新联网访问一次。
 - 加 AI 后不能再纯静态导出；需要 Node 运行时。
 - 页码依赖 Chrome `@page` margin box，Firefox/Safari 会缺失。
 - 预览页数与分页线为估算值，实际以打印预览为准。

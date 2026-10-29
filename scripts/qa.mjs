@@ -5318,6 +5318,171 @@ expect(
 );
 await a11yPage.close();
 
+// 阶段 33：离线缓存 / PWA。开发模式不注册 SW，只验证清理行为；生产模式跑完整离线回放。
+const swResponse = await fetch(`${BASE}/sw.js`);
+const swCacheControl = swResponse.headers.get("cache-control") ?? "";
+const swContentType = swResponse.headers.get("content-type") ?? "";
+expect(
+  "Service Worker 脚本禁止缓存且限定根作用域",
+  swResponse.ok &&
+    swCacheControl.includes("no-store") &&
+    swResponse.headers.get("service-worker-allowed") === "/" &&
+    swContentType.includes("javascript"),
+  JSON.stringify({
+    status: swResponse.status,
+    cacheControl: swCacheControl,
+    scope: swResponse.headers.get("service-worker-allowed"),
+    contentType: swContentType,
+  }),
+);
+
+const swPage = await open({ width: 1440, height: 1000 });
+await swPage.goto(BASE, { waitUntil: "networkidle0" });
+await swPage
+  .waitForFunction(
+    () => Boolean(document.documentElement.dataset.serviceWorker),
+    { timeout: 5000 },
+  )
+  .catch(() => {});
+// 首次安装需要下载构建资源，留出完成时间。
+await pause(1500);
+
+const swState = await swPage.evaluate(async () => {
+  const registrations =
+    "serviceWorker" in navigator
+      ? await navigator.serviceWorker.getRegistrations()
+      : [];
+  const keys = "caches" in window ? await caches.keys() : [];
+  const contents = {};
+  for (const key of keys) {
+    const cache = await caches.open(key);
+    contents[key] = (await cache.keys()).map(
+      (request) => new URL(request.url).pathname,
+    );
+  }
+  return {
+    marker: document.documentElement.dataset.serviceWorker ?? "",
+    controller: Boolean(navigator.serviceWorker?.controller),
+    registrations: registrations.length,
+    keys,
+    contents,
+  };
+});
+
+if (swState.marker === "dev") {
+  expect(
+    "开发模式不注册 Service Worker",
+    swState.registrations === 0 &&
+      !swState.controller &&
+      swState.keys.every((key) => !key.startsWith("resume-workshop-")),
+    JSON.stringify(swState),
+  );
+} else {
+  expect(
+    "生产模式注册并接管 Service Worker",
+    swState.marker === "registered" &&
+      swState.controller &&
+      swState.registrations === 1,
+    JSON.stringify(swState),
+  );
+
+  const cachedPaths = Object.values(swState.contents).flat();
+  expect(
+    "应用外壳、构建静态资源与图标已缓存",
+    cachedPaths.includes("/") &&
+      cachedPaths.some((item) => item.endsWith(".css")) &&
+      cachedPaths.filter((item) => item.startsWith("/_next/static/")).length >=
+        3 &&
+      cachedPaths.includes("/manifest.webmanifest") &&
+      cachedPaths.includes("/icon-192.png"),
+    JSON.stringify(swState.contents),
+  );
+  expect(
+    "接口响应不进入离线缓存",
+    cachedPaths.every((item) => !item.startsWith("/api/")),
+    JSON.stringify(cachedPaths.filter((item) => item.startsWith("/api/"))),
+  );
+
+  await swPage.setOfflineMode(true);
+  await swPage.reload({ waitUntil: "domcontentloaded" });
+  await pause(1200);
+  const offlineState = await swPage.evaluate(() => ({
+    online: navigator.onLine,
+    banner: Boolean(document.querySelector('[data-qa="offline-banner"]')),
+    brand: (document.body.innerText ?? "").includes("简历工坊"),
+    hasForm: Boolean(
+      [...document.querySelectorAll("label")].find(
+        (node) =>
+          node.querySelector("span span")?.textContent?.trim() === "姓名",
+      ),
+    ),
+    controller: Boolean(navigator.serviceWorker?.controller),
+  }));
+  expect(
+    "离线刷新仍能加载完整编辑器并显示离线提示",
+    !offlineState.online &&
+      offlineState.banner &&
+      offlineState.brand &&
+      offlineState.hasForm,
+    JSON.stringify(offlineState),
+  );
+
+  const offlineEdited = await swPage.evaluate(() => {
+    const labels = [...document.querySelectorAll("label")].filter(
+      (node) => node.querySelector("span span")?.textContent?.trim() === "姓名",
+    );
+    const input = labels[0]?.querySelector("input, textarea");
+    if (!input) return false;
+    const proto =
+      input instanceof HTMLTextAreaElement
+        ? HTMLTextAreaElement.prototype
+        : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(
+      input,
+      "离线可用",
+    );
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.focus();
+    input.blur();
+    return true;
+  });
+  await pause(1200);
+  const offlineSaved = await swPage.evaluate(() =>
+    Object.keys(localStorage).some((key) =>
+      (localStorage.getItem(key) ?? "").includes("离线可用"),
+    ),
+  );
+  expect(
+    "离线编辑仍写入 localStorage",
+    offlineEdited && offlineSaved,
+    JSON.stringify({ offlineEdited, offlineSaved }),
+  );
+
+  await swPage.screenshot({
+    path: `${OUT}/qa-offline.png`,
+    fullPage: false,
+  });
+
+  await swPage.setOfflineMode(false);
+  await pause(800);
+  const recoveredState = await swPage.evaluate(() => ({
+    online: navigator.onLine,
+    banner: Boolean(document.querySelector('[data-qa="offline-banner"]')),
+  }));
+  expect(
+    "恢复联网后离线提示自动消失",
+    recoveredState.online && !recoveredState.banner,
+    JSON.stringify(recoveredState),
+  );
+}
+
+expect(
+  "离线缓存流程无控制台错误",
+  swPage.qaErrors.length === 0,
+  swPage.qaErrors.join(" | "),
+);
+await swPage.close();
+
 await browser.close();
 if (failures.length > 0) {
   console.error(`QA failures: ${failures.length}`);

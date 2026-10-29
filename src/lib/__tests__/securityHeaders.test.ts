@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { securityHeaders, type SecurityHeader } from "../securityHeaders";
+import {
+  securityHeaders,
+  serviceWorkerHeaders,
+  type SecurityHeader,
+} from "../securityHeaders";
 
 function toMap(headers: SecurityHeader[]) {
   return Object.fromEntries(headers.map(({ key, value }) => [key, value]));
@@ -24,6 +28,7 @@ describe("securityHeaders", () => {
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("form-action 'self'");
+    expect(csp).toContain("worker-src 'self'");
   });
 
   it("开发环境放行 eval 与 HMR WebSocket", () => {
@@ -37,5 +42,23 @@ describe("securityHeaders", () => {
     const keys = securityHeaders(false).map(({ key }) => key);
 
     expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+describe("serviceWorkerHeaders", () => {
+  it("Service Worker 脚本禁止缓存并允许根作用域", () => {
+    const headers = toMap(serviceWorkerHeaders());
+
+    expect(headers["Cache-Control"]).toBe(
+      "no-cache, no-store, must-revalidate",
+    );
+    expect(headers["Service-Worker-Allowed"]).toBe("/");
+  });
+
+  it("不会覆盖全站安全响应头", () => {
+    const keys = serviceWorkerHeaders().map(({ key }) => key);
+    const securityKeys = securityHeaders(false).map(({ key }) => key);
+
+    expect(keys.some((key) => securityKeys.includes(key))).toBe(false);
   });
 });

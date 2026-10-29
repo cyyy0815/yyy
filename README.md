@@ -38,6 +38,7 @@
 - 浏览器打印导出 PDF：只输出简历，A4 全宽；首页贴顶、续页上下留白，页脚自动带「第 N / M 页」页码，可一键关闭页码；默认文件名取「姓名-求职头衔」
 - 编辑与错误页面兜底：自定义 `error.tsx` / `global-error.tsx` / `not-found.tsx`，出错时可直接重试或刷新
 - **键盘与弹窗体验**：五个业务弹窗统一焦点陷阱、关闭后归还焦点、`Esc` / 点击遮罩关闭与背景滚动锁；提供「跳到主要内容」链接、键盘焦点环与 `prefers-reduced-motion` 降级
+- **离线可用（PWA）**：成功访问一次后，Service Worker 会缓存应用外壳、构建静态资源与图标；断网时仍能打开、编辑、预览、打印、导入导出 JSON 并保存到本机，页面顶部显示离线提示。AI 写作与招聘网站链接需要联网；新版本下载完成后底部提示刷新，不会打断正在编辑的内容
 
 ### AI 写简历（可选，需配置 DeepSeek Key）
 
@@ -76,6 +77,7 @@
 - Next.js 16（App Router）+ React 19 + TypeScript
 - Tailwind CSS 4
 - localStorage 持久化
+- Service Worker 应用外壳离线缓存（仅生产环境注册）
 - DeepSeek Chat Completions（OpenAI 兼容，SSE 流式），仅服务端调用
 - Vitest + Testing Library（纯函数、SSE 解析与组件交互测试）
 - puppeteer-core（仅开发 / CI 用于浏览器自检，不参与构建）
@@ -137,7 +139,7 @@ npm test            # 运行一次
 npm run test:watch  # 监听模式
 ```
 
-当前 18 个测试文件、171 个用例。纯函数覆盖 `normalizeResume` / `parseResumeJSON` / `parseImportFile`、整库与单份导出解析、数据版本与未来备份拒绝、投递记录收敛、板块布局收敛 / 排序 / 显隐与适配建议、ATS 文本生成与关键词覆盖、AI 事实核对（数字 / 技能 / 结构化名称）、技能匹配与评分、技能同义词归一与 `C` / `C++` / `C#` 边界、新增岗位画像、JD 关键词与年限/学历识别、输入校验、技能分组与熟练度归一化、AI 提示词与求职信清理、安全响应头生成，以及上游 SSE 解析（跨分片、CRLF、`reasoning_content`、`[DONE]` 与中止）。组件测试使用 jsdom + Testing Library，覆盖 `Dialog` 的模态语义、焦点陷阱、Escape / 遮罩关闭与焦点归还，以及 `SectionLayoutEditor` 的隐藏不删内容、排序与恢复默认。
+当前 19 个测试文件、176 个用例。纯函数覆盖 `normalizeResume` / `parseResumeJSON` / `parseImportFile`、整库与单份导出解析、数据版本与未来备份拒绝、投递记录收敛、板块布局收敛 / 排序 / 显隐与适配建议、ATS 文本生成与关键词覆盖、AI 事实核对（数字 / 技能 / 结构化名称）、技能匹配与评分、技能同义词归一与 `C` / `C++` / `C#` 边界、新增岗位画像、JD 关键词与年限/学历识别、输入校验、技能分组与熟练度归一化、AI 提示词与求职信清理、安全响应头与 `sw.js` 缓存头生成，以及上游 SSE 解析（跨分片、CRLF、`reasoning_content`、`[DONE]` 与中止）。组件测试使用 jsdom + Testing Library，覆盖 `Dialog` 的模态语义、焦点陷阱、Escape / 遮罩关闭与焦点归还，`SectionLayoutEditor` 的隐藏不删内容、排序与恢复默认，以及 `OfflineBanner` 随网络状态出现 / 消失。
 
 `.github/workflows/ci.yml` 在 push / PR 时依次执行 lint、`tsc --noEmit`、单元 / 组件测试、生产构建，再安装 `fonts-noto-cjk`、启动 `next start` 跑完整的浏览器 QA（Chrome 由 runner 提供）；失败时上传 `.screenshots` 便于排查。
 
@@ -146,7 +148,8 @@ npm run test:watch  # 监听模式
 - `app/layout.tsx` 提供 OG / Twitter / `theme-color` / 关键词等元数据
 - `app/opengraph-image.tsx` 生成 1200×630 分享图；文案使用英文，避免 `ImageResponse` 默认字体缺少中文字形
 - `app/manifest.ts` 与 `public/icon-192.png` / `icon-512.png` 提供可安装清单
-- 只提供 manifest，不注册 Service Worker，因此没有离线缓存
+- `public/sw.js` 只在生产环境注册；`/sw.js` 以 `no-store` 下发，保证及时更新。开发模式会主动注销旧 SW 并清理缓存，避免 HMR 读到旧资源
+- Service Worker 采用网络优先的导航策略与缓存优先的静态资源策略：首次访问需联网，之后断网也能打开编辑器
 - 公网部署时设置 `NEXT_PUBLIC_SITE_URL=https://你的域名`；否则 OG 图片地址会使用请求域名（本地为 localhost）
 
 ### 视觉与 AI 自检
@@ -157,7 +160,7 @@ npm run test:watch  # 监听模式
 npm run qa
 ```
 
-会在 `.screenshots/` 生成桌面、移动端、五套模板、主题色、分页、打印视图，以及 AI 弹窗、AI 移动端、未配置 Key、ATS 弹窗、板块布局编辑器与一页适配弹窗的截图，并检查横向溢出、纸面页数与 PDF 实际页数。另含侧栏模板多页回归：打印时侧栏只作用于首页，续页正文不得保留 62mm 侧栏缩进。还覆盖保存失败提示、删除撤销、导入 / 载入示例确认、手机导入、模板随 JSON 备份、打印文件名等数据安全场景，以及证件照压缩、自定义板块排序 / 显隐 / 删除撤销、项目起止时间编辑、教育增强字段编辑、多份简历切换 / 复制 / 重命名 / 刷新保留与五套模板渲染。P3 新增回归：多标签页冲突与阻止覆盖、表单格式校验、7 天备份提醒与暂停、导入结构与 5MB 限制、页码开关、打印对比度、移动端 `aria-pressed`、自定义 404、推荐页放宽门槛、JD 缺口一键补、非技术岗位画像与新增城市编码。AI 部分通过拦截接口返回固定 SSE 来验证弹窗、采用、撤销与未配置状态，并新增「自动读取 JD」「优化模式空关键词」「整份自述生成结构化预览 / 写入新简历 / 旧简历保留」检查，不消耗真实额度。整库备份另有回归：导出文件包含文档列表与模板，再导入到另一份简历上，验证全部文档、当前文档与模板都能恢复。P4 还会检查首页 OG / Twitter / manifest / 图标元数据，以及 192 / 512 图标和分享图是否可访问；P2 收尾新增网站 / 项目 / 自定义链接可点击与危险协议过滤检查；全局撤销 / 重做另有回归：按钮初始禁用、编辑后可撤销、按钮与快捷键撤销 / 重做、结果自动保存、新增条目可撤销；刷新后从 `sessionStorage` 恢复撤销 / 重做栈，并验证撤销、重做跨刷新仍然生效。技能分组另有回归：旧数据保持扁平展示、新建分组、按所选分组与熟练度保存、五套模板均渲染分组与熟练度。AI 求职信另有回归：默认带入岗位 / 年限 / 素材 / 已存 JD、生成后可编辑与复制下载、请求只含素材且不含姓名与联系方式、不写入简历、未配置 Key 时显示配置步骤。投递看板另有回归：新建时默认带入当前 JD、保存公司 / 岗位 / 状态 / 日期 / JD、状态流转、设为当前 JD、整库备份包含记录、刷新保留与 390px 无溢出。单份导出 / 合并导入另有回归：单份文件只含当前简历且文件名正确、合并单份后保留原简历并生成「标题 2」、合并整库时追加简历与投递记录且不切换当前文档，同时检查手机端六个按钮都在视口内。ATS 导出另有回归：纯文本内容包含各板块且不输出技能等级、JD 覆盖率与缺口正确、桌面与 390px 弹窗无横向溢出、`.txt` / `.md` 文件名与内容正确。AI 事实核对另有回归：在单段预览中追加素材之外的技能与数字后实时提示、整份生成标出自述之外的学校 / 专业 / 数字、求职信标出素材之外的数字。板块布局另有回归：旧数据补齐默认顺序、七行编辑器、五套模板隐藏工作经历与恢复、上下移动在经典模板生效、重置；一页适配另有回归：页数与提示文案、建议隐藏、逐项恢复、恢复打开时与完成关闭，并检查桌面与 390px 无溢出。弹窗与键盘另有回归：模态语义 / 标题描述、背景滚动锁、Tab / Shift+Tab 焦点陷阱、Escape 与完成关闭后的焦点归还、「跳到主要内容」为首个焦点且能把焦点移到主内容、`prefers-reduced-motion` 生效。另检查全站安全响应头完整且未暴露 `X-Powered-By`。岗位库与同义词另有回归：网络安全画像能被识别，粘贴 `JS/TS`、`K8s`、`Golang`、`Postgres`、`SpringBoot` 与 `CI/CD` 后归一为 7 个规范关键词并全部覆盖。任一检查失败时命令以非 0 退出。
+会在 `.screenshots/` 生成桌面、移动端、五套模板、主题色、分页、打印视图，以及 AI 弹窗、AI 移动端、未配置 Key、ATS 弹窗、板块布局编辑器与一页适配弹窗的截图，并检查横向溢出、纸面页数与 PDF 实际页数。另含侧栏模板多页回归：打印时侧栏只作用于首页，续页正文不得保留 62mm 侧栏缩进。还覆盖保存失败提示、删除撤销、导入 / 载入示例确认、手机导入、模板随 JSON 备份、打印文件名等数据安全场景，以及证件照压缩、自定义板块排序 / 显隐 / 删除撤销、项目起止时间编辑、教育增强字段编辑、多份简历切换 / 复制 / 重命名 / 刷新保留与五套模板渲染。P3 新增回归：多标签页冲突与阻止覆盖、表单格式校验、7 天备份提醒与暂停、导入结构与 5MB 限制、页码开关、打印对比度、移动端 `aria-pressed`、自定义 404、推荐页放宽门槛、JD 缺口一键补、非技术岗位画像与新增城市编码。AI 部分通过拦截接口返回固定 SSE 来验证弹窗、采用、撤销与未配置状态，并新增「自动读取 JD」「优化模式空关键词」「整份自述生成结构化预览 / 写入新简历 / 旧简历保留」检查，不消耗真实额度。整库备份另有回归：导出文件包含文档列表与模板，再导入到另一份简历上，验证全部文档、当前文档与模板都能恢复。P4 还会检查首页 OG / Twitter / manifest / 图标元数据，以及 192 / 512 图标和分享图是否可访问；P2 收尾新增网站 / 项目 / 自定义链接可点击与危险协议过滤检查；全局撤销 / 重做另有回归：按钮初始禁用、编辑后可撤销、按钮与快捷键撤销 / 重做、结果自动保存、新增条目可撤销；刷新后从 `sessionStorage` 恢复撤销 / 重做栈，并验证撤销、重做跨刷新仍然生效。技能分组另有回归：旧数据保持扁平展示、新建分组、按所选分组与熟练度保存、五套模板均渲染分组与熟练度。AI 求职信另有回归：默认带入岗位 / 年限 / 素材 / 已存 JD、生成后可编辑与复制下载、请求只含素材且不含姓名与联系方式、不写入简历、未配置 Key 时显示配置步骤。投递看板另有回归：新建时默认带入当前 JD、保存公司 / 岗位 / 状态 / 日期 / JD、状态流转、设为当前 JD、整库备份包含记录、刷新保留与 390px 无溢出。单份导出 / 合并导入另有回归：单份文件只含当前简历且文件名正确、合并单份后保留原简历并生成「标题 2」、合并整库时追加简历与投递记录且不切换当前文档，同时检查手机端六个按钮都在视口内。ATS 导出另有回归：纯文本内容包含各板块且不输出技能等级、JD 覆盖率与缺口正确、桌面与 390px 弹窗无横向溢出、`.txt` / `.md` 文件名与内容正确。AI 事实核对另有回归：在单段预览中追加素材之外的技能与数字后实时提示、整份生成标出自述之外的学校 / 专业 / 数字、求职信标出素材之外的数字。板块布局另有回归：旧数据补齐默认顺序、七行编辑器、五套模板隐藏工作经历与恢复、上下移动在经典模板生效、重置；一页适配另有回归：页数与提示文案、建议隐藏、逐项恢复、恢复打开时与完成关闭，并检查桌面与 390px 无溢出。弹窗与键盘另有回归：模态语义 / 标题描述、背景滚动锁、Tab / Shift+Tab 焦点陷阱、Escape 与完成关闭后的焦点归还、「跳到主要内容」为首个焦点且能把焦点移到主内容、`prefers-reduced-motion` 生效。另检查全站安全响应头完整且未暴露 `X-Powered-By`。岗位库与同义词另有回归：网络安全画像能被识别，粘贴 `JS/TS`、`K8s`、`Golang`、`Postgres`、`SpringBoot` 与 `CI/CD` 后归一为 7 个规范关键词并全部覆盖。离线缓存另有回归：`/sw.js` 以 `no-store` 下发且限定根作用域；生产模式注册并接管 Service Worker，应用外壳、构建静态资源与图标进入缓存，接口响应不进入缓存；断网刷新仍能加载编辑器并显示离线提示，离线编辑照常写入 localStorage，恢复联网后提示自动消失。开发模式则验证不注册 SW。任一检查失败时命令以非 0 退出。
 
 默认自动探测 Windows / macOS / Linux 的常见 Chrome 路径，也可通过环境变量覆盖：
 
@@ -173,7 +176,7 @@ CHROME_PATH="C:/path/to/chrome.exe" QA_BASE="http://localhost:3000" npm run qa
 - 全站响应头包含 CSP、HSTS、`nosniff`、`X-Frame-Options: DENY`、严格 Referrer-Policy、Permissions-Policy、COOP / CORP，并关闭 `X-Powered-By`。生产 CSP 不含 `unsafe-eval`；开发模式仅为 React 调试与 HMR 放行 eval 和 WebSocket。CSP 保留 inline script / style 以兼容 Next 启动脚本与行内样式；如需严格 nonce CSP，需要改为动态渲染。
 - AI 路由需要 Node.js 运行时（`next start` 或 Vercel 等），不能再使用纯静态导出；不要从浏览器直连 DeepSeek。
 - 公网部署建议设置 `NEXT_PUBLIC_SITE_URL`（例如 `https://resume.example.com`），让 OG / Twitter 分享图使用绝对地址；未设置时 Next.js 会退回请求域名。
-- 提供 manifest 与图标，方便添加到主屏，但没有 Service Worker，不做离线缓存。
+- 生产环境注册 Service Worker，缓存应用外壳、构建静态资源与图标，方便添加到主屏并离线打开。缓存不含简历内容、导入文件、AI 请求或响应；简历数据仍只存在 localStorage。首次访问必须联网，开发模式不注册 SW。
 
 ## 目录结构
 
@@ -191,6 +194,8 @@ src/
       generate/route.ts 校验、限流、SSE 转换
   components/
     AppShell.tsx        顶栏、标签页、导入导出、打印、自动保存门控、跳转主内容
+    OfflineBanner.tsx   离线状态提示（编辑可用、AI 与外部链接需联网）
+    ServiceWorkerRegister.tsx 生产环境注册 SW、新版本刷新提示、开发环境清理旧缓存
     resume/
       ResumeForm.tsx    全部编辑表单与重复条目
       SectionLayoutEditor.tsx 内置板块显隐与上下排序
@@ -216,6 +221,7 @@ src/
     useResume.ts        初始化、自动保存、清空、示例、撤销 / 重做与会话恢复
     useResumeDocuments.ts 多份简历快照、切换、合并导入与删除
     useApplications.ts  投递记录状态与跨标签页同步
+    useOnlineStatus.ts  订阅浏览器在线 / 离线事件
   lib/
     types.ts            简历类型与空白工厂
     schema.ts           简历 schema 版本与未来版本判断
@@ -248,13 +254,14 @@ src/
       http.ts           SSE 编码、限流与错误响应
       deepseek.ts       上游请求、重试、SSE 解析
       client.ts         浏览器端 SSE 客户端
-    __tests__/          Vitest：storage / matching / skillSynonyms / jdMatch / validate / SSE / 整份解析 / 撤销栈与会话持久化 / 技能分组 / 提示词 / 投递 / 布局 / ATS / 事实核对 / 安全响应头（171 个）
+    __tests__/          Vitest：storage / matching / skillSynonyms / jdMatch / validate / SSE / 整份解析 / 撤销栈与会话持久化 / 技能分组 / 提示词 / 投递 / 布局 / ATS / 事实核对 / 安全响应头（176 个）
   test/setup.ts         Vitest + jest-dom 初始化与自动 cleanup
 public/
+  sw.js                 Service Worker：外壳 / 静态资源离线缓存与更新
   icon-192.png          安装清单图标
   icon-512.png          安装清单图标
-next.config.ts          全站安全响应头、关闭 X-Powered-By、Turbopack / Cache Components
-scripts/qa.mjs          截图、溢出检查、分页与 PDF 页数、AI/事实核对/照片/自定义板块/多简历/投递看板/单份导出与合并导入/ATS 文本导出/板块布局与一页适配/弹窗焦点与可访问性/刷新后撤销历史自检
+next.config.ts          全站安全响应头、/sw.js 缓存头、关闭 X-Powered-By、Turbopack / Cache Components
+scripts/qa.mjs          截图、溢出检查、分页与 PDF 页数、AI/事实核对/照片/自定义板块/多简历/投递看板/单份导出与合并导入/ATS 文本导出/板块布局与一页适配/弹窗焦点与可访问性/刷新后撤销历史/离线缓存自检
 scripts/mock-deepseek.mjs 本地 mock 上游（开发自测）
 .github/workflows/ci.yml lint + 类型检查 + 单测 / 组件测试 + 构建 + 生产模式浏览器 QA
 vitest.config.mts        Vitest（jsdom + React 插件 + tsconfig paths）
@@ -272,5 +279,5 @@ PROGRESS.md             工作流与进度（中断后从这里继续）
 - 打印页码依赖 Chrome / Edge 的 `@page` margin box，Firefox 与 Safari 不会显示「第 N / M 页」，但简历正文、分页与配色仍可正常打印。导出 PDF 建议使用 Chrome / Edge；其他浏览器可在打印对话框中关闭页眉页脚，或关闭本工具的页码开关后自行添加页码
 - 证件照只在浏览器内压缩为 400×400 JPEG，不保留原图，也不做抠图或美颜；照片会增加 JSON 备份与 localStorage 的体积
 - 多份简历只保存在当前浏览器；JSON 导出会包含全部简历，导入整库备份会替换当前全部简历（操作前会确认）；删除简历不可撤销
-- 有 manifest 与安装图标，但没有 Service Worker，断网无法打开，离线缓存未实现
+- 离线缓存覆盖应用外壳与构建静态资源，不含 AI 接口、招聘站内容或简历数据；首次访问必须联网，清空浏览器站点数据会同时清掉缓存。开发模式不注册 SW，离线行为只能在生产构建（`npm run build && npm run start`）验证
 - 分享卡片文案为英文：`ImageResponse` 默认字体不含中文字形，直接渲染中文会变成方框
