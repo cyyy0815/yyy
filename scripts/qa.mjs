@@ -6026,12 +6026,58 @@ expect(
     zhaopinDiag.trace.sources.role.includes("summary-planes__title") &&
     zhaopinDiag.trace.sources.company.includes("companydetail") &&
     zhaopinDiag.trace.sources.jd === "fallback:heading" &&
+    zhaopinDiag.pageKind.isDetailUrl === true &&
     zhaopinDiag.selectorHits.some(
       (item) => item.selector === ".summary-planes__title" && item.count === 1,
     ),
   JSON.stringify(zhaopinDiag),
 );
 await zhaopinPage.close();
+
+// 列表页识别：一个页面多个职位标题时不能当成详情页去抓（会投错岗位）
+const listingPage = await browser.newPage();
+await listingPage.setRequestInterception(true);
+listingPage.on("request", (request) => {
+  if (request.url().includes("zhipin.com")) {
+    request.respond({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<!doctype html><html><head><meta charset="utf-8"></head><body>
+        <ul>
+          <li><a class="job-name" href="/job_detail/a.html">职位 A</a></li>
+          <li><a class="job-name" href="/job_detail/b.html">职位 B</a></li>
+          <li><a class="job-name" href="/job_detail/c.html">职位 C</a></li>
+        </ul>
+      </body></html>`,
+    });
+    return;
+  }
+  request.continue();
+});
+await listingPage.goto("https://www.zhipin.com/web/geek/jobs", {
+  waitUntil: "domcontentloaded",
+});
+await listingPage.evaluate(() => {
+  window.chrome = {
+    runtime: { onMessage: { addListener: (fn) => { window.__extractHandler = fn; } } },
+  };
+});
+await listingPage.addScriptTag({
+  path: path.join(process.cwd(), "extension/content-job.js"),
+});
+const listingResult = await listingPage.evaluate(
+  () =>
+    new Promise((resolve) => {
+      window.__extractHandler({ type: "extract" }, null, resolve);
+    }),
+);
+expect(
+  "职位列表页会被识别出来",
+  listingResult?.pageKind?.cardCount >= 3 &&
+    listingResult.pageKind.isDetailUrl === false,
+  JSON.stringify(listingResult?.pageKind),
+);
+await listingPage.close();
 
 // ATS 纯文本 / Markdown 导出与 JD 关键词覆盖
 const atsPage = await open({ width: 1440, height: 1000 });

@@ -45,6 +45,17 @@ async function scan() {
   fields.company.value = lead.company || "";
   fields.role.value = lead.role || "";
   fields.jd.value = lead.jd || "";
+
+  const pageKind = response.pageKind;
+  if (pageKind && pageKind.cardCount > 1 && !pageKind.isDetailUrl) {
+    // 列表页上抓到的只是第一个职位，必须提示，否则会投错岗位
+    setStatus(
+      `当前页面有 ${pageKind.cardCount} 个职位，抓到的是第一个——请打开单个职位详情再抓`,
+    );
+    setResult("列表页抓取不可靠，建议点进具体职位", "error");
+    return;
+  }
+
   setStatus(
     lead.jd ? "已抓取，确认无误后发送" : "没有抓到 JD，请在下面粘贴",
   );

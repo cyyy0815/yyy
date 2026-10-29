@@ -150,6 +150,10 @@ function extractByHeading() {
   return "";
 }
 
+// 链接文案是这些通用词时不能当公司名（BOSS 列表卡片上就有“公司”这种占位）
+const GENERIC_COMPANY_LABELS =
+  /^(公司|企业|公司主页|查看公司|更多|首页|全部|招聘|公司介绍|企业主页|查看详情|立即沟通)$/;
+
 /** 公司名兜底：详情页里指向公司主页的链接文案通常就是公司全称。 */
 function extractCompanyFromLink() {
   const anchors = Array.from(
@@ -159,9 +163,23 @@ function extractCompanyFromLink() {
   );
   for (const anchor of anchors) {
     const text = textOf(anchor).split("\n")[0].trim();
-    if (text.length >= 2 && text.length <= 60) return text;
+    if (text.length < 2 || text.length > 60) continue;
+    if (GENERIC_COMPANY_LABELS.test(text)) continue;
+    return text;
   }
   return "";
+}
+
+/** 从标签页标题里取岗位名：「青口物流装卸招聘」_BOSS直聘 → 青口物流装卸 */
+function roleFromTitle() {
+  const title = (document.title || "").trim();
+  if (!title) return "";
+  const cleaned = title
+    .replace(/[_\-|]\s*(BOSS直聘|拉勾|猎聘|智联招聘|前程无忧|zhipin|lagou|liepin).*$/i, "")
+    .replace(/^[「【\[]+|[」】\]]+$/g, "")
+    .replace(/招聘.*$/, "")
+    .trim();
+  return cleaned.length >= 2 && cleaned.length <= 40 ? cleaned : "";
 }
 
 /** 逐个选择器试，命中时返回值与来源，便于诊断「哪条规则起作用」。 */
@@ -216,6 +234,10 @@ function extractWithTrace() {
       role = { value: h1, source: h1 ? "fallback:h1" : "" };
     }
   }
+  if (!role.value) {
+    const fromTitle = roleFromTitle();
+    if (fromTitle) role = { value: fromTitle, source: "fallback:title" };
+  }
 
   // 结构化内容太短时，用「按标题找正文」和正文区域兜底，避免只抓到一句职责标题。
   if (!jd.value || jd.value.length < 120) {
@@ -255,6 +277,15 @@ function extract() {
   return extractWithTrace().lead;
 }
 
+/** 页面类型判断：一个页面出现多个职位标题时，通常还在列表页或列表弹层。 */
+function pageKindInfo() {
+  return {
+    cardCount: document.querySelectorAll(".job-name, [class*='job-card']").length,
+    isDetailUrl: /\/(job_detail|jobdetail|jobs?\/\d)/.test(location.pathname),
+    title: document.title,
+  };
+}
+
 /**
  * 诊断：不改变页面，只回报「哪条选择器命中、哪些候选存在」。
  * 用户在登录态下点一次，把结果贴回来即可按真实 DOM 精确修正。
@@ -285,6 +316,7 @@ function diagnose() {
       selector,
       count: document.querySelectorAll(selector).length,
     })),
+    pageKind: pageKindInfo(),
     headings: Array.from(document.querySelectorAll("h1, h2"))
       .map((node) => textOf(node).slice(0, 24))
       .filter(Boolean)
@@ -420,7 +452,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === "extract") {
     try {
-      sendResponse({ ok: true, lead: extract() });
+      sendResponse({ ok: true, lead: extract(), pageKind: pageKindInfo() });
     } catch (error) {
       sendResponse({
         ok: false,
