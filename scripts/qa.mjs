@@ -6079,6 +6079,57 @@ expect(
 );
 await listingPage.close();
 
+// BOSS 详情页：.company-info .name 里是「职位名 + 薪资」，公司名只在标题里
+const bossDetailPage = await browser.newPage();
+await bossDetailPage.setRequestInterception(true);
+bossDetailPage.on("request", (request) => {
+  if (request.url().includes("zhipin.com")) {
+    request.respond({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<!doctype html><html><head><meta charset="utf-8">
+        <title>「染厂跟单招聘」_福州千华纺织有限公司招聘-BOSS直聘</title>
+        </head><body>
+        <div class="job-banner"><div class="name"><h1>染厂跟单</h1></div></div>
+        <div class="company-info"><span class="name">染厂跟单
+100-110元/天</span></div>
+        <div class="job-sec-text">工作周期：长期兼职；每周工期：5 天及以上；工作时间 14:00-18:00；
+          结算方式：周结。负责染厂订单的跟进与协调，核对工艺单、跟进生产进度、安排出货，
+          等整段描述足够长以模拟真实岗位正文。</div>
+      </body></html>`,
+    });
+    return;
+  }
+  request.continue();
+});
+await bossDetailPage.goto(
+  "https://www.zhipin.com/job_detail/qa-fixture-boss.html",
+  { waitUntil: "domcontentloaded" },
+);
+await bossDetailPage.evaluate(() => {
+  window.chrome = {
+    runtime: { onMessage: { addListener: (fn) => { window.__extractHandler = fn; } } },
+  };
+});
+await bossDetailPage.addScriptTag({
+  path: path.join(process.cwd(), "extension/content-job.js"),
+});
+const bossDetail = await bossDetailPage.evaluate(
+  () =>
+    new Promise((resolve) => {
+      window.__extractHandler({ type: "extract" }, null, resolve);
+    }),
+);
+expect(
+  "BOSS 详情页能从标题取到公司名",
+  bossDetail?.ok &&
+    bossDetail.lead.company === "福州千华纺织有限公司" &&
+    bossDetail.trace.sources.company === "fallback:title" &&
+    bossDetail.lead.role === "染厂跟单",
+  JSON.stringify({ lead: bossDetail?.lead, sources: bossDetail?.trace?.sources }),
+);
+await bossDetailPage.close();
+
 // ATS 纯文本 / Markdown 导出与 JD 关键词覆盖
 const atsPage = await open({ width: 1440, height: 1000 });
 await atsPage.goto(BASE, { waitUntil: "networkidle0" });

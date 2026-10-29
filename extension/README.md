@@ -51,7 +51,7 @@ BOSS直聘、拉勾、猎聘、智联招聘、前程无忧。抓取策略是「�
 | 站点 | 结果 |
 |---|---|
 | 智联招聘 | ✅ 可匿名提取：公司取 `a[href*="/companydetail/"]`、岗位取 `.summary-planes__title`、正文由「按『职位描述』标题向上找容器」的通用兜底拿到；已按真实 DOM 修正（之前写成 `.summary-plane__title`，少了个 s 所以全空） |
-| BOSS直聘 | ⚠️ 未登录访问岗位页直接跳 `/web/user/` 登录页，匿名状态无法验证 |
+| BOSS直聘 | ✅ 登录后详情页可提取（`/job_detail/xxx.html`）：岗位取 `.job-banner .name h1`、正文取 `.job-sec-text`；公司名需从标题「岗位招聘_公司名招聘-BOSS直聘」解析，因为 `.company-info .name` 里是「职位名 + 薪资」 |
 | 拉勾 | ⚠️ 出现「滑动验证」页 |
 | 猎聘 | ⚠️ 列表页被风控打到 `about:blank`，无法验证 |
 | 前程无忧 | ⚠️ `we.51job.com` 是 SPA，未登录时列表不渲染职位卡片 |

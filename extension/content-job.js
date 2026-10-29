@@ -170,6 +170,44 @@ function extractCompanyFromLink() {
   return "";
 }
 
+/**
+ * 公司名校验：列表卡片的「职位名 + 薪资」很容易被当成公司名，
+ * 这里挡掉换行、薪资、占位词这类明显不是公司全称的值。
+ */
+function isLikelyCompany(value) {
+  const text = String(value || "").trim();
+  if (text.length < 2 || text.length > 40) return false;
+  if (text.includes("\n")) return false;
+  if (/元\/天|元\/月|K\/月|薪|面议|\d+\s*人|急招/.test(text)) return false;
+  if (GENERIC_COMPANY_LABELS.test(text)) return false;
+  return true;
+}
+
+/** 公司名兜底：BOSS / 智联的标题里都带公司全称，格式「岗位招聘_公司名招聘-站点」。 */
+function companyFromTitle() {
+  const title = (document.title || "").trim();
+  const parts = title
+    .split(/[_|]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return "";
+  const candidate = parts[1]
+    .replace(/[-–—]\s*(BOSS直聘|智联招聘|前程无忧|猎聘|拉勾).*$/i, "")
+    .replace(/招聘.*$/, "")
+    .replace(/^[「【\[]+|[」】\]]+$/g, "")
+    .trim();
+  return isLikelyCompany(candidate) ? candidate : "";
+}
+
+/** 逐个选择器试，命中且通过校验才算数。 */
+function pickCompany(selectors, prefix) {
+  for (const selector of selectors || []) {
+    const value = textOf(document.querySelector(selector)).trim();
+    if (isLikelyCompany(value)) return { value, source: `${prefix}:${selector}` };
+  }
+  return { value: "", source: "" };
+}
+
 /** 从标签页标题里取岗位名：「青口物流装卸招聘」_BOSS直聘 → 青口物流装卸 */
 function roleFromTitle() {
   const title = (document.title || "").trim();
@@ -196,7 +234,7 @@ function extractWithTrace() {
   const rule = SITE_RULES[host] || {};
   const structured = fromJsonLd();
 
-  let company = firstTextWithSource(rule.company, "site");
+  let company = pickCompany(rule.company, "site");
   let role = firstTextWithSource(rule.role, "site");
   let jd = firstTextWithSource(rule.jd, "site");
 
@@ -213,16 +251,19 @@ function extractWithTrace() {
   }
 
   if (!company.value) {
-    const byClass = firstTextWithSource(
+    const byTitle = companyFromTitle();
+    if (byTitle) company = { value: byTitle, source: "fallback:title" };
+  }
+  if (!company.value) {
+    const byClass = pickCompany(
       ['[class*="company-name"]', '[class*="companyName"]'],
       "fallback",
     );
-    if (byClass.value) {
-      company = byClass;
-    } else {
-      const byLink = extractCompanyFromLink();
-      company = { value: byLink, source: byLink ? "fallback:companyLink" : "" };
-    }
+    if (byClass.value) company = byClass;
+  }
+  if (!company.value) {
+    const byLink = extractCompanyFromLink();
+    company = { value: byLink, source: byLink ? "fallback:companyLink" : "" };
   }
 
   if (!role.value) {
@@ -452,7 +493,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === "extract") {
     try {
-      sendResponse({ ok: true, lead: extract(), pageKind: pageKindInfo() });
+      const { lead, trace } = extractWithTrace();
+      sendResponse({ ok: true, lead, trace, pageKind: pageKindInfo() });
     } catch (error) {
       sendResponse({
         ok: false,
