@@ -279,7 +279,8 @@ public/
 next.config.ts          全站安全响应头、/sw.js 缓存头、关闭 X-Powered-By、Turbopack / Cache Components
 scripts/qa.mjs          截图、溢出检查、分页与 PDF 页数、AI/事实核对/照片/自定义板块/多简历/投递看板/单份导出与合并导入/ATS 文本导出/板块布局与一页适配/字体搭配/简历语言/AI 跟随语言/弹窗焦点与可访问性/刷新后撤销历史/离线缓存自检
 scripts/mock-deepseek.mjs 本地 mock 上游（开发自测）
-extension/              Chrome MV3 扩展：抓取岗位 JD 并发送到待投清单（开发者模式加载，见 extension/README.md）
+scripts/pack-extension.mjs 把 extension/ 打成 zip（打包前校验 manifest 引用与图标尺寸）
+extension/              Chrome MV3 扩展：抓取岗位 JD、填充投递表单（图标 + popup + content scripts，见 extension/README.md）
 .github/workflows/ci.yml lint + 类型检查 + 单测 / 组件测试 + 构建 + 生产模式浏览器 QA
 vitest.config.mts        Vitest（jsdom + React 插件 + tsconfig paths）
 .env.example            环境变量示例

@@ -323,9 +323,6 @@ function extractWithTrace() {
   };
 }
 
-function extract() {
-  return extractWithTrace().lead;
-}
 
 /** 页面类型判断：一个页面出现多个职位标题时，通常还在列表页或列表弹层。 */
 function pageKindInfo() {

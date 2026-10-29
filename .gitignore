@@ -43,3 +43,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 扩展分发包（npm run pack:extension 生成）
+extension-*.zip
