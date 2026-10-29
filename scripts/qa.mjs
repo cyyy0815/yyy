@@ -5963,6 +5963,57 @@ expect(
 );
 await extractPage.close();
 
+// P3 真实站点回归：智联新版详情页（类名是 summary-planes__title，正文没有稳定类名）
+const zhaopinPage = await browser.newPage();
+await zhaopinPage.setRequestInterception(true);
+zhaopinPage.on("request", (request) => {
+  if (request.url().includes("zhaopin.com")) {
+    request.respond({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: `<!doctype html><html><head><meta charset="utf-8"></head><body>
+        <div class="summary-planes__title">高级前端工程师</div>
+        <a href="/companydetail/CZ1.htm">示例科技股份有限公司</a>
+        <div class="describtion-card">
+          <div class="seo-card__header"><div class="seo-card__title-wrap">
+            <h2 class="seo-card__title">职位描述</h2>
+          </div></div>
+          <div>负责中后台系统开发，要求熟悉 React 与 TypeScript，3 年以上经验；建设组件库与工程化体系。登录查看完整内容</div>
+        </div>
+      </body></html>`,
+    });
+    return;
+  }
+  request.continue();
+});
+await zhaopinPage.goto("https://www.zhaopin.com/jobdetail/qa-fixture.htm", {
+  waitUntil: "domcontentloaded",
+});
+await zhaopinPage.evaluate(() => {
+  window.chrome = {
+    runtime: { onMessage: { addListener: (fn) => { window.__extractHandler = fn; } } },
+  };
+});
+await zhaopinPage.addScriptTag({
+  path: path.join(process.cwd(), "extension/content-job.js"),
+});
+const zhaopinExtracted = await zhaopinPage.evaluate(
+  () =>
+    new Promise((resolve) => {
+      window.__extractHandler({ type: "extract" }, null, resolve);
+    }),
+);
+expect(
+  "智联结构能提取公司 / 岗位 / 正文",
+  zhaopinExtracted?.ok &&
+    zhaopinExtracted.lead.company === "示例科技股份有限公司" &&
+    zhaopinExtracted.lead.role === "高级前端工程师" &&
+    zhaopinExtracted.lead.jd.includes("React") &&
+    !zhaopinExtracted.lead.jd.includes("登录查看完整内容"),
+  JSON.stringify(zhaopinExtracted),
+);
+await zhaopinPage.close();
+
 // ATS 纯文本 / Markdown 导出与 JD 关键词覆盖
 const atsPage = await open({ width: 1440, height: 1000 });
 await atsPage.goto(BASE, { waitUntil: "networkidle0" });

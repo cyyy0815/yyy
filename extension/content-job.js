@@ -32,15 +32,17 @@ const SITE_RULES = {
     company: [".company-name", ".company-info .name", ".company-box .name"],
     jd: [".job-intro-container", ".describtion", ".job-description"],
   },
+  // 智联新版详情页：标题在 summary-planes__title，公司名是 companydetail 链接，
+  // 正文没有稳定的类名，交给下面的「按标题文字找正文」兜底。
   "www.zhaopin.com": {
-    role: [".summary-plane__title", ".job-title", "h1"],
-    company: [".company__title", ".company-name"],
-    jd: [".descript__detail", ".job-detail", ".describtion"],
+    role: [".summary-planes__title", ".summary-plane__title", ".job-title", "h1"],
+    company: ['a[href*="/companydetail/"]', ".company-name"],
+    jd: [".descript__detail", ".job-detail"],
   },
   "sou.zhaopin.com": {
-    role: [".summary-plane__title", ".job-title", "h1"],
-    company: [".company__title", ".company-name"],
-    jd: [".descript__detail", ".job-detail", ".describtion"],
+    role: [".summary-planes__title", ".summary-plane__title", ".job-title", "h1"],
+    company: ['a[href*="/companydetail/"]', ".company-name"],
+    jd: [".descript__detail", ".job-detail"],
   },
   "we.51job.com": {
     role: [".tHeader h1", ".job-title", "h1"],
@@ -123,6 +125,45 @@ function fromJsonLd() {
   return null;
 }
 
+const DESC_HEADING = /职位描述|岗位职责|工作内容|工作职责|职位详情|岗位说明/;
+
+/**
+ * 按「职位描述」这类标题文字定位正文：平台改版时类名会变，标题文案通常不变。
+ * 从标题往上找 3 层，取第一个比标题多出一大段文字的容器，再去掉标题本身。
+ */
+function extractByHeading() {
+  const headings = Array.from(document.querySelectorAll("h1, h2, h3, h4, p, div"));
+  const heading = headings.find((node) => {
+    const text = textOf(node);
+    return text.length > 0 && text.length <= 12 && DESC_HEADING.test(text);
+  });
+  if (!heading) return "";
+
+  let container = heading.parentElement;
+  for (let depth = 0; depth < 3 && container; depth += 1) {
+    const text = textOf(container);
+    if (text.length > textOf(heading).length + 80) {
+      return text.replace(textOf(heading), "").trim();
+    }
+    container = container.parentElement;
+  }
+  return "";
+}
+
+/** 公司名兜底：详情页里指向公司主页的链接文案通常就是公司全称。 */
+function extractCompanyFromLink() {
+  const anchors = Array.from(
+    document.querySelectorAll(
+      'a[href*="/companydetail/"], a[href*="/company/"], a[href*="/gongsi/"]',
+    ),
+  );
+  for (const anchor of anchors) {
+    const text = textOf(anchor).split("\n")[0].trim();
+    if (text.length >= 2 && text.length <= 60) return text;
+  }
+  return "";
+}
+
 function extract() {
   const rule = SITE_RULES[location.hostname] || {};
   const structured = fromJsonLd();
@@ -138,13 +179,19 @@ function extract() {
   }
 
   if (!company) {
-    company = firstText(['[class*="company-name"]', '[class*="companyName"]']);
+    company =
+      firstText(['[class*="company-name"]', '[class*="companyName"]']) ||
+      extractCompanyFromLink();
   }
   if (!role) {
     role = metaContent(["og:title", "twitter:title"]) || firstText(["h1"]);
   }
 
-  // 结构化内容太短时，用正文区域兜底，避免只抓到一句职责标题。
+  // 结构化内容太短时，用「按标题找正文」和正文区域兜底，避免只抓到一句职责标题。
+  if (!jd || jd.length < 120) {
+    const byHeading = extractByHeading();
+    if (byHeading.length > jd.length) jd = byHeading;
+  }
   if (!jd || jd.length < 120) {
     const fallback = textOf(document.querySelector("article, main"));
     if (fallback.length > jd.length) jd = fallback;
@@ -153,7 +200,11 @@ function extract() {
   return {
     company: clean(company).slice(0, 100),
     role: clean(role).slice(0, 100),
-    jd: clean(jd).slice(0, MAX_JD_CHARS),
+    // 智联等站点会在正文末尾插「登录查看完整内容」，清掉这行噪声
+    jd: clean(jd)
+      .replace(/登录(后)?查看完整内容/g, "")
+      .trim()
+      .slice(0, MAX_JD_CHARS),
     url: location.href,
   };
 }
