@@ -287,6 +287,7 @@ next.config.ts          全站安全响应头、/sw.js 缓存头、关闭 X-Powe
 scripts/qa.mjs          截图、溢出检查、分页与 PDF 页数、AI/事实核对/照片/自定义板块/多简历/投递看板/单份导出与合并导入/ATS 文本导出/板块布局与一页适配/字体搭配/简历语言/AI 跟随语言/弹窗焦点与可访问性/刷新后撤销历史/离线缓存自检
 scripts/mock-deepseek.mjs 本地 mock 上游（开发自测）
 scripts/pack-extension.mjs 把 extension/ 打成 zip（打包前校验 manifest 引用与图标尺寸）
+scripts/pack-submission.mjs 打包参赛材料（文档 + 参考资料 + 截图 + 源码快照）
 scripts/eval.mjs        生成离线评测报告（写入 docs/eval-report.md）
 docs/eval-report.md     离线评测结果：画像识别 / JD 覆盖率 / 分组收益 / 事实核对
 docs/DEPLOY.md         部署与在线演示说明（Vercel / Node + nginx、环境变量、限流与同源注意事项）

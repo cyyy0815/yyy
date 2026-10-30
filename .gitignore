@@ -46,3 +46,6 @@ next-env.d.ts
 
 # 扩展分发包（npm run pack:extension 生成）
 extension-*.zip
+
+# 参赛材料打成的 zip（npm run pack:submission 生成）
+提交材料/*.zip

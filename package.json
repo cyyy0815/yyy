@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "qa": "node scripts/qa.mjs",
     "eval": "node scripts/eval.mjs",
-    "pack:extension": "node scripts/pack-extension.mjs"
+    "pack:extension": "node scripts/pack-extension.mjs",
+    "pack:submission": "node scripts/pack-submission.mjs"
   },
   "dependencies": {
     "next": "16.4.3",
