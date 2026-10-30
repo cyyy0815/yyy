@@ -1,7 +1,7 @@
 import puppeteer from "puppeteer-core";
 
 const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
-const BASE = "http://localhost:3100";
+const BASE = process.env.SHOT_BASE ?? "http://localhost:3000";
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const browser = await puppeteer.launch({
@@ -56,6 +56,13 @@ await page
   .catch(() => console.log("AI preview timeout, fallback to local steps"));
 await pause(2500);
 await (await page.$("[data-qa=\"agent-dialog\"]")).screenshot({ path: "D:/web/docs/img/agent.png" });
+
+// 图 5：AI 工作台（一级页面）
+await page.keyboard.press("Escape");
+await pause(600);
+await page.click('[data-qa="tab-agent"]');
+await pause(1200);
+await page.screenshot({ path: "D:/web/docs/img/workbench.png" });
 
 console.log("screenshots done");
 await browser.close();

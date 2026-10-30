@@ -160,8 +160,8 @@ body(
 )
 body("使用流程（约 3 分钟）：", bold=True, indent=False)
 body("① 打开首页 → 顶栏点「演示场景」，载入示例简历与 3 个目标岗位；")
-body("② 在「待投清单」里看按匹配度排序的岗位，点「准备」；")
-body("③ 弹窗里点「启动求职 Agent」：模型先规划步骤，前两步本地执行（解析岗位、诊断差距），"
+body("② 顶栏切到「AI 工作台」，左侧按匹配度列出待投岗位，选中一个；")
+body("③ 点「启动 AI 工作流」：模型先规划步骤，前两步本地执行（解析岗位、诊断差距），"
      "第三步流式改写简介并做事实核对，第四步生成求职信；")
 body("④ 点「采用并写入简介」，刷新后仍保留；不满意可一键撤销；")
 body("⑤ 投完点「标记为已投」，在投递看板里跟进。")
@@ -204,10 +204,15 @@ body(
     "简历与投递记录存在 localStorage，AI 只发送当前板块文本、岗位关键词与参考 JD，"
     "不发送姓名、电话、邮箱与整份简历；API Key 只存在于服务端环境变量。"
 )
-body("6. 交付完整：能打印、能过 ATS、能离线", bold=True, indent=False)
+body("6. 交付完整：能打印、能导出 Word / PDF、能过 ATS、能离线", bold=True, indent=False)
 body(
     "8 套模板、字体搭配、中英双语、手动分页与页码；双栏模板打印时改为「浮动侧栏 + 固定栏宽正文」，"
-    "解决分栏无法跨页的问题；ATS 导出为纯文本并按 JD 检查关键词覆盖；PWA 外壳可离线打开。"
+    "解决分栏无法跨页的问题。"
+)
+body(
+    "导出菜单分两类：数据备份（全部 / 当前简历 JSON）与交付格式（Word `.docx`、PDF 图片版、ATS 文本 / Markdown）。"
+    "Word 用单列结构、只含中文主字段，便于招聘系统解析；PDF 图片版一键下载、所见即所得；"
+    "需要可选中文字的 PDF 时用「打印 / PDF」。PWA 外壳可离线打开。"
 )
 
 # ---------- 三 ----------
@@ -253,6 +258,7 @@ table(
         ["提示词工程", "角色约束、素材边界、语言标记 ===EN===、长度限制"],
         ["本地存储与多标签页一致性", "localStorage + storage 事件，未编辑页跟随、编辑页提示冲突"],
         ["CSS @page 打印", "分页控制、页码、双栏浮动降级"],
+        ["docx / jsPDF + html-to-image", "浏览器端生成 Word 与图片版 PDF，无需服务端"],
         ["Chrome MV3", "抓取真实 JD、填充表单、选择器诊断"],
         ["Vitest + Puppeteer", "单元 / 组件测试 + 生产构建上的端到端回归"],
     ],
@@ -267,7 +273,8 @@ body("以下截图均来自真实运行环境（演示场景 + 真实模型调�
 figure("D:/web/docs/img/editor.png", "图 1  编辑页：左侧表单、右侧实时预览，可直接打印为 PDF")
 figure("D:/web/docs/img/match.png", "图 2  职位推荐：匹配分、核心要求命中与可点击的缺口")
 figure("D:/web/docs/img/agent.png", "图 3  求职 Agent：四步计划、流式输出、事实核对与工具轨迹")
-figure("D:/web/docs/img/queue.png", "图 4  待投清单：批量导入的岗位按匹配度排序，右侧可直接「准备」")
+figure("D:/web/docs/img/queue.png", "图 4  待投清单：批量导入的岗位按匹配度排序，右侧可直接「AI 准备」")
+figure("D:/web/docs/img/workbench.png", "图 5  AI 工作台：左侧选目标岗位，右侧是四步流水线与执行说明")
 
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
