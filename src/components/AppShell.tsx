@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { ExportMenu } from "@/components/ExportMenu";
 import { AgentWorkbench } from "@/components/jobs/AgentWorkbench";
 import { JobsPanel } from "@/components/jobs/JobsPanel";
 import { AtsExportDialog } from "@/components/resume/AtsExportDialog";
@@ -174,6 +175,7 @@ function ResumeWorkspace() {
   const [atsOpen, setAtsOpen] = useState(false);
   const [fitOpen, setFitOpen] = useState(false);
   const [aiOpenRequest, setAiOpenRequest] = useState(0);
+  const [exporting, setExporting] = useState(false);
   const [previewPages, setPreviewPages] = useState(1);
   const backupDue = useSyncExternalStore(
     subscribeBackupReminder,
@@ -321,6 +323,51 @@ function ResumeWorkspace() {
       resume,
     });
     setNotice({ type: "ok", message: "已导出当前简历" });
+  };
+
+  /** Word 导出：中文主字段，单列结构，便于 ATS 与人工阅读。 */
+  const handleExportWord = async () => {
+    setExporting(true);
+    try {
+      const { buildResumeDocx, downloadBlob, safeFileName } = await import(
+        "@/lib/export/docx"
+      );
+      const blob = await buildResumeDocx(resume);
+      downloadBlob(blob, `${safeFileName(documents.currentTitle, "简历")}.docx`);
+      setNotice({ type: "ok", message: "已导出 Word（中文版）" });
+    } catch {
+      setNotice({ type: "error", message: "Word 导出失败，请重试" });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  /** PDF（图片版）：直接截预览那张纸，所见即所得。 */
+  const handleExportPdf = async () => {
+    const paper = document.querySelector<HTMLElement>(".resume-paper");
+    if (!paper) {
+      setNotice({
+        type: "error",
+        message: "没找到预览：先切到「预览」再导出 PDF",
+      });
+      return;
+    }
+    setExporting(true);
+    try {
+      const [{ exportElementToPdf }, { safeFileName }] = await Promise.all([
+        import("@/lib/export/pdf"),
+        import("@/lib/export/docx"),
+      ]);
+      await exportElementToPdf(
+        paper,
+        `${safeFileName(documents.currentTitle, "简历")}.pdf`,
+      );
+      setNotice({ type: "ok", message: "已导出 PDF（图片版）" });
+    } catch {
+      setNotice({ type: "error", message: "PDF 导出失败，可改用「打印 / PDF」" });
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleSnoozeBackup = () => {
@@ -758,9 +805,14 @@ function ResumeWorkspace() {
             >
               导入
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExport}>
-              导出
-            </Button>
+            <ExportMenu
+              onJsonArchive={handleExport}
+              onJsonSingle={handleExportSingle}
+              onWord={handleExportWord}
+              onPdf={handleExportPdf}
+              onAts={() => setAtsOpen(true)}
+              busy={exporting}
+            />
             <Button variant="primary" size="sm" onClick={handlePrint}>
               打印
               <span className="hidden sm:inline"> / PDF</span>

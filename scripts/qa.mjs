@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import puppeteer from "puppeteer-core";
@@ -124,6 +124,12 @@ async function clickText(page, text, scope = "body") {
     { label: text, root: scope },
   );
   if (!found) throw new Error(`button not found: ${text}`);
+}
+/** 导出 JSON 现在收在「导出」菜单里：先开菜单，再点对应项。 */
+async function exportJson(page, item = "export-json-all") {
+  await page.click('[data-qa="export-menu"]');
+  await pause(250);
+  await page.click(`[data-qa="${item}"]`);
 }
 
 /** 按 data-qa 写入输入框 / 文本域，触发 React 的 onChange。 */
@@ -1751,7 +1757,7 @@ await photoPage.evaluate(() => {
   };
   HTMLAnchorElement.prototype.click = function () {};
 });
-await clickText(photoPage, "导出");
+await exportJson(photoPage);
 await photoPage.waitForFunction(() => Boolean(window.__photoExport), {
   timeout: 5000,
 });
@@ -2206,7 +2212,7 @@ await customPage.evaluate(() => {
   };
   HTMLAnchorElement.prototype.click = function () {};
 });
-await clickText(customPage, "导出");
+await exportJson(customPage);
 await customPage.waitForFunction(() => Boolean(window.__customExport), {
   timeout: 5000,
 });
@@ -2633,7 +2639,7 @@ await multiPage.evaluate(() => {
     window.__downloadName = this.download;
   };
 });
-await clickText(multiPage, "导出");
+await exportJson(multiPage);
 await multiPage.waitForFunction(() => Boolean(window.__exportedBlob), {
   timeout: 5000,
 });
@@ -3381,11 +3387,9 @@ await pdfNamePage.evaluate(() => {
     window.__downloadName = this.download;
   };
 });
-await pdfNamePage.evaluate(() => {
-  [...document.querySelectorAll("button")]
-    .find((button) => button.textContent?.trim() === "导出")
-    ?.click();
-});
+await pdfNamePage.click('[data-qa="export-menu"]');
+await pause(250);
+await pdfNamePage.click('[data-qa="export-json-all"]');
 await pdfNamePage.waitForFunction(() => Boolean(window.__exportedBlob), {
   timeout: 5000,
 });
@@ -3644,7 +3648,7 @@ await fontPage.evaluate(() => {
   };
   HTMLAnchorElement.prototype.click = function () {};
 });
-await clickText(fontPage, "导出");
+await exportJson(fontPage);
 await fontPage.waitForFunction(() => Boolean(window.__fontExport), {
   timeout: 5000,
 });
@@ -5586,7 +5590,7 @@ await applicationPage.evaluate(() => {
     window.__qaDownloadName = this.download;
   };
 });
-await clickText(applicationPage, "导出");
+await exportJson(applicationPage);
 await applicationPage.waitForFunction(
   () => Boolean(window.__qaExportedBlob),
   { timeout: 5000 },
@@ -5995,6 +5999,66 @@ expect(
 );
 await demoPage.close();
 
+// 导出格式：Word（.docx）与 PDF（图片版）都能真的落盘
+const menuExportDir = path.join(OUT, "menu-exports");
+mkdirSync(menuExportDir, { recursive: true });
+const menuPage = await open({ width: 1440, height: 1000 });
+const menuCdp = await menuPage.createCDPSession();
+await menuCdp.send("Browser.setDownloadBehavior", {
+  behavior: "allow",
+  downloadPath: menuExportDir,
+});
+await menuPage.goto(BASE, { waitUntil: "networkidle0" });
+await pause(1200);
+
+async function waitForMenuFile(extension, timeoutMs = 20000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const found = readdirSync(menuExportDir).find((name) =>
+      name.toLowerCase().endsWith(extension),
+    );
+    if (found) return found;
+    await pause(400);
+  }
+  return null;
+}
+
+await menuPage.click('[data-qa="export-menu"]');
+await pause(300);
+await menuPage.click('[data-qa="export-word"]');
+const menuDocxName = await waitForMenuFile(".docx");
+await menuPage.evaluate(() => {
+  document
+    .querySelector(".resume-paper")
+    ?.scrollIntoView({ block: "center" });
+});
+await pause(400);
+await menuPage.click('[data-qa="export-menu"]');
+await pause(300);
+await menuPage.click('[data-qa="export-pdf"]');
+const menuPdfName = await waitForMenuFile(".pdf", 30000);
+
+const menuDocxBytes = menuDocxName
+  ? readFileSync(path.join(menuExportDir, menuDocxName))
+  : null;
+const menuPdfBytes = menuPdfName
+  ? readFileSync(path.join(menuExportDir, menuPdfName))
+  : null;
+
+expect(
+  "导出菜单能生成 Word 与 PDF",
+  Boolean(menuDocxBytes) &&
+    menuDocxBytes.subarray(0, 2).toString() === "PK" &&
+    menuDocxBytes.length > 2000 &&
+    Boolean(menuPdfBytes) &&
+    menuPdfBytes.subarray(0, 5).toString() === "%PDF-" &&
+    menuPdfBytes.length > 20000,
+  JSON.stringify({
+    docx: menuDocxName ? menuDocxBytes.length : null,
+    pdf: menuPdfName ? menuPdfBytes.length : null,
+  }),
+);
+await menuPage.close();
 // P3 扩展桥：页面收到 postMessage 后自动切到推荐页并预填导入弹窗
 const bridgePage = await open({ width: 1440, height: 1000 });
 await bridgePage.goto(BASE, { waitUntil: "networkidle0" });
