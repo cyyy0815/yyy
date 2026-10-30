@@ -293,5 +293,5 @@ body(
     "并通过浏览器扩展接入真实岗位数据、通过可解释的匹配与 Agent 工作流把 AI 放在流程主导位置。"
 )
 
-document.save("D:/web/提交材料/作品介绍文档.docx")
+document.save("D:/web/docs/作品介绍文档.docx")
 print("intro docx saved")

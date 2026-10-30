@@ -1,8 +1,8 @@
 /**
  * 打包「完整作品」zip：直接上传网盘用。
  *
- * 目标是「评审下载一个包就能跑起来看」：
- * 文档 + 参考资料 + 截图 + 源码（不含 .git / node_modules / .next）。
+ * 提交材料/ 只放要上传的三个文件（两个 PDF + 生成的 zip）；
+ * 说明类文档放在 docs/，打包时改个名字带进去，保持一个入口。
  */
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -12,22 +12,26 @@ const root = process.cwd();
 const folder = join(root, "提交材料");
 const target = join(folder, "简历工坊-完整作品.zip");
 
-const required = [
-  "00-提交说明.md",
-  "作品介绍文档.pdf",
-  "作品介绍文档.docx",
-  "技术文档.pdf",
-  "技术文档.docx",
-  "提交总览.md",
-  "提交表单填写.md",
-  "上线Vercel.md",
-
+const deliverables = ["技术文档.pdf", "作品介绍文档.pdf"];
+const guides = [
+  ["00-提交说明.md", "提交说明.md"],
+  ["提交总览.md", "提交总览.md"],
+  ["提交表单填写.md", "提交填写指南.md"],
+  ["上线Vercel.md", "上线Vercel.md"],
 ];
+
 const entries = [];
-for (const name of required) {
+for (const name of deliverables) {
   const path = join(folder, name);
   if (!existsSync(path)) {
     throw new Error(`缺少提交文件：提交材料/${name}`);
+  }
+  entries.push({ name, path });
+}
+for (const [name, source] of guides) {
+  const path = join(root, "docs", source);
+  if (!existsSync(path)) {
+    throw new Error(`缺少说明文档：docs/${source}`);
   }
   entries.push({ name, path });
 }
@@ -52,7 +56,7 @@ if (existsSync(imageDir)) {
   }
 }
 
-// 源码快照
+// 源码快照（不含 .git / node_modules / 构建产物）
 const SOURCE_DIRS = ["src", "scripts", "extension", "public", "docs"];
 const SOURCE_FILES = [
   "package.json",

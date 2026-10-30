@@ -291,8 +291,8 @@ scripts/pack-submission.mjs 打包参赛材料（文档 + 参考资料 + 截图 
 scripts/eval.mjs        生成离线评测报告（写入 docs/eval-report.md）
 docs/eval-report.md     离线评测结果：画像识别 / JD 覆盖率 / 分组收益 / 事实核对
 docs/DEPLOY.md         部署与在线演示说明（Vercel / Node + nginx、环境变量、限流与同源注意事项）
-提交材料/技术文档.pdf   参赛技术文档（16 页：概述 / 需求 / 架构 / AI 方案 / 实现 / 测试部署 / 创新点）
-docs/build-tech-doc.py 技术文档生成脚本（python-docx，配 docs/img/ 截图）
+提交材料/技术文档.pdf   参赛技术文档（17 页：概述 / 需求 / 架构 / AI 方案 / 实现 / 测试部署 / 创新点）
+docs/build-tech-doc.py 技术文档生成脚本（输出 docs/技术文档.docx，PDF 导出到 提交材料/）
 extension/              Chrome MV3 扩展：抓取岗位 JD、填充投递表单（图标 + popup + content scripts，见 extension/README.md）
 .github/workflows/ci.yml lint + 类型检查 + 单测 / 组件测试 + 构建 + 生产模式浏览器 QA
 vitest.config.mts        Vitest（jsdom + React 插件 + tsconfig paths）
@@ -332,7 +332,7 @@ PROGRESS.md             工作流与进度（中断后从这里继续）
 
 ## 相关链接
 
-- 技术文档：[提交材料/技术文档.pdf](提交材料/技术文档.pdf)（16 页）
+- 技术文档：[提交材料/技术文档.pdf](提交材料/技术文档.pdf)（17 页）
 - 离线评测报告：[docs/eval-report.md](docs/eval-report.md)（`npm run eval` 生成）
 - 部署说明：[docs/DEPLOY.md](docs/DEPLOY.md)
 - 浏览器扩展：[extension/README.md](extension/README.md)
