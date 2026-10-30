@@ -290,6 +290,8 @@ scripts/pack-extension.mjs 把 extension/ 打成 zip（打包前校验 manifest 
 scripts/eval.mjs        生成离线评测报告（写入 docs/eval-report.md）
 docs/eval-report.md     离线评测结果：画像识别 / JD 覆盖率 / 分组收益 / 事实核对
 docs/DEPLOY.md         部署与在线演示说明（Vercel / Node + nginx、环境变量、限流与同源注意事项）
+docs/技术文档.pdf      参赛技术文档（16 页：概述 / 需求 / 架构 / AI 方案 / 实现 / 测试部署 / 创新点）
+docs/build-tech-doc.py 技术文档生成脚本（python-docx，配 docs/img/ 截图）
 extension/              Chrome MV3 扩展：抓取岗位 JD、填充投递表单（图标 + popup + content scripts，见 extension/README.md）
 .github/workflows/ci.yml lint + 类型检查 + 单测 / 组件测试 + 构建 + 生产模式浏览器 QA
 vitest.config.mts        Vitest（jsdom + React 插件 + tsconfig paths）
