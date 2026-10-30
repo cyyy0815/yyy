@@ -721,5 +721,5 @@ table(
     widths=[6.4, 10.0],
 )
 
-document.save("D:/web/docs/技术文档.docx")
+document.save("D:/web/提交材料/技术文档.docx")
 print("docx saved")
