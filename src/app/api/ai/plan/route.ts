@@ -80,6 +80,8 @@ async function callUpstream(
   return data.choices?.[0]?.message?.content ?? "";
 }
 
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   const config = getAiConfig();
   if (!config.apiKey) {
