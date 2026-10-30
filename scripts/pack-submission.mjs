@@ -1,8 +1,8 @@
 /**
- * 把参赛材料打成一个自包含的 zip：文档 + 参考资料 + 界面截图 + 源码快照。
+ * 打包「完整作品」zip：直接上传网盘用。
  *
- * 源码快照用于「评审方只想拿一个包」的场景；正常提交仍以仓库链接为准，
- * 所以这份快照不含 .git 历史，只保留当前工作树的文件。
+ * 目标是「评审下载一个包就能跑起来看」：
+ * 文档 + 参考资料 + 截图 + 源码（不含 .git / node_modules / .next）。
  */
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -10,10 +10,19 @@ import { buildZip } from "./zip.mjs";
 
 const root = process.cwd();
 const folder = join(root, "提交材料");
-const target = join(folder, "简历工坊-提交材料.zip");
+const target = join(folder, "简历工坊-完整作品.zip");
 
-// 1. 必需材料
-const required = ["技术文档.pdf", "技术文档.docx", "提交总览.md", "演示视频脚本.md"];
+const required = [
+  "00-提交说明.md",
+  "作品介绍文档.pdf",
+  "作品介绍文档.docx",
+  "技术文档.pdf",
+  "技术文档.docx",
+  "提交总览.md",
+  "提交表单填写.md",
+  "上线Vercel.md",
+  "演示视频脚本.md",
+];
 const entries = [];
 for (const name of required) {
   const path = join(folder, name);
@@ -23,7 +32,7 @@ for (const name of required) {
   entries.push({ name, path });
 }
 
-// 2. 参考资料（引用仓库里的原文，避免两份内容不一致）
+// 参考资料：引用仓库原文，避免两份内容不一致
 const references = [
   ["参考资料/项目说明.md", join(root, "README.md")],
   ["参考资料/离线评测报告.md", join(root, "docs/eval-report.md")],
@@ -34,7 +43,6 @@ for (const [name, path] of references) {
   if (existsSync(path)) entries.push({ name, path });
 }
 
-// 3. 界面截图
 const imageDir = join(root, "docs/img");
 if (existsSync(imageDir)) {
   for (const file of readdirSync(imageDir).sort()) {
@@ -44,7 +52,7 @@ if (existsSync(imageDir)) {
   }
 }
 
-// 4. 源码快照：排除构建产物、依赖与本地环境
+// 源码快照
 const SOURCE_DIRS = ["src", "scripts", "extension", "public", "docs"];
 const SOURCE_FILES = [
   "package.json",
@@ -57,14 +65,7 @@ const SOURCE_FILES = [
   "README.md",
   "AGENTS.md",
 ];
-const SKIP_NAMES = new Set([
-  "node_modules",
-  ".next",
-  ".git",
-  ".screenshots",
-  "img",
-  "dist",
-]);
+const SKIP_NAMES = new Set(["node_modules", ".next", ".git", ".screenshots", "img", "dist"]);
 
 function collect(directory, prefix) {
   for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) =>
@@ -88,7 +89,6 @@ for (const file of SOURCE_FILES) {
 }
 
 const { count, bytes } = buildZip(entries, target);
-
-const mb = (bytes / 1024 / 1024).toFixed(1);
-console.log(`打包 ${count} 个文件 → ${relative(root, target)}（${mb} MB）`);
-console.log("包含：技术文档 / 总览 / 视频脚本 / 参考资料 / 界面截图 / 源码快照");
+console.log(
+  `打包 ${count} 个文件 → ${relative(root, target)}（${(bytes / 1024 / 1024).toFixed(1)} MB）`,
+);
