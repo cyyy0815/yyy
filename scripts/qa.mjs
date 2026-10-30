@@ -5900,6 +5900,46 @@ expect(
 );
 await agentPage.close();
 
+// D 演示场景：一键载入「小林 + 3 个目标岗位」，用于现场演示与录屏
+const demoPage = await open({ width: 1440, height: 1000 });
+demoPage.on("dialog", async (dialog) => {
+  await dialog.accept();
+});
+await demoPage.goto(BASE, { waitUntil: "networkidle0" });
+await demoPage.evaluate(() =>
+  localStorage.removeItem("resume-workshop:applications:v1"),
+);
+await demoPage.reload({ waitUntil: "networkidle0" });
+await pause(600);
+await demoPage.click('[data-qa="load-demo"]');
+await pause(1400);
+
+const demoState = await demoPage.evaluate(() => {
+  const stored = JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}");
+  const applications = JSON.parse(
+    localStorage.getItem("resume-workshop:applications:v1") ?? "[]",
+  );
+  const rows = [...document.querySelectorAll('[data-qa="job-queue-list"] li')];
+  return {
+    name: stored.basic?.name ?? "",
+    jobs: applications.length,
+    rowCount: rows.length,
+    scores: rows.map((row) => Number(row.innerText.trim().split("\n")[0])),
+    jdLength: (localStorage.getItem("resume-workshop:jd") ?? "").length,
+  };
+});
+expect(
+  "演示场景载入简历与 3 个岗位并按匹配度排序",
+  demoState.name === "小林" &&
+    demoState.jobs === 3 &&
+    demoState.rowCount === 3 &&
+    demoState.scores[0] >= demoState.scores[1] &&
+    demoState.scores[1] >= demoState.scores[2] &&
+    demoState.jdLength > 0,
+  JSON.stringify(demoState),
+);
+await demoPage.close();
+
 // P3 扩展桥：页面收到 postMessage 后自动切到推荐页并预填导入弹窗
 const bridgePage = await open({ width: 1440, height: 1000 });
 await bridgePage.goto(BASE, { waitUntil: "networkidle0" });

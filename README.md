@@ -74,6 +74,7 @@
 - **待投清单与批量 JD**：一次粘贴多条岗位描述（`---` 分隔，首行「公司 | 岗位」），按当前简历的匹配度排队；点「准备」可设该 JD 为当前 JD 并直接打开 AI 求职信，也可「按 JD 优化简历」（切到编辑页打开 AI 写作，已带这条 JD）或一键下载 ATS 文本；投完标记已投并设置跟进日期
 - **求职 Agent**：待投清单里点「启动求职 Agent」，按「解析岗位 → 诊断差距 → 按 JD 改写简介 → 生成求职信」四步执行；前两步纯本地、不发数据，后两步流式生成并强制事实核对，结果需手动采用（可撤销），全过程记录工具调用与耗时
 - **离线评测**：`npm run eval` 用岗位画像库与 5 段手写 JD 跑一遍指标（画像识别、覆盖率、核心要求分组收益、事实核对检出率），产出 `docs/eval-report.md`，改词库后可直接对比
+- **演示场景**：顶栏「演示场景」一键载入「小林（2026 届）+ 3 个目标岗位」，三个岗位匹配度拉开，适合现场演示与录屏；数据全部本地生成
 - **浏览器扩展（可选）**：`extension/` 里的 Chrome MV3 扩展从 BOSS直聘 / 拉勾 / 猎聘 / 智联 / 前程无忧的岗位页抓取 JD，一键发送到待投清单；在投递表单页还能一键填充姓名 / 手机 / 邮箱 / 期望城市等文本字段（不提交、跳过身份证与密码、附件手动上传）
 - 生成 BOSS直聘、拉勾、猎聘、智联招聘、前程无忧的精准搜索链接
 - 支持城市参数（BOSS直聘覆盖 40 个城市编码，拉勾/智联带城市名）
@@ -288,6 +289,7 @@ scripts/mock-deepseek.mjs 本地 mock 上游（开发自测）
 scripts/pack-extension.mjs 把 extension/ 打成 zip（打包前校验 manifest 引用与图标尺寸）
 scripts/eval.mjs        生成离线评测报告（写入 docs/eval-report.md）
 docs/eval-report.md     离线评测结果：画像识别 / JD 覆盖率 / 分组收益 / 事实核对
+docs/DEPLOY.md         部署与在线演示说明（Vercel / Node + nginx、环境变量、限流与同源注意事项）
 extension/              Chrome MV3 扩展：抓取岗位 JD、填充投递表单（图标 + popup + content scripts，见 extension/README.md）
 .github/workflows/ci.yml lint + 类型检查 + 单测 / 组件测试 + 构建 + 生产模式浏览器 QA
 vitest.config.mts        Vitest（jsdom + React 插件 + tsconfig paths）

@@ -28,7 +28,18 @@ import {
   recordExport,
   snoozeBackupReminder,
 } from "@/lib/storage";
-import { readApplications, saveApplications } from "@/lib/applications";
+import {
+  APPLICATIONS_EVENT,
+  readApplications,
+  saveApplications,
+} from "@/lib/applications";
+import {
+  createDemoApplications,
+  createDemoResume,
+  DEMO_JOBS,
+  DEMO_TITLE,
+} from "@/lib/demoScenario";
+import { saveJd } from "@/lib/jdStorage";
 import {
   installJobBridge,
   subscribeJobBridge,
@@ -601,6 +612,27 @@ function ResumeWorkspace() {
     }
   };
 
+  const handleLoadDemo = () => {
+    if (
+      !window.confirm(
+        "载入演示场景会用「小林」的简历和 3 个目标岗位替换当前简历与待投清单，确定继续吗？",
+      )
+    ) {
+      return;
+    }
+    replaceResume(createDemoResume());
+    saveApplications(createDemoApplications());
+    // 同一标签页内让投递面板立刻重新读取
+    window.dispatchEvent(new Event(APPLICATIONS_EVENT));
+    saveJd(DEMO_JOBS[0].jd);
+    setResumeVersion((value) => value + 1);
+    setTab("jobs");
+    setNotice({
+      type: "ok",
+      message: `已载入演示场景：${DEMO_TITLE} + 3 个目标岗位`,
+    });
+  };
+
   const handleLoadSample = () => {
     if (
       !isSample &&
@@ -999,6 +1031,15 @@ function ResumeWorkspace() {
                       onClick={handleLoadSample}
                     >
                       载入示例
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      data-qa="load-demo"
+                      onClick={handleLoadDemo}
+                      title="载入「小林」的简历 + 3 个目标岗位，用于演示全链路"
+                    >
+                      演示场景
                     </Button>
                     <Button variant="ghost" size="sm" onClick={handleClear}>
                       清空

@@ -1110,3 +1110,32 @@ docs/eval-report.md             ✅ 生成物（随仓库提交，便于评审�
 
 - `npm test`：27 个文件 / 265 个用例
 - `npx tsc --noEmit`、`npm run lint`：0 错误 0 警告
+
+---
+
+## 阶段 44（2026-10-30）：演示场景与部署说明
+
+### 演示场景
+
+顶栏新增「演示场景」：一次载入「小林（2026 届本科，前端方向）」+ 3 个目标岗位（云图科技前端 / 明策数据数据分析 / 恒信银行 Java 后端），
+三个岗位的匹配度天然拉开，切到职位推荐即按匹配度排序，适合 5 分钟演示与录屏。
+
+- `src/lib/demoScenario.ts`：演示简历与 3 段 JD（全部本地生成，无真实个人信息）
+- 载入时同时写入简历、投递记录与当前 JD，并广播 `APPLICATIONS_EVENT` 让面板立即刷新
+- 载入前有确认，避免覆盖真实数据
+
+### 部署
+
+`docs/DEPLOY.md` 写了两种上线方式：
+
+- Vercel：环境变量 `DEEPSEEK_API_KEY`，无额外配置
+- 自有服务器：`npm ci && npm run build && npm run start`，附 nginx 片段（保留 Host、关闭缓冲、透传 XFF）
+
+文档里明确了几件容易踩的事：同源校验依赖 Host、`TRUSTED_PROXY_HOPS` 的用法、限流是单进程内存实现。
+
+### 验证
+
+- `npm run qa`（生产模式）：237 项通过（新增「演示场景载入并排序」）
+- `npx tsc --noEmit`、`npm run lint`：0 错误 0 警告
+
+> 注：本机没有 Docker，未提供 Dockerfile；部署文档给的是 Vercel 与 Node + nginx 两条可验证路径。
