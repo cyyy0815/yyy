@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { extractJdKeywords } from "@/lib/jdMatch";
 import { analyzeResume } from "@/lib/matching";
 import { buildJobBoardUrl, JOB_BOARDS } from "@/lib/jobBoards";
 import type { Resume } from "@/lib/types";
@@ -296,16 +297,23 @@ export function JobsPanel({
                 </p>
                 {analysis.missingSkills.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
-                    {analysis.missingSkills.map((skill) => (
-                      <SkillChip
-                        key={skill}
-                        tone="missing"
-                        onClick={() => onAddSkill(skill)}
-                        title="点击添加到简历技能"
-                      >
-                        {skill}
-                      </SkillChip>
-                    ))}
+                    {analysis.missingSkills.map((skill) =>
+                      // 「浏览器」这类是抽象要求，不是可写进简历的技能，只展示不可点
+                      extractJdKeywords(skill).length > 0 ? (
+                        <SkillChip
+                          key={skill}
+                          tone="missing"
+                          onClick={() => onAddSkill(skill)}
+                          title="点击添加到简历技能"
+                        >
+                          {skill}
+                        </SkillChip>
+                      ) : (
+                        <SkillChip key={skill} tone="missing">
+                          {skill}
+                        </SkillChip>
+                      ),
+                    )}
                   </div>
                 ) : (
                   <p className="text-[12px] text-zinc-400">

@@ -27,15 +27,15 @@ export const DEMO_JOBS: { company: string; role: string; jd: string }[] = [
   },
   {
     company: "明策数据",
-    role: "数据分析助理",
+    role: "数据产品前端（校招）",
     jd: `工作内容：
-1. 协助完成业务数据的清洗、统计与可视化；
-2. 输出周报与专题分析，支持运营决策。
+1. 负责数据看板与报表页面的前端开发，把分析结论做成可交互的可视化；
+2. 与数据分析师协作，优化图表交互与加载性能。
 岗位要求：
-1. 本科及以上，统计、数学或计算机相关专业；
-2. 熟练使用 Excel，会写 SQL 查询；
-3. 了解 Python（pandas）做数据处理；
-4. 有数据分析项目或实习经验优先。`,
+1. 本科及以上，计算机、统计相关专业；
+2. 熟悉 HTML、CSS、JavaScript，会使用 React；
+3. 有 ECharts 等可视化库的使用经验；
+4. 会写 SQL 查询，了解 Excel 与 Python（pandas）的数据处理方式者优先。`,
   },
   {
     company: "恒信银行",
