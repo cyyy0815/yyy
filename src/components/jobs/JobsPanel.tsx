@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { analyzeResume } from "@/lib/matching";
 import { buildJobBoardUrl, JOB_BOARDS } from "@/lib/jobBoards";
 import type { Resume } from "@/lib/types";
@@ -132,6 +132,7 @@ export function JobsPanel({
   onGoEdit,
   onAddSkill,
   onOpenAiWriter,
+  onChange,
 }: {
   resume: Resume;
   resumeTitle: string;
@@ -139,6 +140,8 @@ export function JobsPanel({
   onAddSkill: (skill: string) => void;
   /** 打开编辑页的 AI 写作弹窗（待投清单「按 JD 优化简历」用） */
   onOpenAiWriter: () => void;
+  /** Agent 采用改写后写回简历 */
+  onChange: Dispatch<SetStateAction<Resume>>;
 }) {
   const analysis = useMemo(() => analyzeResume(resume), [resume]);
   // 待投清单点「准备」时递增，用来打开求职信弹窗（弹窗自己从「当前 JD」读取内容）
@@ -168,6 +171,7 @@ export function JobsPanel({
           onAddSkill={onAddSkill}
           onPrepareCoverLetter={() => setCoverLetterRequest((value) => value + 1)}
           onOpenAiWriter={onOpenAiWriter}
+          onChange={onChange}
         />
       </div>
     );
@@ -360,6 +364,7 @@ export function JobsPanel({
         onAddSkill={onAddSkill}
         onPrepareCoverLetter={() => setCoverLetterRequest((value) => value + 1)}
         onOpenAiWriter={onOpenAiWriter}
+          onChange={onChange}
       />
 
       <CoverLetterWriter

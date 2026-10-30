@@ -1023,6 +1023,7 @@ function ResumeWorkspace() {
             onGoEdit={() => setTab("edit")}
             onAddSkill={handleAddSkill}
             onOpenAiWriter={handleOpenAiWriter}
+            onChange={updateResume}
           />
         )}
       </main>

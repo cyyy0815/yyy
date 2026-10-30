@@ -3932,6 +3932,22 @@ expect(
 
 await pause(900);
 await clickLanguage("双语");
+// 语言切换要经过保存防抖才落盘，这里等它真的写进去再读，避免读到旧值
+await languagePage
+  .waitForFunction(
+    () => {
+      try {
+        return (
+          JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}")
+            .language === "bilingual"
+        );
+      } catch {
+        return false;
+      }
+    },
+    { timeout: 5000 },
+  )
+  .catch(() => {});
 const bilingualBeforeUndo = await readLanguageState();
 await languagePage.evaluate(() => {
   const root = document.querySelector('[data-qa="history-controls"]');
@@ -5802,6 +5818,87 @@ expect(
   JSON.stringify(optimizeState),
 );
 await queuePage.close();
+
+// P4 求职 Agent：四步计划 → 本地工具执行 → 工具轨迹（无 Key 时 AI 步骤禁用）
+const agentPage = await open({ width: 1440, height: 1000 });
+await agentPage.goto(BASE, { waitUntil: "networkidle0" });
+await agentPage.evaluate(() =>
+  localStorage.removeItem("resume-workshop:applications:v1"),
+);
+await agentPage.reload({ waitUntil: "networkidle0" });
+await pause(700);
+// 新页面默认停在编辑页，先切到「职位推荐」
+await agentPage.evaluate(() => {
+  const tabs = [...document.querySelectorAll("button")];
+  tabs.find((tab) => tab.textContent?.includes("职位推荐"))?.click();
+});
+await agentPage.waitForSelector('[data-qa="job-import-open"]', {
+  timeout: 5000,
+});
+await pause(300);
+await agentPage.click('[data-qa="job-import-open"]');
+await pause(300);
+await agentPage.type(
+  'textarea[aria-label="粘贴岗位描述"]',
+  [
+    "某科技 | 高级前端工程师",
+    "负责中后台系统开发，要求 3 年以上经验，熟悉 React、TypeScript、Webpack 与性能优化。",
+  ].join("\n"),
+);
+await pause(300);
+await agentPage.click('[data-qa="job-import-submit"]');
+await agentPage.waitForSelector('[data-qa="job-queue-list"] li', {
+  timeout: 5000,
+});
+await pause(400);
+await agentPage.click('[data-qa="job-prepare"]');
+await pause(400);
+await agentPage.click('[data-qa="job-agent"]');
+await agentPage.waitForSelector('[data-qa="agent-dialog"]', { timeout: 5000 });
+await pause(600);
+
+const aiConfigured = await agentPage.evaluate(async () => {
+  const response = await fetch("/api/ai/status", { cache: "no-store" });
+  const data = await response.json();
+  return Boolean(data.configured);
+});
+const planState = await agentPage.evaluate(() => {
+  const aiButton = document.querySelector(
+    '[data-qa="agent-run-rewrite_summary"]',
+  );
+  return {
+    steps: document.querySelectorAll('[data-qa^="agent-step-"]').length,
+    aiDisabled: aiButton ? aiButton.disabled : null,
+  };
+});
+expect(
+  "Agent 生成四步计划，AI 步骤可用性跟随 Key 配置",
+  planState.steps === 4 && planState.aiDisabled === !aiConfigured,
+  JSON.stringify({ ...planState, aiConfigured }),
+);
+
+await agentPage.click('[data-qa="agent-run-all"]');
+await pause(2000);
+const runState = await agentPage.evaluate(() => ({
+  analyze:
+    document.querySelector('[data-qa="agent-status-analyze_jd"]')?.textContent ??
+    "",
+  gaps:
+    document.querySelector('[data-qa="agent-status-diagnose_gaps"]')
+      ?.textContent ?? "",
+  traceRows: document.querySelectorAll('[data-qa="agent-trace"] li').length,
+  summary:
+    document.querySelector('[data-qa="agent-summary"]')?.textContent ?? "",
+}));
+expect(
+  "自动执行跑完两个本地步骤并留下工具轨迹",
+  runState.analyze === "已完成" &&
+    runState.gaps === "已完成" &&
+    runState.traceRows === 2 &&
+    runState.summary.includes("工具调用 2 次"),
+  JSON.stringify(runState),
+);
+await agentPage.close();
 
 // P3 扩展桥：页面收到 postMessage 后自动切到推荐页并预填导入弹窗
 const bridgePage = await open({ width: 1440, height: 1000 });

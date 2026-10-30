@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { TextArea, TextInput } from "@/components/ui/Field";
@@ -18,12 +18,15 @@ import {
 } from "@/lib/jobBridge";
 import { saveJd } from "@/lib/jdStorage";
 import type { Resume } from "@/lib/types";
+import { JobAgentPanel } from "./JobAgentPanel";
 import { SkillChip } from "./SkillChip";
 
 type Props = {
   resume: Resume;
   resumeTitle: string;
   onAddSkill: (skill: string) => void;
+  /** 采用 Agent 改写结果时写回简历（走撤销栈） */
+  onChange: Dispatch<SetStateAction<Resume>>;
   /** 设为当前 JD 之后打开求职信弹窗 */
   onPrepareCoverLetter: () => void;
   /** 设为当前 JD 之后打开编辑页的 AI 写作弹窗（按 JD 定制简历） */
@@ -62,6 +65,7 @@ export function JobQueuePanel({
   resume,
   resumeTitle,
   onAddSkill,
+  onChange,
   onPrepareCoverLetter,
   onOpenAiWriter,
 }: Props) {
@@ -69,6 +73,7 @@ export function JobQueuePanel({
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [prepId, setPrepId] = useState<string | null>(null);
+  const [agentId, setAgentId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -121,6 +126,16 @@ export function JobQueuePanel({
   const preparing = prepId
     ? queue.find((item) => item.application.id === prepId) ?? null
     : null;
+  const agentApp = agentId
+    ? applications.find((item) => item.id === agentId) ?? null
+    : null;
+
+  /** 启动 Agent：先把它设为当前 JD，这样改写与求职信都围绕这个岗位。 */
+  const handleStartAgent = (application: JobApplication) => {
+    saveJd(application.jd);
+    setAgentId(application.id);
+    setPrepId(null);
+  };
 
   const handleImport = () => {
     if (!parsed || parsed.error || parsed.leads.length === 0) return;
@@ -349,6 +364,15 @@ export function JobQueuePanel({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <Button
+                  variant="primary"
+                  size="sm"
+                  data-qa="job-agent"
+                  disabled={!preparing.application.jd.trim()}
+                  onClick={() => handleStartAgent(preparing.application)}
+                >
+                  启动求职 Agent
+                </Button>
+                <Button
                   variant="outline"
                   size="sm"
                   data-qa="job-download-ats"
@@ -458,6 +482,19 @@ export function JobQueuePanel({
             </pre>
           </div>
         </Dialog>
+      ) : null}
+
+      {agentApp ? (
+        <JobAgentPanel
+          resume={resume}
+          onChange={onChange}
+          job={{
+            company: agentApp.company,
+            role: agentApp.role,
+            jd: agentApp.jd,
+          }}
+          onClose={() => setAgentId(null)}
+        />
       ) : null}
     </section>
   );
