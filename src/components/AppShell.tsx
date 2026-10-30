@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { AgentWorkbench } from "@/components/jobs/AgentWorkbench";
 import { JobsPanel } from "@/components/jobs/JobsPanel";
 import { AtsExportDialog } from "@/components/resume/AtsExportDialog";
 import { OnePageFitDialog } from "@/components/resume/OnePageFitDialog";
@@ -74,7 +75,7 @@ function readShowPageNumbers(): boolean {
   }
 }
 
-type Tab = "edit" | "jobs";
+type Tab = "edit" | "jobs" | "agent";
 type MobilePane = "form" | "preview";
 type Notice = { type: "ok" | "error"; message: string } | null;
 
@@ -158,7 +159,11 @@ function ResumeWorkspace() {
   } = useResume();
 
   const [tab, setTab] = useState<Tab>(() =>
-    window.location.hash === "#jobs" ? "jobs" : "edit",
+    window.location.hash === "#agent"
+      ? "agent"
+      : window.location.hash === "#jobs"
+        ? "jobs"
+        : "edit",
   );
   const [template, setTemplate] = useState<TemplateId>(readTemplate);
   const [mobilePane, setMobilePane] = useState<MobilePane>("form");
@@ -208,7 +213,7 @@ function ResumeWorkspace() {
   }, [showPageNumbers]);
 
   useEffect(() => {
-    const nextHash = tab === "jobs" ? "#jobs" : "";
+    const nextHash = tab === "agent" ? "#agent" : tab === "jobs" ? "#jobs" : "";
     const nextUrl = `${window.location.pathname}${window.location.search}${nextHash}`;
     try {
       window.history.replaceState(null, "", nextUrl);
@@ -219,7 +224,8 @@ function ResumeWorkspace() {
 
   useEffect(() => {
     const onHashChange = () => {
-      setTab(window.location.hash === "#jobs" ? "jobs" : "edit");
+      const hash = window.location.hash;
+      setTab(hash === "#agent" ? "agent" : hash === "#jobs" ? "jobs" : "edit");
     };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
@@ -713,6 +719,20 @@ function ResumeWorkspace() {
               <span className="sm:hidden">推荐</span>
               <span className="hidden sm:inline">职位推荐</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setTab("agent")}
+              aria-current={tab === "agent" ? "page" : undefined}
+              data-qa="tab-agent"
+              className={`whitespace-nowrap rounded-full px-2.5 py-1.5 text-[12px] font-medium transition sm:px-4 sm:text-[12.5px] ${
+                tab === "agent"
+                  ? "bg-zinc-900 text-white"
+                  : "text-zinc-500 hover:text-zinc-900"
+              }`}
+            >
+              <span className="sm:hidden">AI</span>
+              <span className="hidden sm:inline">AI 工作台</span>
+            </button>
           </nav>
 
           <div className="flex shrink-0 items-center gap-1.5">
@@ -1063,7 +1083,7 @@ function ResumeWorkspace() {
               </div>
             </div>
           </>
-        ) : (
+        ) : tab === "jobs" ? (
           <JobsPanel
             resume={resume}
             resumeTitle={documents.currentTitle}
@@ -1072,6 +1092,8 @@ function ResumeWorkspace() {
             onOpenAiWriter={handleOpenAiWriter}
             onChange={updateResume}
           />
+        ) : (
+          <AgentWorkbench resume={resume} onChange={updateResume} />
         )}
       </main>
 

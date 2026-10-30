@@ -278,6 +278,15 @@ export function JobQueuePanel({
                 <Button
                   variant="primary"
                   size="sm"
+                  data-qa="job-ai-prepare"
+                  title="用 AI 工作流准备这个岗位"
+                  onClick={() => handleStartAgent(application)}
+                >
+                  AI 准备
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   data-qa="job-prepare"
                   onClick={() => setPrepId(application.id)}
                 >

@@ -5958,6 +5958,41 @@ expect(
     demoState.jdLength > 0,
   JSON.stringify(demoState),
 );
+// AI 工作台：Agent 从弹窗提升为一级页面
+await demoPage.click('[data-qa="tab-agent"]');
+await pause(900);
+const workbench = await demoPage.evaluate(() => ({
+  hash: location.hash,
+  jobs: document.querySelectorAll('[data-qa^="agent-job-"]').length,
+  hasStart: Boolean(document.querySelector('[data-qa="agent-workbench-start"]')),
+  startDisabled: document.querySelector('[data-qa="agent-workbench-start"]')
+    ?.disabled,
+}));
+expect(
+  "AI 工作台是一级页面并能选岗位",
+  workbench.hash === "#agent" &&
+    workbench.jobs === 3 &&
+    workbench.hasStart &&
+    workbench.startDisabled === false,
+  JSON.stringify(workbench),
+);
+
+await demoPage.click('[data-qa="agent-workbench-start"]');
+await demoPage.waitForSelector('[data-qa="agent-dialog"]', { timeout: 8000 });
+// 计划可能由模型生成，等步骤渲染出来再断言
+await demoPage.waitForFunction(
+  () => document.querySelectorAll('[data-qa^="agent-step-"]').length > 0,
+  { timeout: 25000 },
+);
+const workbenchDialog = await demoPage.evaluate(() => ({
+  dialog: Boolean(document.querySelector('[data-qa="agent-dialog"]')),
+  steps: document.querySelectorAll('[data-qa^="agent-step-"]').length,
+}));
+expect(
+  "工作台启动后进入 Agent 面板",
+  workbenchDialog.dialog && workbenchDialog.steps >= 1,
+  JSON.stringify(workbenchDialog),
+);
 await demoPage.close();
 
 // P3 扩展桥：页面收到 postMessage 后自动切到推荐页并预填导入弹窗
