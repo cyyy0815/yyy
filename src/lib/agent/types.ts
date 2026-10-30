@@ -41,3 +41,30 @@ export type AgentContext = {
   resume: Resume;
   jd: string;
 };
+
+/** 模型给出的计划步骤：只有工具与理由，参数固定的工具由前端补。 */
+export type PlannedStep = {
+  tool: AgentToolId;
+  rationale: string;
+};
+
+/** 计划来源：模型规划 / 本地兜底，UI 上要能让用户看见区别。 */
+export type PlanSource = "model" | "local";
+
+export type PlanPayload = {
+  steps: PlannedStep[];
+  note: string;
+};
+
+/** 规划请求：把简历摘要、JD、已完成的观察与用户追加要求一起交给模型。 */
+export type PlanRequest = {
+  role: string;
+  years: string;
+  skills: string[];
+  summary: string;
+  profile: string;
+  jd: string;
+  observations: string[];
+  instruction: string;
+};
+

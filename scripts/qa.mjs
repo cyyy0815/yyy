@@ -5821,6 +5821,19 @@ await queuePage.close();
 
 // P4 求职 Agent：四步计划 → 本地工具执行 → 工具轨迹（无 Key 时 AI 步骤禁用）
 const agentPage = await open({ width: 1440, height: 1000 });
+// 把 AI 状态钉成「未配置」，让计划路径稳定走本地兜底，避免 QA 依赖真实模型输出
+await agentPage.setRequestInterception(true);
+agentPage.on("request", (request) => {
+  if (request.url().includes("/api/ai/status")) {
+    request.respond({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ configured: false, model: "stub" }),
+    });
+    return;
+  }
+  request.continue();
+});
 await agentPage.goto(BASE, { waitUntil: "networkidle0" });
 await agentPage.evaluate(() =>
   localStorage.removeItem("resume-workshop:applications:v1"),
@@ -5866,14 +5879,21 @@ const planState = await agentPage.evaluate(() => {
   const aiButton = document.querySelector(
     '[data-qa="agent-run-rewrite_summary"]',
   );
+  const replanButton = document.querySelector('[data-qa="agent-replan"]');
   return {
     steps: document.querySelectorAll('[data-qa^="agent-step-"]').length,
     aiDisabled: aiButton ? aiButton.disabled : null,
+    source:
+      document.querySelector('[data-qa="agent-plan-source"]')?.textContent ?? "",
+    replanDisabled: replanButton ? replanButton.disabled : null,
   };
 });
 expect(
-  "Agent 生成四步计划，AI 步骤可用性跟随 Key 配置",
-  planState.steps === 4 && planState.aiDisabled === !aiConfigured,
+  "未配置 Key 时回退到本地四步计划",
+  planState.steps === 4 &&
+    planState.aiDisabled === true &&
+    planState.source.includes("本地兜底") &&
+    planState.replanDisabled === true,
   JSON.stringify({ ...planState, aiConfigured }),
 );
 

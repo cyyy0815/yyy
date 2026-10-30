@@ -1,8 +1,38 @@
 import { analyzeJd } from "@/lib/jdMatch";
 import { analyzeResume } from "@/lib/matching";
-import type { AgentContext, AgentStepResult } from "./types";
+import type { AgentContext, AgentStepResult, AgentToolId } from "./types";
 
 const MAX_ITEMS = 8;
+
+/**
+ * 工具清单：既是前端渲染用的标题，也是规划提示词里给模型的菜单。
+ * requiresAi 决定「没有 Key 时跳过」与「执行前需要人工确认」。
+ */
+export const TOOL_SPECS: Record<
+  AgentToolId,
+  { title: string; requiresAi: boolean; description: string }
+> = {
+  analyze_jd: {
+    title: "解析岗位要求",
+    requiresAi: false,
+    description: "识别 JD 里的技能关键词、年限与学历要求，给出匹配分",
+  },
+  diagnose_gaps: {
+    title: "诊断能力差距",
+    requiresAi: false,
+    description: "对照岗位画像的核心要求，列出缺口与可补的技能",
+  },
+  rewrite_summary: {
+    title: "按岗位改写个人简介",
+    requiresAi: true,
+    description: "重写个人简介使其贴合该 JD，只使用简历里已有的事实",
+  },
+  cover_letter: {
+    title: "生成求职信",
+    requiresAi: true,
+    description: "基于简历与 JD 生成一段可直接发送的求职信",
+  },
+};
 
 function joinItems(items: string[], max = MAX_ITEMS): string {
   if (items.length <= max) return items.join("、");
