@@ -215,7 +215,7 @@ export function JobQueuePanel({
   return (
     <section
       data-qa="job-queue"
-      className="rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+      className="scroll-mt-24 rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -276,7 +276,7 @@ export function JobQueuePanel({
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <Button
-                  variant="outline"
+                  variant="primary"
                   size="sm"
                   data-qa="job-prepare"
                   onClick={() => setPrepId(application.id)}

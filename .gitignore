@@ -49,3 +49,6 @@ extension-*.zip
 
 # 参赛材料打成的 zip（npm run pack:submission 生成）
 提交材料/*.zip
+
+# 本地临时工具（cloudflared 等，npm run pack 不会包含）
+.tools/

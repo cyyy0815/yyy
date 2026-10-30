@@ -212,7 +212,31 @@ export function JobsPanel({
         </p>
       </header>
 
-      <section className="rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+      <nav className="flex flex-wrap gap-2 text-[12px] text-zinc-500" aria-label="页内导航">
+        {[
+          { label: "匹配结果", target: '[data-qa="match-section"]' },
+          { label: "待投清单", target: '[data-qa="job-queue"]' },
+          { label: "投递看板", target: '[data-qa="application-board"]' },
+        ].map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            className="rounded-full border border-zinc-200 bg-white px-3 py-1 hover:text-zinc-900"
+            onClick={() =>
+              document
+                .querySelector(item.target)
+                ?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      <section
+        data-qa="match-section"
+        className="scroll-mt-24 rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+      >
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
           <ScoreRing
             value={analysis.profile ? analysis.score : analysis.completeness}
@@ -263,7 +287,31 @@ export function JobsPanel({
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+        <nav className="flex flex-wrap gap-2 text-[12px] text-zinc-500" aria-label="页内导航">
+        {[
+          { label: "匹配结果", target: '[data-qa="match-section"]' },
+          { label: "待投清单", target: '[data-qa="job-queue"]' },
+          { label: "投递看板", target: '[data-qa="application-board"]' },
+        ].map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            className="rounded-full border border-zinc-200 bg-white px-3 py-1 hover:text-zinc-900"
+            onClick={() =>
+              document
+                .querySelector(item.target)
+                ?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      <section
+        data-qa="match-section"
+        className="scroll-mt-24 rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+      >
           <h3 className="text-[14px] font-semibold tracking-tight text-zinc-900">
             技能匹配
           </h3>
@@ -345,7 +393,31 @@ export function JobsPanel({
           )}
         </section>
 
-        <section className="rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+        <nav className="flex flex-wrap gap-2 text-[12px] text-zinc-500" aria-label="页内导航">
+        {[
+          { label: "匹配结果", target: '[data-qa="match-section"]' },
+          { label: "待投清单", target: '[data-qa="job-queue"]' },
+          { label: "投递看板", target: '[data-qa="application-board"]' },
+        ].map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            className="rounded-full border border-zinc-200 bg-white px-3 py-1 hover:text-zinc-900"
+            onClick={() =>
+              document
+                .querySelector(item.target)
+                ?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      <section
+        data-qa="match-section"
+        className="scroll-mt-24 rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+      >
           <h3 className="text-[14px] font-semibold tracking-tight text-zinc-900">
             简历优化建议
           </h3>
@@ -382,7 +454,31 @@ export function JobsPanel({
 
       <ApplicationBoard resumeTitle={resumeTitle} />
 
-      <section className="rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+      <nav className="flex flex-wrap gap-2 text-[12px] text-zinc-500" aria-label="页内导航">
+        {[
+          { label: "匹配结果", target: '[data-qa="match-section"]' },
+          { label: "待投清单", target: '[data-qa="job-queue"]' },
+          { label: "投递看板", target: '[data-qa="application-board"]' },
+        ].map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            className="rounded-full border border-zinc-200 bg-white px-3 py-1 hover:text-zinc-900"
+            onClick={() =>
+              document
+                .querySelector(item.target)
+                ?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      <section
+        data-qa="match-section"
+        className="scroll-mt-24 rounded-3xl border border-zinc-200/80 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-[14px] font-semibold tracking-tight text-zinc-900">

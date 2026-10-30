@@ -630,8 +630,8 @@ function ResumeWorkspace() {
     // 待投清单在职位推荐页首屏下方，切页后滚过去，否则看起来像「没有演示数据」
     window.setTimeout(() => {
       document
-        .querySelector('[data-qa="job-queue-list"]')
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        .querySelector('[data-qa="job-queue"]')
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 400);
     setNotice({
       type: "ok",
