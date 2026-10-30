@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "qa": "node scripts/qa.mjs",
+    "eval": "node scripts/eval.mjs",
     "pack:extension": "node scripts/pack-extension.mjs"
   },
   "dependencies": {
