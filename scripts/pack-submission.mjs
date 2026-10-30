@@ -21,7 +21,7 @@ const required = [
   "提交总览.md",
   "提交表单填写.md",
   "上线Vercel.md",
-  "演示视频脚本.md",
+
 ];
 const entries = [];
 for (const name of required) {

@@ -76,7 +76,7 @@ const materials = [
   "提交材料/技术文档.pdf",
   "提交材料/技术文档.docx",
   "提交材料/提交总览.md",
-  "提交材料/演示视频脚本.md",
+
 ];
 const missing = materials.filter((file) => !existsSync(file));
 check(
