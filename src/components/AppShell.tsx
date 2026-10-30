@@ -627,6 +627,12 @@ function ResumeWorkspace() {
     saveJd(DEMO_JOBS[0].jd);
     setResumeVersion((value) => value + 1);
     setTab("jobs");
+    // 待投清单在职位推荐页首屏下方，切页后滚过去，否则看起来像「没有演示数据」
+    window.setTimeout(() => {
+      document
+        .querySelector('[data-qa="job-queue-list"]')
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 400);
     setNotice({
       type: "ok",
       message: `已载入演示场景：${DEMO_TITLE} + 3 个目标岗位`,

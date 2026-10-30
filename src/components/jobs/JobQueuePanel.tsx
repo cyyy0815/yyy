@@ -223,8 +223,8 @@ export function JobQueuePanel({
             待投清单
           </h3>
           <p className="mt-1 max-w-2xl text-[12px] leading-5 text-zinc-500">
-            批量粘贴岗位描述，按当前简历的匹配度排队；点「准备」把该 JD
-            设为当前 JD 并打开求职信，投完一键标记已投。
+            批量粘贴岗位描述，按当前简历的匹配度排队；点「准备」可设为当前
+            JD、启动求职 Agent 或生成求职信，投完一键标记已投。
           </p>
         </div>
         <Button
