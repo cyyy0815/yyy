@@ -5,7 +5,7 @@
  * 所以这份快照不含 .git 历史，只保留当前工作树的文件。
  */
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, relative } from "node:path";
 import { buildZip } from "./zip.mjs";
 
 const root = process.cwd();
