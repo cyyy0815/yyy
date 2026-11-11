@@ -779,7 +779,7 @@ function SkillChip({
       <button
         type="button"
         onClick={onRemove}
-        className="flex h-4 w-4 items-center justify-center rounded-full text-zinc-500 transition hover:bg-red-50 hover:text-red-600"
+        className="-m-1 flex h-6 w-6 items-center justify-center rounded-full text-zinc-500 transition hover:bg-red-50 hover:text-red-600"
         aria-label={`删除技能 ${name}`}
       >
         ×
