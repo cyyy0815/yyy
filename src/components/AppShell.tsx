@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { AppSkeleton } from "@/components/AppSkeleton";
 import { ExportMenu } from "@/components/ExportMenu";
 import { AgentWorkbench } from "@/components/jobs/AgentWorkbench";
 import { JobsPanel } from "@/components/jobs/JobsPanel";
@@ -131,11 +132,7 @@ export function AppShell() {
   );
 
   if (!hydrated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-[13px] text-zinc-400">
-        正在载入…
-      </div>
-    );
+    return <AppSkeleton />;
   }
 
   return <ResumeWorkspace />;
