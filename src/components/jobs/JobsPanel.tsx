@@ -32,7 +32,7 @@ function ScoreRing({
         <span className="text-[30px] font-semibold leading-none tabular-nums tracking-tight text-zinc-900">
           {value}
         </span>
-        <span className="mt-1 text-[10px] tracking-wide text-zinc-400">{label}</span>
+        <span className="mt-1 text-[10px] tracking-wide text-zinc-500">{label}</span>
       </div>
     </div>
   );
@@ -77,7 +77,7 @@ function JobBoardCard({
       <p className="mt-2 text-[12px] leading-5 text-zinc-500">{board.description}</p>
 
       <div className="mt-3 rounded-xl bg-zinc-50 px-3 py-2.5">
-        <p className="text-[11px] text-zinc-400">当前搜索</p>
+        <p className="text-[11px] text-zinc-500">当前搜索</p>
         <p className="mt-0.5 truncate text-[13px] font-medium text-zinc-800">
           {keyword}
           {city ? (
@@ -103,7 +103,7 @@ function JobBoardCard({
       ) : null}
 
       {board.note ? (
-        <p className="mt-3 text-[10.5px] text-zinc-400">{board.note}</p>
+        <p className="mt-3 text-[10.5px] text-zinc-500">{board.note}</p>
       ) : null}
     </div>
   );
@@ -200,7 +200,7 @@ export function JobsPanel({
   return (
     <div className="space-y-6">
       <header>
-        <p className="text-[11px] font-medium tracking-[0.18em] text-zinc-400">
+        <p className="text-[11px] font-medium tracking-[0.18em] text-zinc-500">
           JOB MATCH &amp; SEARCH
         </p>
         <h1 className="mt-2 text-[26px] font-semibold tracking-tight text-zinc-900">
@@ -245,7 +245,7 @@ export function JobsPanel({
           />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] tracking-widest text-zinc-400">
+              <span className="text-[11px] tracking-widest text-zinc-500">
                 目标岗位
               </span>
               <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] text-zinc-600">
@@ -270,7 +270,7 @@ export function JobsPanel({
               )}
             </p>
             {analysis.profile ? (
-              <p className="mt-1 text-[11px] text-zinc-400">
+              <p className="mt-1 text-[11px] text-zinc-500">
                 匹配分 = 核心 {analysis.breakdown.core} + 加分{" "}
                 {analysis.breakdown.bonus} + 完整度{" "}
                 {analysis.breakdown.completeness}
@@ -318,7 +318,7 @@ export function JobsPanel({
           {analysis.profile ? (
             <div className="mt-4 space-y-4">
               <div>
-                <p className="mb-2 text-[11px] text-zinc-400">
+                <p className="mb-2 text-[11px] text-zinc-500">
                   已满足的核心要求（{analysis.matchedRequirements.length}）
                 </p>
                 {analysis.matchedRequirements.length > 0 ? (
@@ -330,12 +330,12 @@ export function JobsPanel({
                     ))}
                   </div>
                 ) : (
-                  <p className="text-[12px] text-zinc-400">暂无命中</p>
+                  <p className="text-[12px] text-zinc-500">暂无命中</p>
                 )}
               </div>
 
               <div>
-                <p className="mb-2 text-[11px] text-zinc-400">
+                <p className="mb-2 text-[11px] text-zinc-500">
                   缺失核心技能（{analysis.missingSkills.length}）
                   {analysis.missingSkills.length > 0 ? (
                     <span className="ml-1 text-zinc-300">
@@ -364,7 +364,7 @@ export function JobsPanel({
                     )}
                   </div>
                 ) : (
-                  <p className="text-[12px] text-zinc-400">
+                  <p className="text-[12px] text-zinc-500">
                     核心技能已覆盖，继续保持
                   </p>
                 )}
@@ -372,7 +372,7 @@ export function JobsPanel({
 
               {analysis.matchedBonus.length > 0 ? (
                 <div>
-                  <p className="mb-2 text-[11px] text-zinc-400">
+                  <p className="mb-2 text-[11px] text-zinc-500">
                     加分技能（{analysis.matchedBonus.length}）
                   </p>
                   <div className="flex flex-wrap gap-1.5">
@@ -532,7 +532,7 @@ export function JobsPanel({
         </div>
       </section>
 
-      <p className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-4 py-3 text-[11.5px] leading-5 text-zinc-400">
+      <p className="rounded-2xl border border-dashed border-zinc-200 bg-white/60 px-4 py-3 text-[11.5px] leading-5 text-zinc-500">
         说明：BOSS直聘、拉勾等平台没有公开的职位 API，本工具不抓取职位数据，而是根据你的简历生成精准搜索入口；职位数量、薪资与排序以平台实时结果为准。期望薪资{" "}
         {resume.intent.salaryMin || resume.intent.salaryMax
           ? `${resume.intent.salaryMin || "?"}–${resume.intent.salaryMax || "?"}K`

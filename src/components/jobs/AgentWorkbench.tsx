@@ -66,7 +66,7 @@ export function AgentWorkbench({ resume, onChange }: Props) {
   return (
     <div className="space-y-4">
       <header>
-        <p className="text-[11px] tracking-[0.18em] text-zinc-400">AI WORKFLOW</p>
+        <p className="text-[11px] tracking-[0.18em] text-zinc-500">AI WORKFLOW</p>
         <h1 className="mt-1 text-[26px] font-semibold tracking-tight text-zinc-900">
           AI 工作台
         </h1>
@@ -82,7 +82,7 @@ export function AgentWorkbench({ resume, onChange }: Props) {
             <h2 className="text-[14px] font-semibold text-zinc-900">
               1. 选择目标岗位
             </h2>
-            <span className="text-[11.5px] text-zinc-400">
+            <span className="text-[11.5px] text-zinc-500">
               共 {queue.length} 个待投
             </span>
           </div>

@@ -104,7 +104,7 @@ export function ResumePreview({
                     className="absolute inset-x-0 border-t border-dashed border-zinc-300"
                     style={{ top }}
                   >
-                    <span className="absolute right-2 top-1 rounded bg-white/85 px-1 text-[8px] leading-[1.5] text-zinc-400">
+                    <span className="absolute right-2 top-1 rounded bg-white/85 px-1 text-[8px] leading-[1.5] text-zinc-500">
                       第 {index + 2} 页
                     </span>
                   </div>

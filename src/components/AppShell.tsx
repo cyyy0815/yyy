@@ -1,12 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AppSkeleton } from "@/components/AppSkeleton";
 import { ExportMenu } from "@/components/ExportMenu";
-import { AgentWorkbench } from "@/components/jobs/AgentWorkbench";
-import { JobsPanel } from "@/components/jobs/JobsPanel";
-import { AtsExportDialog } from "@/components/resume/AtsExportDialog";
-import { OnePageFitDialog } from "@/components/resume/OnePageFitDialog";
 import { ResumeDocumentsBar } from "@/components/resume/ResumeDocumentsBar";
 import { ResumeForm } from "@/components/resume/ResumeForm";
 import { ResumePreview } from "@/components/resume/ResumePreview";
@@ -78,6 +75,45 @@ function readShowPageNumbers(): boolean {
 }
 
 type Tab = "edit" | "jobs" | "agent";
+
+/**
+ * 两个非默认标签页按需加载：首屏只下载「编辑简历」需要的代码，
+ * 点「职位推荐」或「AI 工作台」时才取对应 chunk。
+ */
+const TabFallback = () => (
+  <div className="space-y-3" aria-busy="true">
+    <div className="h-16 rounded-2xl bg-zinc-100 motion-safe:animate-pulse" />
+    <div className="h-40 rounded-2xl bg-zinc-100 motion-safe:animate-pulse" />
+  </div>
+);
+
+const JobsPanel = dynamic(
+  () => import("@/components/jobs/JobsPanel").then((mod) => mod.JobsPanel),
+  { ssr: false, loading: TabFallback },
+);
+
+/** 两个导出弹窗只在打开时才加载，不进首屏包。 */
+const AtsExportDialog = dynamic(
+  () =>
+    import("@/components/resume/AtsExportDialog").then(
+      (mod) => mod.AtsExportDialog,
+    ),
+  { ssr: false },
+);
+
+const OnePageFitDialog = dynamic(
+  () =>
+    import("@/components/resume/OnePageFitDialog").then(
+      (mod) => mod.OnePageFitDialog,
+    ),
+  { ssr: false },
+);
+
+const AgentWorkbench = dynamic(
+  () =>
+    import("@/components/jobs/AgentWorkbench").then((mod) => mod.AgentWorkbench),
+  { ssr: false, loading: TabFallback },
+);
 type MobilePane = "form" | "preview";
 type Notice = { type: "ok" | "error"; message: string } | null;
 
@@ -727,7 +763,7 @@ function ResumeWorkspace() {
               <span className="block text-[14px] font-semibold tracking-tight text-zinc-900">
                 简历工坊
               </span>
-              <span className="block text-[9.5px] tracking-[0.16em] text-zinc-400">
+              <span className="block text-[9.5px] tracking-[0.16em] text-zinc-500">
                 RESUME WORKSHOP
               </span>
             </span>
@@ -984,7 +1020,7 @@ function ResumeWorkspace() {
                       ↷ 重做
                     </Button>
                   </div>
-                  <span className="hidden text-[11px] text-zinc-400 sm:inline">
+                  <span className="hidden text-[11px] text-zinc-500 sm:inline">
                     Ctrl+Z 撤销 · Ctrl+Shift+Z 重做
                   </span>
                 </div>
@@ -997,7 +1033,7 @@ function ResumeWorkspace() {
                   aiOpenRequest={aiOpenRequest}
                   onAiOpenConsumed={() => setAiOpenRequest(0)}
                 />
-                <p className="mt-4 flex items-center gap-1.5 px-1 text-[11px] text-zinc-400">
+                <p className="mt-4 flex items-center gap-1.5 px-1 text-[11px] text-zinc-500">
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${
                       isSample
@@ -1075,7 +1111,7 @@ function ResumeWorkspace() {
                       className={`rounded-lg border px-2.5 py-1.5 text-[11.5px] font-medium transition ${
                         showPageNumbers
                           ? "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400"
-                          : "border-zinc-200 bg-transparent text-zinc-400 hover:text-zinc-600"
+                          : "border-zinc-200 bg-transparent text-zinc-500 hover:text-zinc-600"
                       }`}
                     >
                       页码 {showPageNumbers ? "开" : "关"}
@@ -1146,7 +1182,7 @@ function ResumeWorkspace() {
         )}
       </main>
 
-      <footer className="print-hide mx-auto w-full max-w-[1500px] px-4 pb-8 text-[11px] text-zinc-400 lg:px-6">
+      <footer className="print-hide mx-auto w-full max-w-[1500px] px-4 pb-8 text-[11px] text-zinc-500 lg:px-6">
         数据仅保存在本机浏览器 · 导出 JSON 可备份或迁移 · 求职推荐基于本地岗位画像
       </footer>
 

@@ -280,7 +280,8 @@ body {
   }
 
   /* 打印对比度：浅灰日期 / 链接在纸面上偏淡，统一压深一档 */
-  #resume-print [class*="text-zinc-400"] {
+  #resume-print [class*="text-zinc-400"],
+  #resume-print [class*="text-zinc-500"] {
     color: #52525b !important;
   }
 

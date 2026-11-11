@@ -21,7 +21,7 @@ export function AppSkeleton() {
               <div className="text-[14px] font-semibold tracking-tight text-zinc-900">
                 简历工坊
               </div>
-              <div className="text-[10px] tracking-[0.2em] text-zinc-400">
+              <div className="text-[10px] tracking-[0.2em] text-zinc-500">
                 RESUME WORKSHOP
               </div>
             </div>
@@ -31,10 +31,10 @@ export function AppSkeleton() {
             <span className="rounded-full bg-zinc-900 px-4 py-1.5 text-[12px] font-medium text-white">
               编辑简历
             </span>
-            <span className="px-4 py-1.5 text-[12px] font-medium text-zinc-400">
+            <span className="px-4 py-1.5 text-[12px] font-medium text-zinc-500">
               职位推荐
             </span>
-            <span className="px-4 py-1.5 text-[12px] font-medium text-zinc-400">
+            <span className="px-4 py-1.5 text-[12px] font-medium text-zinc-500">
               AI 工作台
             </span>
           </div>
@@ -48,7 +48,7 @@ export function AppSkeleton() {
       </header>
 
       <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-6 lg:px-6">
-        <p className="mb-4 text-[11px] tracking-[0.18em] text-zinc-400">
+        <p className="mb-4 text-[11px] tracking-[0.18em] text-zinc-500">
           LOADING · 正在载入你的简历
         </p>
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
@@ -86,7 +86,7 @@ export function AppSkeleton() {
         </div>
       </main>
 
-      <footer className="mx-auto w-full max-w-[1500px] px-4 pb-8 text-[11px] text-zinc-400 lg:px-6">
+      <footer className="mx-auto w-full max-w-[1500px] px-4 pb-8 text-[11px] text-zinc-500 lg:px-6">
         数据仅保存在本机浏览器 · 导出 JSON 可备份或迁移
       </footer>
     </div>

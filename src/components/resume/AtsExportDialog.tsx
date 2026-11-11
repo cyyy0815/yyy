@@ -56,7 +56,7 @@ export function AtsExportDialog({ onClose, title, resume }: Props) {
       onClose={onClose}
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[10.5px] text-zinc-400">
+          <p className="text-[10.5px] text-zinc-500">
             文件编码为 UTF-8，可直接上传或粘贴到招聘系统。
           </p>
           <div className="ml-auto flex items-center gap-2">
@@ -98,7 +98,7 @@ export function AtsExportDialog({ onClose, title, resume }: Props) {
                 </button>
               ))}
             </div>
-            <span className="text-[11px] text-zinc-400">
+            <span className="text-[11px] text-zinc-500">
               纯文本适合 ATS 与在线表单，Markdown 适合人工阅读
             </span>
           </div>
@@ -133,7 +133,7 @@ export function AtsExportDialog({ onClose, title, resume }: Props) {
                 placeholder="粘贴岗位描述，检查导出文本的关键词覆盖"
                 className="w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[11.5px] leading-5 text-zinc-800 transition focus:border-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-700/10"
               />
-              <p className="mt-1 text-[10.5px] leading-4 text-zinc-400">
+              <p className="mt-1 text-[10.5px] leading-4 text-zinc-500">
                 自动读取职位推荐页保存的 JD，修改只影响本次检查。
               </p>
 
@@ -197,7 +197,7 @@ export function AtsExportDialog({ onClose, title, resume }: Props) {
                     粘贴目标 JD 后，会检查导出文本里是否出现对应关键词。
                   </p>
                 )}
-                <p className="mt-2 text-[10px] leading-4 text-zinc-400">
+                <p className="mt-2 text-[10px] leading-4 text-zinc-500">
                   只检查关键词是否出现，不代表真实技能水平。
                 </p>
               </div>

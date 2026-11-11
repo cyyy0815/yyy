@@ -34,7 +34,7 @@ export function ResumeDocumentsBar({
       className="print-hide mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2"
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="shrink-0 text-[11px] font-medium tracking-wide text-zinc-400">
+        <span className="shrink-0 text-[11px] font-medium tracking-wide text-zinc-500">
           简历
         </span>
         <select
@@ -49,7 +49,7 @@ export function ResumeDocumentsBar({
             </option>
           ))}
         </select>
-        <span className="hidden shrink-0 text-[11px] text-zinc-400 sm:inline">
+        <span className="hidden shrink-0 text-[11px] text-zinc-500 sm:inline">
           共 {documents.length} 份
         </span>
       </div>

@@ -124,7 +124,7 @@ export function CustomSectionsEditor({ sections, onChange, onDelete }: Props) {
       description="证书、获奖、语言、校园经历、作品集等；可隐藏或调整顺序"
     >
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-[11px] text-zinc-400">快速添加</span>
+        <span className="mr-1 text-[11px] text-zinc-500">快速添加</span>
         {PRESETS.map((title) => {
           const exists = sections.some(
             (section) => section.title.trim() === title,
@@ -148,7 +148,7 @@ export function CustomSectionsEditor({ sections, onChange, onDelete }: Props) {
       </div>
 
       {sections.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-zinc-200 px-4 py-5 text-center text-[12px] text-zinc-400">
+        <p className="rounded-xl border border-dashed border-zinc-200 px-4 py-5 text-center text-[12px] text-zinc-500">
           还没有自定义板块。证书、语言或作品集可以放在这里。
         </p>
       ) : (
@@ -174,7 +174,7 @@ export function CustomSectionsEditor({ sections, onChange, onDelete }: Props) {
                     }
                     className="h-8 min-w-[120px] flex-1 border-transparent bg-transparent px-1.5 text-[13px] font-semibold shadow-none focus:border-zinc-300 focus:ring-0"
                   />
-                  <span className="px-1 text-[10.5px] text-zinc-400">
+                  <span className="px-1 text-[10.5px] text-zinc-500">
                     {section.items.length} 条
                   </span>
                   <Button
@@ -231,7 +231,7 @@ export function CustomSectionsEditor({ sections, onChange, onDelete }: Props) {
 
                 <div className="space-y-3 p-3">
                   {section.items.length === 0 ? (
-                    <p className="text-center text-[11.5px] text-zinc-400">
+                    <p className="text-center text-[11.5px] text-zinc-500">
                       还没有条目，点下方按钮添加。
                     </p>
                   ) : null}
@@ -243,7 +243,7 @@ export function CustomSectionsEditor({ sections, onChange, onDelete }: Props) {
                       className="rounded-lg border border-zinc-200/80 bg-white p-3"
                     >
                       <div className="mb-2 flex items-center gap-1">
-                        <span className="text-[11px] font-medium text-zinc-400">
+                        <span className="text-[11px] font-medium text-zinc-500">
                           条目 {itemIndex + 1}
                         </span>
                         <div className="ml-auto flex items-center gap-0.5">

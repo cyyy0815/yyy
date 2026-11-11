@@ -14,7 +14,7 @@ export function ThemePicker({
 
   return (
     <div className="flex items-center gap-2" role="group" aria-label="主题色">
-      <span className="hidden text-[11px] text-zinc-400 sm:inline">主题色</span>
+      <span className="hidden text-[11px] text-zinc-500 sm:inline">主题色</span>
       <div className="flex items-center gap-1.5">
         {ACCENT_PRESETS.map((preset) => {
           const selected = active === preset.value;
@@ -39,7 +39,7 @@ export function ThemePicker({
           title="自定义颜色"
           className={`relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border border-dashed transition ${
             isPreset
-              ? "border-zinc-300 text-zinc-400 hover:border-zinc-400"
+              ? "border-zinc-300 text-zinc-500 hover:border-zinc-400"
               : "border-transparent ring-2 ring-zinc-900 ring-offset-2"
           }`}
           style={isPreset ? undefined : { backgroundColor: active }}

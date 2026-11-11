@@ -48,7 +48,7 @@ const STATUS_LABEL: Record<AgentStepStatus, string> = {
 };
 
 const STATUS_TONE: Record<AgentStepStatus, string> = {
-  pending: "text-zinc-400",
+  pending: "text-zinc-500",
   running: "text-blue-600",
   done: "text-emerald-600",
   skipped: "text-amber-600",
@@ -632,7 +632,7 @@ export function JobAgentPanel({ resume, onChange, job, onClose }: Props) {
             className="rounded-xl border border-zinc-200 bg-white px-3 py-2"
             data-qa="agent-trace"
           >
-            <p className="text-[10.5px] font-medium uppercase tracking-wide text-zinc-400">
+            <p className="text-[10.5px] font-medium uppercase tracking-wide text-zinc-500">
               工具调用轨迹
             </p>
             <ul className="mt-1 space-y-1">
@@ -647,7 +647,7 @@ export function JobAgentPanel({ resume, onChange, job, onClose }: Props) {
                   <span className={STATUS_TONE[entry.status]}>
                     {STATUS_LABEL[entry.status]}
                   </span>
-                  <span className="text-zinc-400">{entry.durationMs} ms</span>
+                  <span className="text-zinc-500">{entry.durationMs} ms</span>
                   <span>{entry.summary}</span>
                 </li>
               ))}

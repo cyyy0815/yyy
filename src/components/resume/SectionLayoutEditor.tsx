@@ -74,12 +74,12 @@ export function SectionLayoutEditor({ resume, onChange }: Props) {
               <div className="min-w-0 flex-1">
                 <p
                   className={`text-[12.5px] font-medium ${
-                    visible ? "text-zinc-800" : "text-zinc-400"
+                    visible ? "text-zinc-800" : "text-zinc-500"
                   }`}
                 >
                   {label}
                 </p>
-                <p className="mt-0.5 truncate text-[10.5px] text-zinc-400">
+                <p className="mt-0.5 truncate text-[10.5px] text-zinc-500">
                   {filled ? sectionSummary(resume, key) : "未填写"}
                 </p>
               </div>
@@ -124,7 +124,7 @@ export function SectionLayoutEditor({ resume, onChange }: Props) {
           );
         })}
       </div>
-      <p className="mt-2.5 text-[10.5px] leading-4 text-zinc-400">
+      <p className="mt-2.5 text-[10.5px] leading-4 text-zinc-500">
         隐藏只影响预览、打印与 ATS 导出，内容不会被删除。现代 / 侧栏模板的求职意向、技能、教育固定在侧栏；经典 / 紧凑 / 时间轴模板不展示求职意向。
       </p>
     </SectionCard>

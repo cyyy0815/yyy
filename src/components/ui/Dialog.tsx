@@ -201,7 +201,7 @@ export function Dialog({
             onClick={() => onCloseRef.current()}
             aria-label="关闭"
             data-qa={closeDataQa}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[16px] leading-none text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[16px] leading-none text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700"
           >
             ×
           </button>

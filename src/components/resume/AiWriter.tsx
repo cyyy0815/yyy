@@ -874,7 +874,7 @@ export function AiWriter({
           onClose={closeDialog}
           footer={
             <>
-              <p className="text-[11px] leading-4 text-zinc-400">
+              <p className="text-[11px] leading-4 text-zinc-500">
                 {fullMode
                   ? "只发送这段自述、目标岗位与参考 JD，不发送姓名、电话、邮箱或任何已有简历内容。"
                   : `只发送本面板内容、当前板块文本${
@@ -943,7 +943,7 @@ export function AiWriter({
           }
         >
               {statusLoading || (!status && !statusError) ? (
-                <p className="py-8 text-center text-[12.5px] text-zinc-400">
+                <p className="py-8 text-center text-[12.5px] text-zinc-500">
                   正在检查 AI 配置…
                 </p>
               ) : statusError ? (
@@ -1026,7 +1026,7 @@ export function AiWriter({
 
                   <p
                     data-qa="ai-language-hint"
-                    className="-mt-1 text-[11px] leading-4 text-zinc-400"
+                    className="-mt-1 text-[11px] leading-4 text-zinc-500"
                   >
                     输出语言：{languageLabel}（跟随简历语言）
                     {language === "bilingual"
@@ -1072,7 +1072,7 @@ export function AiWriter({
                         </Select>
                       </Field>
                       {targetId === "new" ? (
-                        <p className="-mt-1 text-[11px] leading-4 text-zinc-400">
+                        <p className="-mt-1 text-[11px] leading-4 text-zinc-500">
                           {NEW_ENTRY_HINTS[section]}
                         </p>
                       ) : null}
@@ -1210,7 +1210,7 @@ export function AiWriter({
                       </Button>
                     ) : null}
                     {status?.model ? (
-                      <span className="ml-auto text-[11px] text-zinc-400">
+                      <span className="ml-auto text-[11px] text-zinc-500">
                         {fullMode ? "一次生成，约 10–20 秒" : status.model}
                       </span>
                     ) : null}
@@ -1238,7 +1238,7 @@ export function AiWriter({
                             warnings={fullWarnings}
                             sourceLabel="自述"
                           />
-                          <p className="text-[10.5px] leading-4 text-zinc-400">
+                          <p className="text-[10.5px] leading-4 text-zinc-500">
                             采用后会新建一份简历并切换过去，当前简历保留在顶部列表里。姓名、电话、邮箱不会由 AI 生成，请在新简历里补充。
                           </p>
                         </>
@@ -1257,7 +1257,7 @@ export function AiWriter({
                     </div>
                   ) : (
                     <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3">
-                      <div className="mb-1.5 flex items-center justify-between text-[11px] text-zinc-400">
+                      <div className="mb-1.5 flex items-center justify-between text-[11px] text-zinc-500">
                         <span>
                           生成预览 · {languageLabel}
                           {draft && !streaming ? "（可直接修改）" : ""}
@@ -1274,7 +1274,7 @@ export function AiWriter({
                             className="space-y-2"
                             data-qa="ai-bilingual-preview"
                           >
-                            <label className="block text-[11px] text-zinc-400">
+                            <label className="block text-[11px] text-zinc-500">
                               中文
                               <textarea
                                 value={draft.zh}
@@ -1289,7 +1289,7 @@ export function AiWriter({
                                 className="mt-1 min-h-[88px] w-full resize-y rounded-lg border border-zinc-200 bg-white p-2 text-[13px] leading-6 text-zinc-800 outline-none"
                               />
                             </label>
-                            <label className="block text-[11px] text-zinc-400">
+                            <label className="block text-[11px] text-zinc-500">
                               English
                               <textarea
                                 value={draft.en}
@@ -1370,12 +1370,12 @@ function PreviewCard({
 }) {
   return (
     <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3">
-      <p className="mb-1.5 text-[11px] text-zinc-400">
+      <p className="mb-1.5 text-[11px] text-zinc-500">
         {title}
         {empty ? " · 未提及" : ""}
       </p>
       <div className="space-y-1.5 text-[13px] leading-6 text-zinc-800">
-        {empty ? <span className="text-zinc-400">待补充</span> : children}
+        {empty ? <span className="text-zinc-500">待补充</span> : children}
       </div>
     </div>
   );
@@ -1409,7 +1409,7 @@ function FullResumePreview({
               ])}
             </p>
             {dateRange(item.start, item.end) ? (
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-[11px] text-zinc-500">
                 {dateRange(item.start, item.end)}
               </p>
             ) : null}
@@ -1441,14 +1441,14 @@ function FullResumePreview({
               {joinMeta([item.company || "公司待补充", item.role])}
             </p>
             {dateRange(item.start, item.end) ? (
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-[11px] text-zinc-500">
                 {dateRange(item.start, item.end)}
               </p>
             ) : null}
             {item.description ? (
               <p className="whitespace-pre-wrap">{item.description}</p>
             ) : (
-              <p className="text-[12px] text-zinc-400">工作内容待补充</p>
+              <p className="text-[12px] text-zinc-500">工作内容待补充</p>
             )}
           </div>
         ))}
@@ -1464,14 +1464,14 @@ function FullResumePreview({
               {joinMeta([item.name || "项目名待补充", item.role])}
             </p>
             {dateRange(item.start, item.end) ? (
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-[11px] text-zinc-500">
                 {dateRange(item.start, item.end)}
               </p>
             ) : null}
             {item.description ? (
               <p className="whitespace-pre-wrap">{item.description}</p>
             ) : (
-              <p className="text-[12px] text-zinc-400">项目内容待补充</p>
+              <p className="text-[12px] text-zinc-500">项目内容待补充</p>
             )}
           </div>
         ))}

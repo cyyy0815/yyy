@@ -544,7 +544,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
                 <SkillChips
                   resume={resume}
                   chipClassName="resume-soft rounded px-1.5 py-0.5 text-[9.5px] leading-[1.5] text-zinc-600"
-                  titleClassName="mb-0.5 text-[9px] font-medium text-zinc-400"
+                  titleClassName="mb-0.5 text-[9px] font-medium text-zinc-500"
                 />
               </section>
             ) : null}
@@ -561,7 +561,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
                       <p className="text-[10px] leading-[1.6] text-zinc-500">
                         {[item.major, item.degree].filter(Boolean).join(" · ")}
                       </p>
-                      <p className="text-[9.5px] tabular-nums text-zinc-400">
+                      <p className="text-[9.5px] tabular-nums text-zinc-500">
                         {range(item.start, item.end)}
                       </p>
                       <EducationDetails
@@ -609,7 +609,7 @@ function ModernTemplate({ resume }: { resume: Resume }) {
                           <span className="text-zinc-600"> · {item.company}</span>
                         ) : null}
                       </p>
-                      <span className="shrink-0 text-[10px] tabular-nums text-zinc-400">
+                      <span className="shrink-0 text-[10px] tabular-nums text-zinc-500">
                         {range(item.start, item.end)}
                       </span>
                     </div>
@@ -647,12 +647,12 @@ function ModernTemplate({ resume }: { resume: Resume }) {
                       {item.link || item.start || item.end ? (
                         <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
                           {range(item.start, item.end) ? (
-                            <span className="text-[9.5px] tabular-nums text-zinc-400">
+                            <span className="text-[9.5px] tabular-nums text-zinc-500">
                               {range(item.start, item.end)}
                             </span>
                           ) : null}
                           {item.link ? (
-                            <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
+                            <span className="max-w-[50mm] break-all text-[9px] text-zinc-500">
                               <ResumeLink value={item.link} />
                             </span>
                           ) : null}
@@ -681,9 +681,9 @@ function ModernTemplate({ resume }: { resume: Resume }) {
                 section={section}
                 titleClassName="text-[12px] leading-snug"
                 subtitleClassName="text-zinc-500"
-                dateClassName="text-[9.5px] text-zinc-400"
+                dateClassName="text-[9.5px] text-zinc-500"
                 bodyClassName="mt-1 text-[11px] leading-[1.7] text-zinc-600"
-                linkClassName="mt-0.5 text-[9px] text-zinc-400"
+                linkClassName="mt-0.5 text-[9px] text-zinc-500"
               />
             </section>
           ))}
@@ -791,7 +791,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
                       <span className="text-zinc-600"> / {item.role}</span>
                     ) : null}
                   </p>
-                  <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-400">
+                  <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-500">
                     {range(item.start, item.end)}
                   </span>
                 </div>
@@ -829,12 +829,12 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
                   {item.link || item.start || item.end ? (
                     <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
                       {range(item.start, item.end) ? (
-                        <span className="text-[9px] tabular-nums text-zinc-400">
+                        <span className="text-[9px] tabular-nums text-zinc-500">
                           {range(item.start, item.end)}
                         </span>
                       ) : null}
                       {item.link ? (
-                        <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
+                        <span className="max-w-[50mm] break-all text-[9px] text-zinc-500">
                           <ResumeLink value={item.link} />
                         </span>
                       ) : null}
@@ -859,9 +859,9 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
             section={section}
             titleClassName="text-[11.5px] leading-snug"
             subtitleClassName="text-zinc-600"
-            dateClassName="text-[9.5px] text-zinc-400"
+            dateClassName="text-[9.5px] text-zinc-500"
             bodyClassName="mt-1 text-[10.5px] leading-[1.8] text-zinc-600"
-            linkClassName="mt-0.5 text-[9px] text-zinc-400"
+            linkClassName="mt-0.5 text-[9px] text-zinc-500"
             gapClassName="space-y-3"
           />
         </section>
@@ -884,7 +884,7 @@ function ClassicTemplate({ resume }: { resume: Resume }) {
                         : ""}
                     </span>
                   </p>
-                  <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-400">
+                  <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-500">
                     {range(item.start, item.end)}
                   </span>
                 </div>
@@ -1000,7 +1000,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
                       <span className="text-zinc-600"> ｜ {item.role}</span>
                     ) : null}
                   </p>
-                  <span className="shrink-0 text-[9px] tabular-nums text-zinc-400">
+                  <span className="shrink-0 text-[9px] tabular-nums text-zinc-500">
                     {range(item.start, item.end)}
                   </span>
                 </div>
@@ -1038,12 +1038,12 @@ function CompactTemplate({ resume }: { resume: Resume }) {
                   {item.link || item.start || item.end ? (
                     <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
                       {range(item.start, item.end) ? (
-                        <span className="text-[8.5px] tabular-nums text-zinc-400">
+                        <span className="text-[8.5px] tabular-nums text-zinc-500">
                           {range(item.start, item.end)}
                         </span>
                       ) : null}
                       {item.link ? (
-                        <span className="max-w-[45mm] break-all text-[8.5px] text-zinc-400">
+                        <span className="max-w-[45mm] break-all text-[8.5px] text-zinc-500">
                           <ResumeLink value={item.link} />
                         </span>
                       ) : null}
@@ -1068,9 +1068,9 @@ function CompactTemplate({ resume }: { resume: Resume }) {
             section={section}
             titleClassName="text-[10.5px] leading-snug"
             subtitleClassName="text-zinc-500"
-            dateClassName="text-[8.5px] text-zinc-400"
+            dateClassName="text-[8.5px] text-zinc-500"
             bodyClassName="mt-0.5 text-[9.5px] leading-[1.65] text-zinc-600"
-            linkClassName="mt-0.5 text-[8.5px] text-zinc-400"
+            linkClassName="mt-0.5 text-[8.5px] text-zinc-500"
             gapClassName="space-y-2"
           />
         </section>
@@ -1089,7 +1089,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
                 <div key={item.id} className="break-inside-avoid">
                   <p className="text-[10px] font-medium text-zinc-800">
                     {item.school || "学校名称"}
-                    <span className="ml-1 font-normal text-zinc-400">
+                    <span className="ml-1 font-normal text-zinc-500">
                       {range(item.start, item.end)}
                     </span>
                   </p>
@@ -1277,7 +1277,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
                         <span className="text-zinc-600"> · {item.company}</span>
                       ) : null}
                     </p>
-                    <span className="shrink-0 text-[10px] tabular-nums text-zinc-400">
+                    <span className="shrink-0 text-[10px] tabular-nums text-zinc-500">
                       {range(item.start, item.end)}
                     </span>
                   </div>
@@ -1315,12 +1315,12 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
                     {item.link || item.start || item.end ? (
                       <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
                         {range(item.start, item.end) ? (
-                          <span className="text-[9.5px] tabular-nums text-zinc-400">
+                          <span className="text-[9.5px] tabular-nums text-zinc-500">
                             {range(item.start, item.end)}
                           </span>
                         ) : null}
                         {item.link ? (
-                          <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
+                          <span className="max-w-[50mm] break-all text-[9px] text-zinc-500">
                             <ResumeLink value={item.link} />
                           </span>
                         ) : null}
@@ -1349,9 +1349,9 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
               section={section}
               titleClassName="text-[12px] leading-snug"
               subtitleClassName="text-zinc-500"
-              dateClassName="text-[9.5px] text-zinc-400"
+              dateClassName="text-[9.5px] text-zinc-500"
               bodyClassName="mt-1 text-[11px] leading-[1.7] text-zinc-600"
-              linkClassName="mt-0.5 text-[9px] text-zinc-400"
+              linkClassName="mt-0.5 text-[9px] text-zinc-500"
             />
           </section>
         ))}
@@ -1444,7 +1444,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
                       <span className="text-zinc-600"> · {item.company}</span>
                     ) : null}
                   </p>
-                  <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-400">
+                  <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-500">
                     {range(item.start, item.end)}
                   </span>
                 </div>
@@ -1486,12 +1486,12 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
                   {item.link || item.start || item.end ? (
                     <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
                       {range(item.start, item.end) ? (
-                        <span className="text-[9px] tabular-nums text-zinc-400">
+                        <span className="text-[9px] tabular-nums text-zinc-500">
                           {range(item.start, item.end)}
                         </span>
                       ) : null}
                       {item.link ? (
-                        <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
+                        <span className="max-w-[50mm] break-all text-[9px] text-zinc-500">
                           <ResumeLink value={item.link} />
                         </span>
                       ) : null}
@@ -1516,9 +1516,9 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
             section={section}
             titleClassName="text-[12px] leading-snug"
             subtitleClassName="text-zinc-500"
-            dateClassName="text-[9.5px] text-zinc-400"
+            dateClassName="text-[9.5px] text-zinc-500"
             bodyClassName="mt-1 text-[11px] leading-[1.7] text-zinc-600"
-            linkClassName="mt-0.5 text-[9px] text-zinc-400"
+            linkClassName="mt-0.5 text-[9px] text-zinc-500"
           />
         </section>
       ))}
@@ -1545,7 +1545,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
                         </span>
                       ) : null}
                     </p>
-                    <p className="text-[9px] tabular-nums text-zinc-400">
+                    <p className="text-[9px] tabular-nums text-zinc-500">
                       {range(item.start, item.end)}
                     </p>
                     <EducationDetails
@@ -1565,7 +1565,7 @@ function TimelineTemplate({ resume }: { resume: Resume }) {
               <SkillChips
                 resume={resume}
                 chipClassName="resume-soft rounded px-1.5 py-0.5 text-[9.5px] leading-[1.5] text-zinc-600"
-                titleClassName="mb-0.5 text-[9px] font-medium text-zinc-400"
+                titleClassName="mb-0.5 text-[9px] font-medium text-zinc-500"
               />
             </section>
           ) : null}
@@ -1667,7 +1667,7 @@ function MinimalTemplate({ resume }: { resume: Resume }) {
                         <span className="text-zinc-500"> · {item.company}</span>
                       ) : null}
                     </p>
-                    <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-400">
+                    <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-500">
                       {range(item.start, item.end)}
                     </span>
                   </div>
@@ -1705,12 +1705,12 @@ function MinimalTemplate({ resume }: { resume: Resume }) {
                     {item.link || item.start || item.end ? (
                       <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
                         {range(item.start, item.end) ? (
-                          <span className="text-[9px] tabular-nums text-zinc-400">
+                          <span className="text-[9px] tabular-nums text-zinc-500">
                             {range(item.start, item.end)}
                           </span>
                         ) : null}
                         {item.link ? (
-                          <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
+                          <span className="max-w-[50mm] break-all text-[9px] text-zinc-500">
                             <ResumeLink value={item.link} />
                           </span>
                         ) : null}
@@ -1736,9 +1736,9 @@ function MinimalTemplate({ resume }: { resume: Resume }) {
               section={section}
               titleClassName="text-[11px] leading-snug"
               subtitleClassName="text-zinc-500"
-              dateClassName="text-[9px] text-zinc-400"
+              dateClassName="text-[9px] text-zinc-500"
               bodyClassName="mt-0.5 text-[10.5px] leading-[1.8] text-zinc-600"
-              linkClassName="mt-0.5 text-[9px] text-zinc-400"
+              linkClassName="mt-0.5 text-[9px] text-zinc-500"
             />
           </section>
         ))}
@@ -1761,7 +1761,7 @@ function MinimalTemplate({ resume }: { resume: Resume }) {
                         </span>
                       ) : null}
                     </p>
-                    <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-400">
+                    <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-500">
                       {range(item.start, item.end)}
                     </span>
                   </div>
@@ -1907,7 +1907,7 @@ function AcademicTemplate({ resume }: { resume: Resume }) {
                         <span className="text-zinc-600"> · {item.role}</span>
                       ) : null}
                     </p>
-                    <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-400">
+                    <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-500">
                       {range(item.start, item.end)}
                     </span>
                   </div>
@@ -1945,12 +1945,12 @@ function AcademicTemplate({ resume }: { resume: Resume }) {
                     {item.link || item.start || item.end ? (
                       <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
                         {range(item.start, item.end) ? (
-                          <span className="text-[9px] tabular-nums text-zinc-400">
+                          <span className="text-[9px] tabular-nums text-zinc-500">
                             {range(item.start, item.end)}
                           </span>
                         ) : null}
                         {item.link ? (
-                          <span className="max-w-[50mm] break-all text-[9px] text-zinc-400">
+                          <span className="max-w-[50mm] break-all text-[9px] text-zinc-500">
                             <ResumeLink value={item.link} />
                           </span>
                         ) : null}
@@ -1976,9 +1976,9 @@ function AcademicTemplate({ resume }: { resume: Resume }) {
               section={section}
               titleClassName="text-[10.8px] leading-snug"
               subtitleClassName="text-zinc-600"
-              dateClassName="text-[9px] text-zinc-400"
+              dateClassName="text-[9px] text-zinc-500"
               bodyClassName="mt-0.5 text-[10.5px] leading-[1.8] text-zinc-600"
-              linkClassName="mt-0.5 text-[9px] text-zinc-400"
+              linkClassName="mt-0.5 text-[9px] text-zinc-500"
             />
           </section>
         ))}
@@ -2001,7 +2001,7 @@ function AcademicTemplate({ resume }: { resume: Resume }) {
                         </span>
                       ) : null}
                     </p>
-                    <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-400">
+                    <span className="shrink-0 text-[9.5px] tabular-nums text-zinc-500">
                       {range(item.start, item.end)}
                     </span>
                   </div>
@@ -2153,7 +2153,7 @@ function CardTemplate({ resume }: { resume: Resume }) {
                           <span className="text-zinc-500"> · {item.company}</span>
                         ) : null}
                       </p>
-                      <span className="shrink-0 text-[9px] tabular-nums text-zinc-400">
+                      <span className="shrink-0 text-[9px] tabular-nums text-zinc-500">
                         {range(item.start, item.end)}
                       </span>
                     </div>
@@ -2196,12 +2196,12 @@ function CardTemplate({ resume }: { resume: Resume }) {
                       {item.link || item.start || item.end ? (
                         <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
                           {range(item.start, item.end) ? (
-                            <span className="text-[8.5px] tabular-nums text-zinc-400">
+                            <span className="text-[8.5px] tabular-nums text-zinc-500">
                               {range(item.start, item.end)}
                             </span>
                           ) : null}
                           {item.link ? (
-                            <span className="max-w-[45mm] break-all text-[8.5px] text-zinc-400">
+                            <span className="max-w-[45mm] break-all text-[8.5px] text-zinc-500">
                               <ResumeLink value={item.link} />
                             </span>
                           ) : null}
@@ -2229,9 +2229,9 @@ function CardTemplate({ resume }: { resume: Resume }) {
                 section={section}
                 titleClassName="text-[10.8px] leading-snug"
                 subtitleClassName="text-zinc-500"
-                dateClassName="text-[8.5px] text-zinc-400"
+                dateClassName="text-[8.5px] text-zinc-500"
                 bodyClassName="mt-0.5 text-[10px] leading-[1.7] text-zinc-600"
-                linkClassName="mt-0.5 text-[8.5px] text-zinc-400"
+                linkClassName="mt-0.5 text-[8.5px] text-zinc-500"
                 gapClassName="space-y-2"
               />
             </section>
@@ -2259,7 +2259,7 @@ function CardTemplate({ resume }: { resume: Resume }) {
                             : ""}
                         </span>
                       </p>
-                      <span className="shrink-0 text-[9px] tabular-nums text-zinc-400">
+                      <span className="shrink-0 text-[9px] tabular-nums text-zinc-500">
                         {range(item.start, item.end)}
                       </span>
                     </div>
@@ -2283,7 +2283,7 @@ function CardTemplate({ resume }: { resume: Resume }) {
               <SkillChips
                 resume={resume}
                 chipClassName="resume-soft rounded px-1.5 py-0.5 text-[9.5px] leading-[1.5] text-zinc-700"
-                titleClassName="mb-1 text-[8.5px] font-medium tracking-wide text-zinc-400"
+                titleClassName="mb-1 text-[8.5px] font-medium tracking-wide text-zinc-500"
               />
             </section>
           ) : null}

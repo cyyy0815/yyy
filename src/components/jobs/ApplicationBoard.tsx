@@ -99,7 +99,7 @@ function Card({
       </div>
 
       {meta.length > 0 ? (
-        <p className="mt-2 text-[10.5px] leading-4 text-zinc-400">
+        <p className="mt-2 text-[10.5px] leading-4 text-zinc-500">
           {meta.join(" · ")}
         </p>
       ) : null}
@@ -119,7 +119,7 @@ function Card({
       {expanded ? (
         <div className="mt-3 space-y-3 border-t border-zinc-100 pt-3">
           <div>
-            <p className="text-[10px] font-medium tracking-wide text-zinc-400">
+            <p className="text-[10px] font-medium tracking-wide text-zinc-500">
               JD
             </p>
             <p className="mt-1 max-h-56 overflow-y-auto whitespace-pre-wrap text-[11.5px] leading-5 text-zinc-600">
@@ -139,7 +139,7 @@ function Card({
           </div>
           {application.coverLetter ? (
             <div>
-              <p className="text-[10px] font-medium tracking-wide text-zinc-400">
+              <p className="text-[10px] font-medium tracking-wide text-zinc-500">
                 求职信
               </p>
               <p className="mt-1 max-h-56 overflow-y-auto whitespace-pre-wrap text-[11.5px] leading-5 text-zinc-600">
@@ -149,7 +149,7 @@ function Card({
           ) : null}
           {application.note ? (
             <div>
-              <p className="text-[10px] font-medium tracking-wide text-zinc-400">
+              <p className="text-[10px] font-medium tracking-wide text-zinc-500">
                 备注
               </p>
               <p className="mt-1 whitespace-pre-wrap text-[11.5px] leading-5 text-zinc-600">
@@ -379,7 +379,7 @@ export function ApplicationBoard({ resumeTitle }: { resumeTitle: string }) {
                   />
                   {column.label}
                 </span>
-                <span className="text-[10.5px] tabular-nums text-zinc-400">
+                <span className="text-[10.5px] tabular-nums text-zinc-500">
                   {column.items.length}
                 </span>
               </div>
@@ -404,7 +404,7 @@ export function ApplicationBoard({ resumeTitle }: { resumeTitle: string }) {
                     />
                   ))
                 ) : (
-                  <p className="rounded-xl border border-dashed border-zinc-200 px-2 py-4 text-center text-[10.5px] text-zinc-400">
+                  <p className="rounded-xl border border-dashed border-zinc-200 px-2 py-4 text-center text-[10.5px] text-zinc-500">
                     {column.hint}
                   </p>
                 )}
@@ -413,7 +413,7 @@ export function ApplicationBoard({ resumeTitle }: { resumeTitle: string }) {
           ))}
         </div>
 
-        <p className="mt-4 text-[10.5px] leading-5 text-zinc-400">
+        <p className="mt-4 text-[10.5px] leading-5 text-zinc-500">
           提示：在 AI 求职信面板生成内容后，可以复制到「编辑投递」的求职信字段，和岗位 JD 一起保存。
         </p>
       </section>
@@ -594,7 +594,7 @@ export function ApplicationBoard({ resumeTitle }: { resumeTitle: string }) {
                 >
                   填入当前 JD
                 </Button>
-                <span className="text-[10.5px] text-zinc-400">
+                <span className="text-[10.5px] text-zinc-500">
                   「当前 JD」来自 JD 匹配面板
                 </span>
               </div>

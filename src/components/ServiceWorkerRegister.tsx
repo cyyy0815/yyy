@@ -145,7 +145,7 @@ export function ServiceWorkerRegister() {
         type="button"
         onClick={() => setDismissed(true)}
         aria-label="稍后更新"
-        className="text-zinc-400 transition hover:text-zinc-700"
+        className="text-zinc-500 transition hover:text-zinc-700"
       >
         ×
       </button>

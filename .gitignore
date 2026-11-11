@@ -52,3 +52,7 @@ extension-*.zip
 
 # 本地临时工具（cloudflared 等，npm run pack 不会包含）
 .tools/
+
+# 其他任务的临时产物，不属于本仓库
+pptwork/
+*.pptx

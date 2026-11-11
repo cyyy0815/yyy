@@ -17,7 +17,7 @@ export function LanguagePicker({
 
   return (
     <div className="flex items-center gap-2" role="group" aria-label="简历语言">
-      <span className="hidden text-[11px] text-zinc-400 sm:inline">语言</span>
+      <span className="hidden text-[11px] text-zinc-500 sm:inline">语言</span>
       <div className="flex min-w-0 max-w-full items-center overflow-x-auto rounded-lg border border-zinc-200 bg-white p-0.5">
         {RESUME_LANGUAGES.map((item) => {
           const selected = active === item.id;

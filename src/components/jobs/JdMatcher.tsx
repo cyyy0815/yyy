@@ -88,7 +88,7 @@ export function JdMatcher({
             清空
           </Button>
         ) : null}
-        <span className="text-[11px] text-zinc-400">粘贴完整 JD，结果更准</span>
+        <span className="text-[11px] text-zinc-500">粘贴完整 JD，结果更准</span>
       </div>
 
       {result ? (
@@ -106,12 +106,12 @@ export function JdMatcher({
                   >
                     {result.score}
                   </span>
-                  <span className="text-[13px] text-zinc-400">%</span>
+                  <span className="text-[13px] text-zinc-500">%</span>
                 </div>
                 <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[11.5px] text-zinc-600">
                   {result.label}
                 </span>
-                <span className="ml-auto text-[11.5px] text-zinc-400">
+                <span className="ml-auto text-[11.5px] text-zinc-500">
                   JD 关键词 {result.keywordCount} 个 · 已覆盖 {result.matched.length} 个
                 </span>
               </div>
@@ -125,7 +125,7 @@ export function JdMatcher({
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <div>
-                  <p className="mb-2 text-[11px] text-zinc-400">简历已覆盖</p>
+                  <p className="mb-2 text-[11px] text-zinc-500">简历已覆盖</p>
                   {result.matched.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
                       {result.matched.map((skill) => (
@@ -135,11 +135,11 @@ export function JdMatcher({
                       ))}
                     </div>
                   ) : (
-                    <p className="text-[12px] text-zinc-400">暂无</p>
+                    <p className="text-[12px] text-zinc-500">暂无</p>
                   )}
                 </div>
                 <div>
-                  <p className="mb-2 text-[11px] text-zinc-400">
+                  <p className="mb-2 text-[11px] text-zinc-500">
                     简历未体现
                     {result.missing.length > 0 ? (
                       <span className="ml-1 text-zinc-300">
@@ -182,7 +182,7 @@ export function JdMatcher({
                 ))}
               </ol>
 
-              <p className="mt-4 text-[10.5px] leading-5 text-zinc-400">
+              <p className="mt-4 text-[10.5px] leading-5 text-zinc-500">
                 仅基于本地技能词典与简历文本做关键词覆盖分析，不构成录用判断；建议结合岗位实际情况投递。
               </p>
             </>

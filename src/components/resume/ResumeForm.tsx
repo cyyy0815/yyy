@@ -162,7 +162,7 @@ function ItemActions({
           size="sm"
           onClick={onToggleBreak}
           aria-pressed={Boolean(breakBefore)}
-          aria-label={breakBefore ? "取消分页" : "从新的一页开始"}
+          aria-label={breakBefore ? "取消分页（分页）" : "分页：从新的一页开始"}
           title={breakBefore ? "取消分页" : "从新的一页开始"}
           className="px-2"
         >
@@ -185,7 +185,7 @@ function ItemActions({
 
 function EmptyBlock({ text }: { text: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-6 text-center text-[12px] text-zinc-400">
+    <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-6 text-center text-[12px] text-zinc-500">
       {text}
     </div>
   );
@@ -250,7 +250,7 @@ function ExperienceSection({
                   onStart={() => setDraggingId(item.id)}
                   onEnd={() => setDraggingId(null)}
                 />
-                <span className="text-[11px] font-medium tracking-wide text-zinc-400">
+                <span className="text-[11px] font-medium tracking-wide text-zinc-500">
                   经历 {String(index + 1).padStart(2, "0")}
                 </span>
               </span>
@@ -415,7 +415,7 @@ function ProjectSection({ resume, onChange, onDelete }: SectionProps) {
                   onStart={() => setDraggingId(item.id)}
                   onEnd={() => setDraggingId(null)}
                 />
-                <span className="text-[11px] font-medium tracking-wide text-zinc-400">
+                <span className="text-[11px] font-medium tracking-wide text-zinc-500">
                   项目 {String(index + 1).padStart(2, "0")}
                 </span>
               </span>
@@ -584,7 +584,7 @@ function EducationSection({ resume, onChange, onDelete }: SectionProps) {
                   onStart={() => setDraggingId(item.id)}
                   onEnd={() => setDraggingId(null)}
                 />
-                <span className="text-[11px] font-medium tracking-wide text-zinc-400">
+                <span className="text-[11px] font-medium tracking-wide text-zinc-500">
                   教育 {String(index + 1).padStart(2, "0")}
                 </span>
               </span>
@@ -779,7 +779,7 @@ function SkillChip({
       <button
         type="button"
         onClick={onRemove}
-        className="flex h-4 w-4 items-center justify-center rounded-full text-zinc-400 transition hover:bg-red-50 hover:text-red-600"
+        className="flex h-4 w-4 items-center justify-center rounded-full text-zinc-500 transition hover:bg-red-50 hover:text-red-600"
         aria-label={`删除技能 ${name}`}
       >
         ×
@@ -990,7 +990,7 @@ function SkillsSection({ resume, onChange }: EditorProps) {
           ＋ 新建分组
         </Button>
         {hasGroups ? (
-          <span className="text-[11px] text-zinc-400">
+          <span className="text-[11px] text-zinc-500">
             分组只影响简历展示；技能本身仍会被推荐匹配
           </span>
         ) : null}
@@ -1040,14 +1040,14 @@ function SkillsSection({ resume, onChange }: EditorProps) {
                     <button
                       type="button"
                       onClick={() => renameGroup(group.title)}
-                      className="rounded px-1.5 py-1 text-[11px] text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
+                      className="rounded px-1.5 py-1 text-[11px] text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700"
                     >
                       重命名
                     </button>
                     <button
                       type="button"
                       onClick={() => deleteGroup(group.title)}
-                      className="rounded px-1.5 py-1 text-[11px] text-zinc-400 transition hover:bg-red-50 hover:text-red-600"
+                      className="rounded px-1.5 py-1 text-[11px] text-zinc-500 transition hover:bg-red-50 hover:text-red-600"
                     >
                       删除分组
                     </button>
@@ -1057,7 +1057,7 @@ function SkillsSection({ resume, onChange }: EditorProps) {
               <div className="flex flex-wrap gap-1.5">
                 {group.skills.map((skill) => renderChip(skill.name))}
                 {group.skills.length === 0 ? (
-                  <span className="text-[11px] text-zinc-400">
+                  <span className="text-[11px] text-zinc-500">
                     暂无技能，在下方添加
                   </span>
                 ) : null}
@@ -1069,7 +1069,7 @@ function SkillsSection({ resume, onChange }: EditorProps) {
         <div className="flex flex-wrap gap-1.5">
           {resume.skills.map((skill) => renderChip(skill))}
           {resume.skills.length === 0 ? (
-            <span className="text-[12px] text-zinc-400">还没有技能标签</span>
+            <span className="text-[12px] text-zinc-500">还没有技能标签</span>
           ) : null}
         </div>
       )}
@@ -1127,7 +1127,7 @@ function SkillsSection({ resume, onChange }: EditorProps) {
 
       {suggestions.length > 0 ? (
         <div className="mt-4 border-t border-dashed border-zinc-200 pt-3">
-          <p className="mb-2 text-[11px] text-zinc-400">
+          <p className="mb-2 text-[11px] text-zinc-500">
             目标岗位常要求、你还没填的技能（点击添加）
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -1352,7 +1352,7 @@ export function ResumeForm({
 
       <SectionCard title="基本信息" description="让 HR 第一眼知道你是谁">
         <div className="mb-4 flex items-center gap-4 rounded-xl border border-zinc-100 bg-zinc-50/70 p-3">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white text-[10px] tracking-wide text-zinc-300">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white text-[10px] tracking-wide text-zinc-500">
             {resume.basic.photo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -1391,7 +1391,7 @@ export function ResumeForm({
                 </Button>
               ) : null}
             </div>
-            <p className="mt-1 text-[11px] leading-5 text-zinc-400">
+            <p className="mt-1 text-[11px] leading-5 text-zinc-500">
               选填。自动居中裁成正方形并压缩，只保存在本机。
             </p>
             {photoError ? (

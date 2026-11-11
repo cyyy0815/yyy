@@ -159,16 +159,16 @@ export function OnePageFitDialog({
                       <span className="min-w-0 flex-1">
                         <span
                           className={`block text-[12.5px] font-medium ${
-                            visible ? "text-zinc-800" : "text-zinc-400"
+                            visible ? "text-zinc-800" : "text-zinc-500"
                           }`}
                         >
                           {SECTION_LABELS[key]}
                         </span>
-                        <span className="mt-0.5 block truncate text-[10.5px] text-zinc-400">
+                        <span className="mt-0.5 block truncate text-[10.5px] text-zinc-500">
                           {sectionSummary(resume, key)}
                         </span>
                       </span>
-                      <span className="shrink-0 text-[10.5px] text-zinc-400">
+                      <span className="shrink-0 text-[10.5px] text-zinc-500">
                         {visible ? "显示中" : "已隐藏"}
                       </span>
                     </button>
@@ -177,7 +177,7 @@ export function OnePageFitDialog({
               </div>
             </>
           ) : (
-            <p className="mt-4 rounded-xl border border-dashed border-zinc-200 px-4 py-6 text-center text-[12px] text-zinc-400">
+            <p className="mt-4 rounded-xl border border-dashed border-zinc-200 px-4 py-6 text-center text-[12px] text-zinc-500">
               简历还没有内容，先在编辑区填写后再适配。
             </p>
           )}
@@ -201,7 +201,7 @@ export function OnePageFitDialog({
             </div>
           ) : null}
 
-          <p className="mt-3 text-[10.5px] leading-4 text-zinc-400">
+          <p className="mt-3 text-[10.5px] leading-4 text-zinc-500">
             隐藏只影响预览、打印与 ATS 导出，内容不会被删除；之后可在编辑区「板块显示与排序」恢复。
           </p>
     </Dialog>

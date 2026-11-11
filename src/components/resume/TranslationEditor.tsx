@@ -288,7 +288,7 @@ export function TranslationEditor({ resume, onChange }: Props) {
                     key={item.id}
                     className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-3"
                   >
-                    <p className="mb-2 truncate text-[11px] text-zinc-400">
+                    <p className="mb-2 truncate text-[11px] text-zinc-500">
                       #{index + 1} {item.company || item.role || "未命名经历"}
                     </p>
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -353,7 +353,7 @@ export function TranslationEditor({ resume, onChange }: Props) {
                     key={item.id}
                     className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-3"
                   >
-                    <p className="mb-2 truncate text-[11px] text-zinc-400">
+                    <p className="mb-2 truncate text-[11px] text-zinc-500">
                       #{index + 1} {item.name || item.role || "未命名项目"}
                     </p>
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -420,7 +420,7 @@ export function TranslationEditor({ resume, onChange }: Props) {
                     key={item.id}
                     className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-3"
                   >
-                    <p className="mb-2 truncate text-[11px] text-zinc-400">
+                    <p className="mb-2 truncate text-[11px] text-zinc-500">
                       #{index + 1} {item.school || "未命名学校"}
                     </p>
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -511,7 +511,7 @@ export function TranslationEditor({ resume, onChange }: Props) {
             <h3 className="mb-2 text-[12px] font-semibold text-zinc-700">
               技能
             </h3>
-            <p className="mb-2 text-[11px] text-zinc-400">
+            <p className="mb-2 text-[11px] text-zinc-500">
               技能名与分组名只影响展示；匹配和 AI 仍使用中文技能名。
             </p>
             {resume.skillGroups.length > 0 ? (
@@ -636,7 +636,7 @@ export function TranslationEditor({ resume, onChange }: Props) {
           </div>
         ) : null}
 
-        <p className="text-[11px] leading-5 text-zinc-400">
+        <p className="text-[11px] leading-5 text-zinc-500">
           提示：语言切换在右侧预览工具栏。双语的板块标题会并列显示，正文按中文 /
           英文顺序排列。
         </p>

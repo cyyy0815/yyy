@@ -249,7 +249,7 @@ export function JobQueuePanel({
       ) : null}
 
       {queue.length === 0 ? (
-        <p className="mt-4 rounded-xl border border-dashed border-zinc-200 px-4 py-6 text-center text-[12px] text-zinc-400">
+        <p className="mt-4 rounded-xl border border-dashed border-zinc-200 px-4 py-6 text-center text-[12px] text-zinc-500">
           还没有待投岗位。点右上角「批量导入 JD」，一次粘贴多条岗位描述即可开始排队。
         </p>
       ) : (
@@ -268,7 +268,7 @@ export function JobQueuePanel({
                 <p className="truncate text-[12.5px] font-medium text-zinc-800">
                   {leadLabel(application)}
                 </p>
-                <p className="mt-0.5 truncate text-[11px] text-zinc-400">
+                <p className="mt-0.5 truncate text-[11px] text-zinc-500">
                   {analysis
                     ? `关键词覆盖 ${analysis.matched.length}/${analysis.keywordCount} · 缺口 ${analysis.missing.length} 项${analysis.missing.length > 0 ? `：${analysis.missing.slice(0, 3).join("、")}` : ""}`
                     : "未填写 JD，无法计算匹配度"}
@@ -315,7 +315,7 @@ export function JobQueuePanel({
           onClose={() => setImportOpen(false)}
           footer={
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[10.5px] text-zinc-400">
+              <p className="text-[10.5px] text-zinc-500">
                 单次最多导入 50 条，单条 JD 最多 8000 字
               </p>
               <div className="flex items-center gap-2">
@@ -448,7 +448,7 @@ export function JobQueuePanel({
 
           {preparing.analysis && preparing.analysis.missing.length > 0 ? (
             <div className="mt-4">
-              <p className="mb-2 text-[11px] text-zinc-400">
+              <p className="mb-2 text-[11px] text-zinc-500">
                 简历未体现（若你掌握，点击补进简历）
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -469,7 +469,7 @@ export function JobQueuePanel({
           <div className="mt-4">
             <label
               htmlFor="job-next-action"
-              className="mb-1 block text-[11px] text-zinc-400"
+              className="mb-1 block text-[11px] text-zinc-500"
             >
               下一步（跟进提醒日期）
             </label>
@@ -485,7 +485,7 @@ export function JobQueuePanel({
           </div>
 
           <div className="mt-4">
-            <p className="mb-1 text-[11px] text-zinc-400">JD 原文</p>
+            <p className="mb-1 text-[11px] text-zinc-500">JD 原文</p>
             <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-zinc-200 bg-zinc-50 p-3 font-sans text-[11.5px] leading-5 text-zinc-600">
               {preparing.application.jd || "（无）"}
             </pre>

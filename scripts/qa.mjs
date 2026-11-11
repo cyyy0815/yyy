@@ -3431,7 +3431,7 @@ await printPage.emulateMediaType("print");
 await new Promise((resolve) => setTimeout(resolve, 300));
 const printContrast = await printPage.evaluate(() => {
   const node = document.querySelector(
-    '#resume-print [class*="text-zinc-400"]',
+    '#resume-print [class*="text-zinc-5"], #resume-print [class*="text-zinc-4"]',
   );
   return node ? getComputedStyle(node).color : "none";
 });

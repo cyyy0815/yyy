@@ -312,13 +312,13 @@ export function CoverLetterWriter({
           onClose={closeDialog}
           footer={
             <>
-              <p className="text-[11px] leading-4 text-zinc-400">
+              <p className="text-[11px] leading-4 text-zinc-500">
                 只发送本面板中的目标岗位、工作年限、个人素材与参考 JD；姓名、邮箱、电话和链接不会发送（服务端也会再次过滤）。个人素材可自行删改。
               </p>
               <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
                 {letter && !streaming ? (
                   <>
-                    <span className="mr-auto text-[10.5px] text-zinc-400">
+                    <span className="mr-auto text-[10.5px] text-zinc-500">
                       可直接粘贴到邮件或招聘平台
                     </span>
                     <Button
@@ -347,7 +347,7 @@ export function CoverLetterWriter({
           }
         >
               {statusLoading || (!status && !statusError) ? (
-                <p className="py-8 text-center text-[12.5px] text-zinc-400">
+                <p className="py-8 text-center text-[12.5px] text-zinc-500">
                   正在检查 AI 配置…
                 </p>
               ) : statusError ? (
@@ -504,14 +504,14 @@ export function CoverLetterWriter({
                       </Button>
                     ) : null}
                     {status?.model ? (
-                      <span className="ml-auto text-[11px] text-zinc-400">
+                      <span className="ml-auto text-[11px] text-zinc-500">
                         {status.model}
                       </span>
                     ) : null}
                   </div>
 
                   <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3">
-                    <div className="mb-1.5 flex items-center justify-between text-[11px] text-zinc-400">
+                    <div className="mb-1.5 flex items-center justify-between text-[11px] text-zinc-500">
                       <span>
                         求职信预览
                         {letter && !streaming ? "（可直接修改）" : ""}

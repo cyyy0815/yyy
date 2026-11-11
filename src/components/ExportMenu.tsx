@@ -71,7 +71,7 @@ export function ExportMenu({
           data-qa="export-panel"
           className="absolute right-0 z-30 mt-2 w-60 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-lg"
         >
-          <p className="px-3 py-1 text-[10.5px] uppercase tracking-wide text-zinc-400">
+          <p className="px-3 py-1 text-[10.5px] uppercase tracking-wide text-zinc-500">
             数据备份
           </p>
           <button
@@ -94,7 +94,7 @@ export function ExportMenu({
           </button>
 
           <div className="my-1 border-t border-zinc-100" />
-          <p className="px-3 py-1 text-[10.5px] uppercase tracking-wide text-zinc-400">
+          <p className="px-3 py-1 text-[10.5px] uppercase tracking-wide text-zinc-500">
             交付格式
           </p>
           <button
@@ -124,7 +124,7 @@ export function ExportMenu({
           >
             ATS 文本 / Markdown…
           </button>
-          <p className="px-3 pb-2 pt-1 text-[10.5px] leading-4 text-zinc-400">
+          <p className="px-3 pb-2 pt-1 text-[10.5px] leading-4 text-zinc-500">
             需要可选中文字的 PDF，用右上「打印 / PDF」。
           </p>
         </div>
