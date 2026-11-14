@@ -1326,3 +1326,20 @@ docs/eval-report.md             ✅ 生成物（随仓库提交，便于评审�
 - `tsc`、`eslint` 干净
 - 生产构建 + 完整 QA：全部通过（含多标签页跟随 / 冲突用例）
 - 实机两标签页：A 复制出副本后 B 显示 2 份；A 切回原文档，B 的下拉自动从副本 id 切到 `default`，无控制台错误
+
+---
+
+## 阶段 54（2026-11-14）：历史照片去重、SW 版本化与扩展线上域名
+
+### 实现
+
+- 撤销历史升到 v2：照片从快照里抽出来存进 `photos`，快照只留 `photoRef`；同一张证件照在 20 步历史里只序列化一次，仍能正确往返到每一步。v1 旧历史继续可读
+- Service Worker 版本化：`NEXT_PUBLIC_BUILD_ID` 取 Vercel 提交号（本地为 `dev`），注册为 `/sw.js?v=<build>`；SW 从查询串取版本命名缓存，`activate` 时按版本清理旧缓存。业务更新会真正触发「新版本已就绪」
+- 扩展补上线上域名 `https://yyy-sandy.vercel.app/*` 的 host permission 与 content script 匹配；弹窗 placeholder、扩展 README 同步线上地址
+
+### 验证
+
+- 单测：33 文件 / 300 用例（新增照片去重、v1 历史兼容）
+- `tsc`、`eslint` 干净
+- 生产构建 + 完整 QA：全部通过（含撤销历史、Service Worker 与离线缓存）
+- SW 实测：`scriptURL = /sw.js?v=dev`，缓存键为 `resume-workshop-{shell,static,runtime}-dev`

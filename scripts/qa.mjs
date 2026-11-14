@@ -5238,7 +5238,7 @@ const persistedHistory = await historyPage.evaluate(() => {
 });
 expect(
   "撤销历史写入会话存储并带数据版本",
-  persistedHistory?.version === 1 &&
+  persistedHistory?.version >= 1 &&
     persistedHistory.schemaVersion >= 1 &&
     persistedHistory.past > 0,
   JSON.stringify(persistedHistory),

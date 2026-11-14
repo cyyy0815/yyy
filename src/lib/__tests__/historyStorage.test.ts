@@ -92,6 +92,46 @@ describe("packResumeHistory / parseResumeHistory", () => {
     expect(parsed?.past.at(-1)?.resume.basic.name).toBe("4");
   });
 
+  it("同一张照片在历史里只存一份，往返后仍挂回快照", () => {
+    const photo = `data:image/png;base64,${"A".repeat(5000)}`;
+    const first = makeResume("1");
+    first.basic.photo = photo;
+    const second = makeResume("2");
+    second.basic.photo = photo;
+
+    const text = packResumeHistory(
+      {
+        past: [
+          { resume: first, isSample: false },
+          { resume: second, isSample: false },
+        ],
+        future: [],
+      },
+      { now: 1 },
+    );
+    expect(text).not.toBeNull();
+    expect((text as string).match(/data:image\/png;base64/g)).toHaveLength(1);
+
+    const parsed = parseResumeHistory(text);
+    expect(parsed?.past).toHaveLength(2);
+    expect(parsed?.past[0].resume.basic.photo).toBe(photo);
+    expect(parsed?.past[1].resume.basic.photo).toBe(photo);
+  });
+
+  it("仍能读取 v1 旧历史（照片原本就嵌在快照里）", () => {
+    const legacy = parseResumeHistory(
+      JSON.stringify({
+        format: HISTORY_STORAGE_FORMAT,
+        version: 1,
+        schemaVersion: RESUME_SCHEMA_VERSION,
+        savedAt: 1,
+        past: [{ resume: makeResume("旧"), isSample: false }],
+        future: [],
+      }),
+    );
+    expect(legacy?.past[0].resume.basic.name).toBe("旧");
+  });
+
   it("忽略更新 schema 的快照与未来版本载荷", () => {
     const newer = RESUME_SCHEMA_VERSION + 1;
     const mixed = parseResumeHistory(

@@ -6,10 +6,12 @@
  * - 同源图标 / manifest / 字体：stale-while-revalidate。
  * - `/api/*`、非 GET、跨域请求：完全不拦截，避免缓存 AI 响应或个人信息。
  *
- * 发布新版本时只需改动 VERSION；activate 会清理旧缓存。
+ * 版本来自注册时的 ?v=构建号（Vercel 提交号 / 本地 dev）：每次部署换一个
+ * script URL，浏览器会安装新 SW，activate 时按版本清理旧缓存。
  * `/sw.js` 自身由 next.config.ts 的 no-store 响应头保证及时更新。
  */
-const VERSION = "v1";
+const BUILD_ID = new URL(self.location.href).searchParams.get("v") ?? "v1";
+const VERSION = BUILD_ID.replace(/[^a-z0-9]/gi, "").slice(0, 16) || "v1";
 const CACHE_PREFIX = "resume-workshop-";
 const SHELL_CACHE = `${CACHE_PREFIX}shell-${VERSION}`;
 const STATIC_CACHE = `${CACHE_PREFIX}static-${VERSION}`;

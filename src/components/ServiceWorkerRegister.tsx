@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 
 const CACHE_PREFIX = "resume-workshop-";
+/** 每次构建不同，用作 SW 脚本 URL 的版本，触发浏览器更新检查。 */
+const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID || "dev";
 
 /** 开发模式下清掉生产构建留下的 SW 与缓存，避免 HMR 读到旧资源。 */
 async function clearDevelopmentServiceWorkers() {
@@ -90,7 +92,10 @@ export function ServiceWorkerRegister() {
     };
 
     navigator.serviceWorker
-      .register("/sw.js", { scope: "/", updateViaCache: "none" })
+      .register(`/sw.js?v=${encodeURIComponent(BUILD_ID)}`, {
+        scope: "/",
+        updateViaCache: "none",
+      })
       .then((registration) => {
         if (disposed) return;
         watch(registration);
