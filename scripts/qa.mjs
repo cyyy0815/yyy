@@ -3535,6 +3535,23 @@ const clickFont = async (label) => {
   await pause(400);
 };
 
+/** 等自动保存落盘，而不是赌 400ms 防抖定时器刚好先于读取触发。 */
+const waitFontStored = (font) =>
+  fontPage.waitForFunction(
+    (value) => {
+      try {
+        return (
+          JSON.parse(localStorage.getItem("resume-workshop:v1") ?? "{}").font ===
+          value
+        );
+      } catch {
+        return false;
+      }
+    },
+    { timeout: 5000 },
+    font,
+  );
+
 const fontDefault = await readFontState();
 expect(
   "字体选择器提供五种搭配且默认沿用模板字体",
@@ -3570,6 +3587,7 @@ expect(
 );
 
 await clickFont("报刊");
+await waitFontStored("editorial");
 const fontEditorial = await readFontState();
 expect(
   "报刊搭配只让标题使用衬线",
@@ -3580,6 +3598,7 @@ expect(
 );
 
 await clickFont("等宽");
+await waitFontStored("mono");
 const fontMono = await readFontState();
 expect(
   "等宽搭配使用等宽标题与无衬线正文",

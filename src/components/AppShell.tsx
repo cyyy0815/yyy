@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useDeferredValue, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AppSkeleton } from "@/components/AppSkeleton";
 import { ExportMenu } from "@/components/ExportMenu";
 import { ResumeDocumentsBar } from "@/components/resume/ResumeDocumentsBar";
@@ -12,6 +12,7 @@ import { LanguagePicker } from "@/components/resume/LanguagePicker";
 import { ThemePicker } from "@/components/resume/ThemePicker";
 import { Button } from "@/components/ui/Button";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { CorruptDataBanner } from "@/components/CorruptDataBanner";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { useResume } from "@/hooks/useResume";
 import { useResumeDocuments } from "@/hooks/useResumeDocuments";
@@ -210,6 +211,9 @@ function ResumeWorkspace() {
   const [aiOpenRequest, setAiOpenRequest] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [previewPages, setPreviewPages] = useState(1);
+  // 输入优先：预览用延迟值，连续打字时不再同步重算整棵模板；
+  // 表单与保存仍读最新 resume。
+  const previewResume = useDeferredValue(resume);
   const backupDue = useSyncExternalStore(
     subscribeBackupReminder,
     getBackupReminderSnapshot,
@@ -441,19 +445,25 @@ function ResumeWorkspace() {
         }
         const applicationsSaved = saveApplications([
           ...readApplications(),
-          ...result.applications,
+          ...(result.applications ?? []),
         ]);
+        const mergedApplications = result.applications?.length ?? 0;
         setNotice({
           type: applicationsSaved ? "ok" : "error",
           message: applicationsSaved
-            ? `已合并 ${result.documents.length} 份简历与 ${result.applications.length} 条投递记录`
+            ? `已合并 ${result.documents.length} 份简历与 ${mergedApplications} 条投递记录`
             : `已合并 ${result.documents.length} 份简历，但投递记录保存失败`,
         });
         return;
       }
+      const applicationCount = result.applications?.length;
       if (
         !window.confirm(
-          `导入会替换当前全部简历（共 ${result.documents.length} 份），建议先导出 JSON 备份。确定继续吗？`,
+          `导入会替换当前全部简历（共 ${result.documents.length} 份）${
+            applicationCount === undefined
+              ? "，备份不含投递记录，现有看板会保留"
+              : `与 ${applicationCount} 条投递记录`
+          }，建议先导出 JSON 备份。确定继续吗？`,
         )
       ) {
         setNotice({ type: "ok", message: "已取消导入" });
@@ -466,13 +476,19 @@ function ResumeWorkspace() {
         });
         return;
       }
-      const applicationsSaved = saveApplications(result.applications);
+      // 旧版备份没有 applications 字段：此时保留现有看板，不当成「导出时为空」清空。
+      const applicationsSaved =
+        result.applications === undefined ||
+        saveApplications(result.applications);
       setResumeVersion((value) => value + 1);
       setNotice({
         type: applicationsSaved ? "ok" : "error",
-        message: applicationsSaved
-          ? `已导入 ${result.documents.length} 份简历与 ${result.applications.length} 条投递记录`
-          : `已导入 ${result.documents.length} 份简历，但投递记录保存失败`,
+        message:
+          result.applications === undefined
+            ? `已导入 ${result.documents.length} 份简历；备份不含投递记录，已保留现有看板`
+            : applicationsSaved
+              ? `已导入 ${result.documents.length} 份简历与 ${result.applications.length} 条投递记录`
+              : `已导入 ${result.documents.length} 份简历，但投递记录保存失败`,
       });
       return;
     }
@@ -691,7 +707,11 @@ function ResumeWorkspace() {
   };
 
   const handleClear = () => {
-    if (window.confirm("确定清空简历吗？此操作不可撤销，建议先导出 JSON 备份。")) {
+    if (
+      window.confirm(
+        "确定清空当前简历吗？清空后仍可用撤销恢复，建议先导出 JSON 备份。",
+      )
+    ) {
       clearAll();
       setResumeVersion((value) => value + 1);
       setNotice({ type: "ok", message: "已清空，可以开始写新简历" });
@@ -860,6 +880,7 @@ function ResumeWorkspace() {
         className="print-root mx-auto w-full max-w-[1500px] flex-1 scroll-mt-20 px-4 py-6 outline-none lg:px-6"
       >
         <OfflineBanner />
+        <CorruptDataBanner />
         {tab === "edit" ? (
           <>
             <div
@@ -1160,7 +1181,7 @@ function ResumeWorkspace() {
 
                 <div className="resume-scroll rounded-2xl border border-zinc-200/80 bg-[#eceae7] p-4 lg:sticky lg:top-[88px] lg:max-h-[calc(100vh-112px)] lg:overflow-auto">
                   <ResumePreview
-                    resume={resume}
+                    resume={previewResume}
                     template={template}
                     onPageCountChange={setPreviewPages}
                   />

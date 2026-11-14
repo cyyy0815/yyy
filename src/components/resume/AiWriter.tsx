@@ -98,6 +98,8 @@ type Props = {
   /** 外部（待投清单）请求打开：> 0 时打开弹窗，打开后回调置回 0 */
   openRequest?: number;
   onOpenConsumed?: () => void;
+  /** 由外层「AI 帮我写」入口卡片触发时隐藏内置卡片，避免重复渲染。 */
+  hideTrigger?: boolean;
 };
 
 export function AiWriter({
@@ -106,6 +108,7 @@ export function AiWriter({
   onCreateDocument,
   openRequest = 0,
   onOpenConsumed,
+  hideTrigger = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<AiStatus | null>(null);
@@ -831,22 +834,24 @@ export function AiWriter({
 
   return (
     <>
-      <div className="print-hide flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-gradient-to-r from-blue-50/80 via-white to-white px-4 py-3">
-        <div>
-          <p className="text-[13px] font-semibold text-zinc-900">AI 帮我写</p>
-          <p className="mt-0.5 text-[11.5px] text-zinc-500">
-            生成单板块草稿，或用一段个人经历直接生成整份简历。
-          </p>
+      {hideTrigger ? null : (
+        <div className="print-hide flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200/70 bg-gradient-to-r from-blue-50/80 via-white to-white px-4 py-3">
+          <div>
+            <p className="text-[13px] font-semibold text-zinc-900">AI 帮我写</p>
+            <p className="mt-0.5 text-[11.5px] text-zinc-500">
+              生成单板块草稿，或用一段个人经历直接生成整份简历。
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openDialog}
+            className="border-blue-200 bg-white text-blue-700 hover:bg-blue-50"
+          >
+            开始生成
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={openDialog}
-          className="border-blue-200 bg-white text-blue-700 hover:bg-blue-50"
-        >
-          开始生成
-        </Button>
-      </div>
+      )}
 
       {undo ? (
         <div

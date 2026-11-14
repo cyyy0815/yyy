@@ -1,4 +1,5 @@
 import { normalizeApplications, type JobApplication } from "./applications";
+import { preserveUnreadable } from "./corruptBackup";
 import { normalizeResumeFont } from "./fonts";
 import { normalizeResumeLanguage } from "./language";
 import {
@@ -323,7 +324,11 @@ export function parseStoredResume(raw: string | null): Resume | null {
 export function loadResume(): Resume | null {
   if (typeof window === "undefined") return null;
   try {
-    return parseStoredResume(window.localStorage.getItem(STORAGE_KEY));
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    // 读不出来时先留一份原始内容：界面会把简历当示例继续用，后续保存不能把它冲掉。
+    preserveUnreadable(STORAGE_KEY, (value) => parseStoredResume(value) !== null);
+    return parseStoredResume(raw);
   } catch {
     return null;
   }
@@ -442,7 +447,8 @@ export type ImportFileResult =
       kind: "library";
       documents: ArchiveDocument[];
       activeId: string;
-      applications: JobApplication[];
+      /** 旧版备份没有这个字段；`undefined` 表示导入时不要动现有投递看板。 */
+      applications?: JobApplication[];
     }
   | { ok: false; error: string };
 
@@ -650,7 +656,9 @@ function parseArchive(data: Record<string, unknown>): ImportFileResult {
     activeId: documents.some((document) => document.id === requested)
       ? requested
       : documents[0].id,
-    applications: normalizeApplications(data.applications),
+    applications: Array.isArray(data.applications)
+      ? normalizeApplications(data.applications)
+      : undefined,
   };
 }
 

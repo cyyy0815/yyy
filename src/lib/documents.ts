@@ -1,3 +1,4 @@
+import { preserveUnreadable } from "./corruptBackup";
 import { normalizeResume } from "./storage";
 import { isTemplateId, newId, type Resume, type TemplateId } from "./types";
 
@@ -44,6 +45,15 @@ export function loadResumeLibrary(): ResumeLibrary | null {
   try {
     const raw = window.localStorage.getItem(LIBRARY_KEY);
     if (!raw) return null;
+    // 文档列表坏掉时先留原始内容，避免下一次「重命名 / 新建」把它覆盖成空列表。
+    preserveUnreadable(LIBRARY_KEY, (value) => {
+      try {
+        const parsed: unknown = JSON.parse(value);
+        return Boolean(parsed) && typeof parsed === "object";
+      } catch {
+        return false;
+      }
+    });
     const data: unknown = JSON.parse(raw);
     if (!data || typeof data !== "object") return null;
     const source = data as Record<string, unknown>;

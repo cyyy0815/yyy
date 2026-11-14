@@ -11,10 +11,12 @@ export function AppSkeleton() {
     <div
       className="flex min-h-screen flex-col"
       aria-busy="true"
-      aria-live="polite"
     >
-      <header className="sticky top-0 z-20 border-b border-zinc-200/70 bg-white/85 backdrop-blur print-hide">
-        <div className="mx-auto flex w-full max-w-[1500px] items-center gap-3 px-4 py-3 lg:px-6">
+      <header
+        aria-hidden="true"
+        className="sticky top-0 z-30 border-b border-zinc-200/70 bg-[#faf9f7]/85 backdrop-blur print-hide"
+      >
+        <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center justify-between gap-2 px-3 sm:gap-3 sm:px-4 lg:px-6">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-zinc-900" />
             <div className="hidden sm:block">
@@ -48,10 +50,16 @@ export function AppSkeleton() {
       </header>
 
       <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-6 lg:px-6">
-        <p className="mb-4 text-[11px] tracking-[0.18em] text-zinc-500">
+        <p
+          role="status"
+          className="mb-4 text-[11px] tracking-[0.18em] text-zinc-500"
+        >
           LOADING · 正在载入你的简历
         </p>
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+        <div
+          aria-hidden="true"
+          className="grid gap-6 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)]"
+        >
           <section className="space-y-3">
             {[0, 1, 2].map((index) => (
               <div
@@ -68,8 +76,8 @@ export function AppSkeleton() {
             ))}
           </section>
 
-          <section className="rounded-2xl border border-zinc-200/80 bg-[#eceae7] p-4">
-            <div className="mx-auto aspect-[210/297] w-full max-w-[520px] rounded-md bg-white p-8 shadow-sm">
+          <section className="hidden rounded-2xl border border-zinc-200/80 bg-[#eceae7] p-4 lg:block">
+            <div className="mx-auto aspect-[210/297] w-full max-w-[794px] rounded-md bg-white p-8 shadow-sm">
               <div className="h-6 w-40 rounded bg-zinc-200/80 motion-safe:animate-pulse" />
               <div className="mt-2 h-3 w-56 rounded bg-zinc-100 motion-safe:animate-pulse" />
               <div className="mt-6 space-y-2">

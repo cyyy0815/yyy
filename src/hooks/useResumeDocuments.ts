@@ -9,7 +9,7 @@ import {
   type ResumeLibrary,
   type StoredDocument,
 } from "@/lib/documents";
-import { saveResume } from "@/lib/storage";
+import { saveResume, loadResume } from "@/lib/storage";
 import {
   createEmptyResume,
   newId,
@@ -88,15 +88,39 @@ export function useResumeDocuments({
     return true;
   };
 
+  /**
+   * 载入示例时，当前文档的真实内容还留在 v1 里，只是 UI 暂时显示示例。
+   * 文档级操作（切换 / 新建 / 复制）会改写 v1，所以动手前先把 v1 里的真实文档
+   * 快照出来，否则它会从文档列表里被永久丢弃（载入示例 → 切到另一份即触发）。
+   */
+  const sampleBackdropDocument = (): StoredDocument | null => {
+    if (!isSample) return null;
+    const stored = loadResume();
+    if (!stored) return null;
+    return {
+      id: activeId,
+      title:
+        (state.activeTitle ?? "").trim() ||
+        deriveResumeTitle(stored, false) ||
+        "我的简历",
+      template,
+      resume: stored,
+    };
+  };
+
   const switchTo = (id: string): boolean => {
     if (id === activeId) return true;
     const target = others.find((document) => document.id === id);
     if (!target) return false;
 
+    const backdrop = sampleBackdropDocument();
     // 先把目标文档同步写入 v1，防止切页后刷新仍读回上一份简历。
     if (!saveResume(target.resume)) return false;
     const nextOthers = isSample
-      ? others.filter((document) => document.id !== target.id)
+      ? [
+          ...(backdrop ? [backdrop] : []),
+          ...others.filter((document) => document.id !== target.id),
+        ]
       : others.map((document) =>
           document.id === target.id ? currentDocument() : document,
         );
@@ -106,7 +130,7 @@ export function useResumeDocuments({
       others: nextOthers,
     };
     if (!saveResumeLibrary(library)) {
-      saveResume(resume);
+      saveResume(backdrop ? backdrop.resume : resume);
       return false;
     }
 
@@ -118,6 +142,7 @@ export function useResumeDocuments({
 
   const createBlank = (): boolean => {
     const nextResume = createEmptyResume();
+    const backdrop = sampleBackdropDocument();
     if (!saveResume(nextResume)) return false;
 
     const nextId = newId();
@@ -125,10 +150,12 @@ export function useResumeDocuments({
     const library: ResumeLibrary = {
       activeId: nextId,
       activeTitle: title,
-      others: isSample ? others : [currentDocument(), ...others],
+      others: isSample
+        ? [...(backdrop ? [backdrop] : []), ...others]
+        : [currentDocument(), ...others],
     };
     if (!saveResumeLibrary(library)) {
-      saveResume(resume);
+      saveResume(backdrop ? backdrop.resume : resume);
       return false;
     }
 
@@ -140,6 +167,7 @@ export function useResumeDocuments({
 
   const duplicateCurrent = (): boolean => {
     const copy = cloneResume(resume);
+    const backdrop = sampleBackdropDocument();
     if (!saveResume(copy)) return false;
 
     const nextId = newId();
@@ -147,10 +175,12 @@ export function useResumeDocuments({
     const library: ResumeLibrary = {
       activeId: nextId,
       activeTitle: title,
-      others: isSample ? others : [currentDocument(), ...others],
+      others: isSample
+        ? [...(backdrop ? [backdrop] : []), ...others]
+        : [currentDocument(), ...others],
     };
     if (!saveResumeLibrary(library)) {
-      saveResume(resume);
+      saveResume(backdrop ? backdrop.resume : resume);
       return false;
     }
 
@@ -166,6 +196,7 @@ export function useResumeDocuments({
     baseTitle: string,
     nextTemplate: TemplateId = template,
   ): string | null => {
+    const backdrop = sampleBackdropDocument();
     if (!saveResume(nextResume)) return null;
 
     const nextId = newId();
@@ -173,10 +204,12 @@ export function useResumeDocuments({
     const library: ResumeLibrary = {
       activeId: nextId,
       activeTitle: title,
-      others: isSample ? others : [currentDocument(), ...others],
+      others: isSample
+        ? [...(backdrop ? [backdrop] : []), ...others]
+        : [currentDocument(), ...others],
     };
     if (!saveResumeLibrary(library)) {
-      saveResume(resume);
+      saveResume(backdrop ? backdrop.resume : resume);
       return null;
     }
 
@@ -253,6 +286,8 @@ export function useResumeDocuments({
     const target =
       remapped.find((_, index) => imported[index].id === nextActiveId) ??
       remapped[0];
+    // 失败回滚时 v1 已被目标文档覆盖，先留一份原来的内容。
+    const previousStored = loadResume();
     if (!saveResume(target.resume)) return false;
 
     const library: ResumeLibrary = {
@@ -261,7 +296,7 @@ export function useResumeDocuments({
       others: remapped.filter((document) => document.id !== target.id),
     };
     if (!saveResumeLibrary(library)) {
-      saveResume(resume);
+      saveResume(previousStored ?? resume);
       return false;
     }
 
@@ -274,6 +309,7 @@ export function useResumeDocuments({
   const deleteActive = (): boolean => {
     if (others.length === 0) return false;
     const [next, ...rest] = others;
+    const previousStored = loadResume();
     if (!saveResume(next.resume)) return false;
 
     const library: ResumeLibrary = {
@@ -282,7 +318,7 @@ export function useResumeDocuments({
       others: rest,
     };
     if (!saveResumeLibrary(library)) {
-      saveResume(resume);
+      saveResume(previousStored ?? resume);
       return false;
     }
 

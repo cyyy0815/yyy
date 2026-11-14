@@ -1,3 +1,4 @@
+import { preserveUnreadable } from "./corruptBackup";
 import { newId } from "./types";
 
 export const APPLICATIONS_KEY = "resume-workshop:applications:v1";
@@ -176,7 +177,15 @@ export function readApplications(): JobApplication[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(APPLICATIONS_KEY);
-    return raw ? normalizeApplications(JSON.parse(raw)) : [];
+    if (!raw) return [];
+    preserveUnreadable(APPLICATIONS_KEY, (value) => {
+      try {
+        return Array.isArray(JSON.parse(value));
+      } catch {
+        return false;
+      }
+    });
+    return normalizeApplications(JSON.parse(raw));
   } catch {
     return [];
   }

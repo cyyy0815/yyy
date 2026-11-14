@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import {
   useCallback,
   useEffect,
@@ -32,10 +33,9 @@ import {
   type SkillMeta,
 } from "@/lib/types";
 import { groupSkills } from "@/lib/skills";
-import { AiWriter } from "@/components/resume/AiWriter";
+import { AiWriterLauncher } from "@/components/resume/AiWriterLauncher";
 import { CustomSectionsEditor } from "@/components/resume/CustomSectionsEditor";
 import { SectionLayoutEditor } from "@/components/resume/SectionLayoutEditor";
-import { TranslationEditor } from "@/components/resume/TranslationEditor";
 import {
   deleteTargetLabel,
   type DeleteTarget,
@@ -43,6 +43,18 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { SectionCard } from "@/components/ui/SectionCard";
+
+/**
+ * 英文覆盖层编辑器只在英文 / 双语模式下出现，中文用户不该为它下载 20KB+。
+ * 条件挂载 + 动态加载；切换语言时再取这个 chunk。
+ */
+const TranslationEditor = dynamic(
+  () =>
+    import("@/components/resume/TranslationEditor").then(
+      (mod) => mod.TranslationEditor,
+    ),
+  { ssr: false },
+);
 
 type Props = {
   resume: Resume;
@@ -1340,15 +1352,17 @@ export function ResumeForm({
 
   return (
     <div className="space-y-4">
-      <AiWriter
+      <AiWriterLauncher
         resume={resume}
         onChange={onChange}
         onCreateDocument={onCreateDocument}
-        openRequest={aiOpenRequest}
-        onOpenConsumed={onAiOpenConsumed}
+        aiOpenRequest={aiOpenRequest}
+        onAiOpenConsumed={onAiOpenConsumed}
       />
 
-      <TranslationEditor resume={resume} onChange={onChange} />
+      {resume.language !== "zh" ? (
+        <TranslationEditor resume={resume} onChange={onChange} />
+      ) : null}
 
       <SectionCard title="基本信息" description="让 HR 第一眼知道你是谁">
         <div className="mb-4 flex items-center gap-4 rounded-xl border border-zinc-100 bg-zinc-50/70 p-3">

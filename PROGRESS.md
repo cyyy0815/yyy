@@ -1203,3 +1203,49 @@ docs/eval-report.md             ✅ 生成物（随仓库提交，便于评审�
 - 单测：29 文件 / 278 用例（新增 4 个：docx 是合法 zip、空简历不报错、文件名清洗）
 - QA：240 项通过（新增「导出菜单能生成 Word 与 PDF」，用 CDP 下载目录校验 PK / %PDF 头与大小）
 - 既有 5 处 QA 的「点导出拿 JSON」改为先开菜单再点项
+
+---
+
+## 阶段 48（2026-11-14）：数据安全加固
+
+针对「会丢整份简历」的路径与保存时序做一轮加固，全部有回归用例。
+
+### 实现
+
+- 载入示例后切换 / 新建 / 复制 / 导入文档时，先用 v1 里的真实内容补一份当前文档快照（`useResumeDocuments.sampleBackdropDocument`），不再因为 `isSample` 把上一份简历从列表里丢掉；文档库写入失败回滚时也恢复操作前的 v1，而不是把示例写回磁盘
+- 自动保存补 `pagehide` / `visibilitychange(hidden)` 同步落盘与 2s 最大等待；导入、清空、切换文档改为立即写入，不再留 400ms 丢失窗口
+- 旧版整库备份没有 `applications` 字段时，导入不再清空投递看板；确认文案与实际影响一致
+- 损坏的简历 / 文档列表 / 投递记录在读取时自动备份原始字符串，页面顶部提示可下载，后续保存不会把它冲掉（`src/lib/corruptBackup.ts`、`CorruptDataBanner`）
+- 示例快照不再写进 sessionStorage 撤销历史，恢复旧会话时过滤，避免刷新后撤销退回示例再覆盖真实简历
+- 顺带去掉每次输入的一次 `JSON.stringify`（跨标签页比对改为事件触发时计算）；「清空」确认文案改为与「可撤销」一致
+- `scripts/qa.mjs`：字体断言原来固定 `pause(400)` 后读 localStorage，和 400ms 保存防抖卡在同一时间点，机器一忙就偶发失败；改为 `waitFontStored()` 等存储值落盘
+
+### 验证
+
+- 单测：32 文件 / 291 用例（新增 13 个：载入示例后切换/新建保留原简历、pagehide 落盘、replaceResume / clearAll 立即落盘、示例不落盘、示例快照过滤、损坏数据备份与提示条）
+- `npx tsc --noEmit`、`npx eslint src`：0 错误 0 警告
+- 本机生产构建后 `npm run qa`：全部通过（含修复后的字体断言）
+
+---
+
+## 阶段 49（2026-11-14）：首屏按需加载与输入优先
+
+### 实现
+
+- `AiWriterLauncher`：首屏只保留「AI 帮我写」卡片；AiWriter（弹窗、流式生成、事实核对、`fullResume` 等依赖）第一次点「开始生成」时才动态加载，外部「按 JD 优化简历」请求走同一入口
+- `TranslationEditor` 只在 `resume.language !== "zh"` 时挂载并动态加载，中文用户不再为首屏下载 20KB+
+- 预览用 `useDeferredValue(resume)`：连续输入时表单先响应，预览在空闲时重算，`ResumePaper` 的 memo 不再每次输入都失效
+- 骨架屏对齐真实首屏（header 64px、`460px/1fr` 网格、A4 794px 纸面、移动端默认只显示表单），并去掉大容器的 `aria-live`，避免读屏朗读整块骨架
+- `AiWriter` 新增 `hideTrigger`，入口卡片与面板同时存在时不会重复渲染
+
+### 指标（隔离副本生产构建，gzip）
+
+- 首屏总载荷：254KB → 241KB（-13KB，约 -5%）
+- 编辑页页面 chunk：45.4KB → 35.9KB（-9.5KB，约 -21%）
+- AI 面板 / 英文编辑器 / 导出库都不在初始 HTML 里，首次使用时才取对应 chunk
+
+### 验证
+
+- 单测：33 文件 / 293 用例（新增 2 个：AI 入口默认不挂载、外部请求消费后可重复打开）
+- `npx tsc --noEmit`、`npx eslint src`：0 错误 0 警告
+- 隔离副本构建后 `QA_BASE=http://localhost:3100 npm run qa`：全部通过

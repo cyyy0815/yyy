@@ -1,12 +1,42 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
+  loadResume,
   MAX_IMPORT_BYTES,
   normalizeResume,
   parseImportFile,
   parseResumeJSON,
+  STORAGE_KEY,
 } from "../storage";
+import {
+  backupKeyFor,
+  listCorruptBackups,
+} from "../corruptBackup";
 import { RESUME_SCHEMA_VERSION } from "../schema";
 import { createEmptyResume, DEFAULT_SECTION_ORDER } from "../types";
+
+describe("损坏的本机数据", () => {
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("简历 JSON 损坏时保留原始内容，后续保存不会把它冲掉", () => {
+    window.localStorage.setItem(STORAGE_KEY, "{不是合法 JSON");
+    expect(loadResume()).toBeNull();
+    expect(window.localStorage.getItem(backupKeyFor(STORAGE_KEY))).toBe(
+      "{不是合法 JSON",
+    );
+    expect(listCorruptBackups().map((entry) => entry.key)).toContain(STORAGE_KEY);
+  });
+
+  it("正常数据不会产生备份", () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(normalizeResume({ basic: { name: "林一" } })),
+    );
+    expect(loadResume()?.basic.name).toBe("林一");
+    expect(listCorruptBackups()).toHaveLength(0);
+  });
+});
 
 describe("normalizeResume", () => {
   it("非对象输入返回空白简历与默认主题", () => {
@@ -399,7 +429,9 @@ describe("parseImportFile", () => {
     });
     expect(result.documents[0].resume.skills).toEqual(["React"]);
     expect(result.documents[1].template).toBe("modern");
-    expect(result.applications).toEqual([]);
+    // 旧版备份没有 applications 字段：用 undefined 表示「导入时别动现有看板」，
+    // 不能收成 []，否则一次导入会把用户的投递记录清空。
+    expect(result.applications).toBeUndefined();
   });
 
   it("解析整库备份中的投递记录并收敛脏数据", () => {
@@ -432,6 +464,7 @@ describe("parseImportFile", () => {
     );
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "library") return;
+    if (!result.applications) return;
     expect(result.applications).toHaveLength(1);
     expect(result.applications[0]).toMatchObject({
       id: "job-1",
