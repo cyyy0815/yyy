@@ -6,13 +6,25 @@ import { createEmptyResume, type Resume } from "@/lib/types";
 
 /**
  * 演示场景：一个 2026 届应届生的真实困境——简历偏薄、方向不明确，
- * 三个岗位的匹配度差距明显，正好用来演示「诊断 → 定向改写 → 投递」。
+ * 几段岗位从「几乎完全匹配」到「跨方向」拉开，正好用来演示「诊断 → 定向改写 → 投递」。
  *
  * 数据全部本地生成，不包含任何真实个人信息。
  */
 export const DEMO_TITLE = "小林 · 2026 届前端";
 
 export const DEMO_JOBS: { company: string; role: string; jd: string }[] = [
+  {
+    company: "星澜科技",
+    role: "前端开发工程师（React）",
+    jd: `岗位职责：
+1. 负责公司 SaaS 产品的前端开发，使用 React + TypeScript 构建可复用组件；
+2. 与设计、后端协作，持续优化页面性能与交互体验。
+任职要求：
+1. 2026 届本科及以上，计算机相关专业；
+2. 熟悉 HTML、CSS、JavaScript，熟练掌握 React 与 TypeScript；
+3. 熟悉 Git 协作流程，有组件化开发经验；
+4. 关注前端性能优化，有实际项目经验者优先。`,
+  },
   {
     company: "云图科技",
     role: "前端开发工程师（应届）",
@@ -38,6 +50,18 @@ export const DEMO_JOBS: { company: string; role: string; jd: string }[] = [
 4. 会写 SQL 查询，了解 Excel 与 Python（pandas）的数据处理方式者优先。`,
   },
   {
+    company: "海川电商",
+    role: "前端开发（Vue 方向）",
+    jd: `岗位职责：
+1. 负责商城小程序与运营活动页的前端开发；
+2. 配合后端完成接口联调，优化首屏加载与转化链路。
+任职要求：
+1. 2026 届本科及以上，计算机相关专业；
+2. 熟悉 Vue 3 与小程序开发，了解组件化与状态管理；
+3. 熟悉 HTML、CSS、JavaScript，能独立完成活动页；
+4. 有性能优化或埋点经验者优先。`,
+  },
+  {
     company: "恒信银行",
     role: "Java 后端开发（校招）",
     jd: `岗位职责：
@@ -48,6 +72,17 @@ export const DEMO_JOBS: { company: string; role: string; jd: string }[] = [
 2. 熟悉 Java 基础与面向对象设计，了解 Spring Boot、MyBatis；
 3. 熟悉 MySQL 常用语法与索引优化，了解 Redis；
 4. 了解微服务架构与消息队列者优先。`,
+  },
+  {
+    company: "远野网络",
+    role: "产品经理（校招）",
+    jd: `岗位职责：
+1. 负责用户需求调研、竞品分析与 PRD 撰写；
+2. 协调设计、研发推进版本上线，跟踪数据表现。
+任职要求：
+1. 2026 届本科及以上，专业不限；
+2. 逻辑清晰、沟通能力强，能独立推进项目；
+3. 熟悉 SQL、Axure 者优先。`,
   },
 ];
 

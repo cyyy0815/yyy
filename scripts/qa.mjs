@@ -5943,7 +5943,7 @@ expect(
 );
 await agentPage.close();
 
-// D 演示场景：一键载入「小林 + 3 个目标岗位」，用于现场演示与录屏
+// D 演示场景：一键载入「小林 + 6 个目标岗位」，用于现场演示与录屏
 const demoPage = await open({ width: 1440, height: 1000 });
 demoPage.on("dialog", async (dialog) => {
   await dialog.accept();
@@ -5972,12 +5972,14 @@ const demoState = await demoPage.evaluate(() => {
   };
 });
 expect(
-  "演示场景载入简历与 3 个岗位并按匹配度排序",
+  "演示场景载入简历与 6 个岗位并按匹配度排序",
   demoState.name === "小林" &&
-    demoState.jobs === 3 &&
-    demoState.rowCount === 3 &&
-    demoState.scores[0] >= demoState.scores[1] &&
-    demoState.scores[1] >= demoState.scores[2] &&
+    demoState.jobs === 6 &&
+    demoState.rowCount === 6 &&
+    demoState.scores.length === 6 &&
+    demoState.scores.every(
+      (score, index) => index === 0 || demoState.scores[index - 1] >= score,
+    ) &&
     demoState.jdLength > 0,
   JSON.stringify(demoState),
 );
@@ -5994,7 +5996,7 @@ const workbench = await demoPage.evaluate(() => ({
 expect(
   "AI 工作台是一级页面并能选岗位",
   workbench.hash === "#agent" &&
-    workbench.jobs === 3 &&
+    workbench.jobs === 6 &&
     workbench.hasStart &&
     workbench.startDisabled === false,
   JSON.stringify(workbench),

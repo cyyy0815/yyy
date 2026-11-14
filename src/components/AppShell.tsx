@@ -721,7 +721,7 @@ function ResumeWorkspace() {
   const handleLoadDemo = () => {
     if (
       !window.confirm(
-        "载入演示场景会用「小林」的简历和 3 个目标岗位替换当前简历与待投清单，确定继续吗？",
+        "载入演示场景会用「小林」的简历和 6 个目标岗位替换当前简历与待投清单，确定继续吗？",
       )
     ) {
       return;
@@ -741,7 +741,7 @@ function ResumeWorkspace() {
     }, 400);
     setNotice({
       type: "ok",
-      message: `已载入演示场景：${DEMO_TITLE} + 3 个目标岗位`,
+      message: `已载入演示场景：${DEMO_TITLE} + 6 个目标岗位`,
     });
   };
 
@@ -1174,7 +1174,7 @@ function ResumeWorkspace() {
                       size="sm"
                       data-qa="load-demo"
                       onClick={handleLoadDemo}
-                      title="载入「小林」的简历 + 3 个目标岗位，用于演示全链路"
+                      title="载入「小林」的简历 + 6 个目标岗位，用于演示全链路"
                     >
                       演示场景
                     </Button>
