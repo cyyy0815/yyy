@@ -1131,7 +1131,7 @@ function CompactTemplate({ resume }: { resume: Resume }) {
 
 function SidebarHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="mb-2 break-after-avoid border-b border-white/15 pb-1 text-[9px] font-semibold tracking-[0.2em] text-white/55">
+    <h2 className="mb-2 break-after-avoid border-b border-white/15 pb-1 text-[9px] font-semibold tracking-[0.2em] text-white/80">
       {children}
     </h2>
   );
@@ -1167,7 +1167,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
 
         {contact.length > 0 ? (
           <section className="mt-6">
-            <SidebarHeading>联系方式</SidebarHeading>
+            <SidebarHeading>{L.contact}</SidebarHeading>
             <div className="space-y-1 text-[9.5px] leading-[1.6] text-white/75">
               {contact.map((item) => (
                 <p key={item.key} className="break-all">
@@ -1213,7 +1213,7 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
             <SkillChips
               resume={resume}
               chipClassName="rounded bg-white/10 px-1.5 py-0.5 text-[9px] leading-[1.5] text-white/80"
-              titleClassName="mb-1 text-[8.5px] font-medium tracking-wide text-white/45"
+              titleClassName="mb-1 text-[8.5px] font-medium tracking-wide text-white/80"
             />
           </section>
         ) : null}
@@ -1227,16 +1227,16 @@ function SidebarTemplate({ resume }: { resume: Resume }) {
                   <p className="text-[10px] font-medium leading-snug text-white">
                     {item.school || "学校名称"}
                   </p>
-                  <p className="text-[9px] leading-[1.6] text-white/65">
+                  <p className="text-[9px] leading-[1.6] text-white/75">
                     {[item.major, item.degree].filter(Boolean).join(" · ")}
                   </p>
-                  <p className="text-[8.5px] tabular-nums text-white/50">
+                  <p className="text-[8.5px] tabular-nums text-white/80">
                     {range(item.start, item.end)}
                   </p>
                   <EducationDetails
                     item={item}
                     labels={L}
-                    className="text-[8.5px] leading-[1.6] text-white/55"
+                    className="text-[8.5px] leading-[1.6] text-white/80"
                   />
                 </div>
               ))}

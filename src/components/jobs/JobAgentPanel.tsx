@@ -36,6 +36,8 @@ type Props = {
   resume: Resume;
   onChange: Dispatch<SetStateAction<Resume>>;
   job: { company: string; role: string; jd: string };
+  /** 从 AI 工作台启动时，计划就绪后自动跑完本地步骤（AI 步骤仍需逐条确认）。 */
+  autoStart?: boolean;
   onClose: () => void;
 };
 
@@ -79,7 +81,7 @@ function toAgentSteps(planned: PlannedStep[]): AgentStep[] {
  * - 本地工具不出网，AI 步骤流式生成且必须人工采用；
  * - 每步记录状态、耗时与工具名，观察会回灌给模型用于重新规划。
  */
-export function JobAgentPanel({ resume, onChange, job, onClose }: Props) {
+export function JobAgentPanel({ resume, onChange, job, autoStart = false, onClose }: Props) {
   const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
   const [planning, setPlanning] = useState(false);
   const [planSource, setPlanSource] = useState<PlanSource | "pending">("pending");
@@ -104,6 +106,7 @@ export function JobAgentPanel({ resume, onChange, job, onClose }: Props) {
   const abortRef = useRef<AbortController | null>(null);
   const streamRef = useRef("");
   const autoReplannedRef = useRef(false);
+  const autoStartedRef = useRef(false);
 
   const sourceText = useMemo(() => buildResumeText(resume), [resume]);
   const analysis = useMemo(() => analyzeJd(job.jd, resume), [job.jd, resume]);
@@ -362,6 +365,20 @@ export function JobAgentPanel({ resume, onChange, job, onClose }: Props) {
     }
   };
 
+  // AI 工作台点「启动」：计划就绪后自动跑本地两步，用户不必再点一次按钮。
+  // 只触发一次；AI 步骤仍停在「执行」等人工确认。
+  useEffect(() => {
+    if (!autoStart || autoStartedRef.current) return;
+    if (planning || steps.length === 0) return;
+    autoStartedRef.current = true;
+    // 放到下一拍再跑：避免在 effect 体内同步 setState，也等 Dialog 先挂载完。
+    const timer = window.setTimeout(() => {
+      void runAll();
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, planning, steps]);
+
   const adoptSummary = () => {
     if (!ai || !ai.done) return;
     const text = ai.text.trim();
@@ -397,6 +414,13 @@ export function JobAgentPanel({ resume, onChange, job, onClose }: Props) {
     }
   };
 
+  const localPending = steps.some(
+    (step) =>
+      !step.requiresAi &&
+      statuses[step.id] !== "done" &&
+      statuses[step.id] !== "skipped",
+  );
+
   return (
     <Dialog
       title={`求职 Agent · ${job.company || "目标岗位"}`}
@@ -424,10 +448,14 @@ export function JobAgentPanel({ resume, onChange, job, onClose }: Props) {
               variant="primary"
               size="sm"
               data-qa="agent-run-all"
-              disabled={running || planning || steps.length === 0}
+              disabled={running || planning || !localPending}
               onClick={runAll}
             >
-              {running ? "执行中…" : "自动执行本地步骤"}
+              {running
+                ? "执行中…"
+                : localPending
+                  ? "自动执行本地步骤"
+                  : "本地步骤已完成"}
             </Button>
           </div>
         </div>
@@ -585,9 +613,11 @@ export function JobAgentPanel({ resume, onChange, job, onClose }: Props) {
                           >
                             {status === "running"
                               ? "执行中…"
-                              : status === "failed"
-                                ? "重试"
-                                : "执行"}
+                              : step.requiresAi && !aiStatus?.configured
+                                ? "需配置 Key"
+                                : status === "failed"
+                                  ? "重试"
+                                  : "执行"}
                           </Button>
                         ) : null}
                         {status !== "done" && status !== "skipped" ? (

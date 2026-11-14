@@ -113,7 +113,10 @@ export async function POST(request: NextRequest) {
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(
+    () => controller.abort(new DOMException("timeout", "TimeoutError")),
+    TIMEOUT_MS,
+  );
   request.signal.addEventListener("abort", () => controller.abort(), {
     once: true,
   });

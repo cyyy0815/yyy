@@ -1249,3 +1249,44 @@ docs/eval-report.md             ✅ 生成物（随仓库提交，便于评审�
 - 单测：33 文件 / 293 用例（新增 2 个：AI 入口默认不挂载、外部请求消费后可重复打开）
 - `npx tsc --noEmit`、`npx eslint src`：0 错误 0 警告
 - 隔离副本构建后 `QA_BASE=http://localhost:3100 npm run qa`：全部通过
+
+---
+
+## 阶段 50（2026-11-14）：AI 工作台与启动流程适配
+
+### 实现
+
+- `AgentWorkbench` 改成「选岗位 → 预演计划 → 启动」的工作流入口：顶部显示 AI 配置状态与待投数量，右侧常驻「本次工作流」卡片（选中岗位、匹配分、四步预览、启动按钮）
+- 计划预览随岗位和 AI 状态变化：用 `buildPlan` 按当前简历 / JD 预演，本地步骤标「本地」、AI 步骤标「AI」或「需配置 Key」；启动按钮文案在「启动 AI 工作流 / 启动本地工作流」之间切换
+- 空状态给出「去职位推荐添加岗位」按钮；移动端选完岗位自动滚到流程卡
+- `JobAgentPanel` 新增 `autoStart`：从工作台启动后计划就绪即自动跑本地两步，AI 步骤仍停在「执行」等人工确认；底部按钮在本地步骤跑完后变为「本地步骤已完成」并禁用
+- 未配置 Key 时 AI 步骤按钮显示「需配置 Key」并禁用，不再让用户点一次才发现跑不了
+- 启动时同步把该岗位写入「当前 JD」，后续改写 / 求职信沿用同一段 JD
+
+### 验证
+
+- 单测：33 文件 / 293 用例
+- `tsc`、`eslint` 干净
+- 隔离副本生产构建 + `QA_BASE=http://localhost:3100 npm run qa`：全部通过
+- 手工 smoke：未配置 Key 时工作台显示「本地模式」，启动后 `analyze_jd` / `diagnose_gaps` 自动完成，工具轨迹 2 条，无控制台错误
+
+---
+
+## 阶段 51（2026-11-14）：可访问性与 SEO 收尾
+
+### 实现
+
+- 侧栏模板深色底上的小字从 `text-white/45–55` 提到 `/75–80`，打印同样受益；侧栏「联系方式」补 `contact` 标签，英文 / 双语不再漏翻
+- 编辑页补视觉隐藏的 `h1`「简历编辑工作台」；保存状态加 `role="status" aria-live="polite"`
+- `Dialog` 打开时把背景兄弟节点设为 `inert` + `aria-hidden`，关闭后还原；读屏不会读到模态背后的表单
+- `Field` 把错误通过 `aria-describedby` / `aria-invalid` 关联到具体控件，错误文本加 `role="alert"`
+- AI 流式输出与整份预览加 `aria-busy`；导出菜单从假的 `role="menu"` 改成普通分组，Escape 关闭并把焦点还给触发按钮
+- 移动端预览缩放下限从 0.42 降到 0.28，≤390px 时 A4 纸不再撑出横向滚动
+- 新增 `robots.txt` / `sitemap.xml` 与 canonical；OG 文案从「5 templates」改为 8；manifest 补 `scope` / `id` / `maskable` 图标
+- 修复 plan 路由 20s 超时的 504 死代码：改用带 `TimeoutError` reason 的 abort
+
+### 验证
+
+- 单测：33 文件 / 293 用例；`tsc`、`eslint` 干净
+- 隔离副本生产构建 + 完整 QA：全部通过（含打印分页、语言与模板回归）
+- 手工 smoke：编辑页 h1 存在、保存状态 `role=status`、弹窗打开时背景 3 个节点被隐藏且关闭后恢复、邮箱错误带上 `aria-invalid` / `aria-describedby` / `role=alert`

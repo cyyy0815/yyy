@@ -7,7 +7,10 @@ export default function manifest(): MetadataRoute.Manifest {
     description:
       "在浏览器里写简历、切换模板、导出 PDF，并根据简历生成国内招聘网站的精准搜索入口。",
     start_url: "/",
+    scope: "/",
+    id: "/",
     display: "standalone",
+    orientation: "portrait",
     background_color: "#faf9f7",
     theme_color: "#1d4ed8",
     lang: "zh-CN",
@@ -24,6 +27,12 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
+      },
+      {
+        src: "/icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
       },
     ],
   };

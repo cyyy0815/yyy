@@ -1225,6 +1225,7 @@ export function AiWriter({
                     <div
                       ref={fullPreviewRef}
                       data-qa="ai-full-preview"
+                      aria-busy={streaming}
                       className="space-y-2"
                     >
                       {fullDraft ? (
@@ -1332,7 +1333,10 @@ export function AiWriter({
                           />
                         )
                       ) : (
-                        <div className="min-h-[120px] whitespace-pre-wrap text-[13px] leading-6 text-zinc-800">
+                        <div
+                          aria-busy={streaming}
+                          className="min-h-[120px] whitespace-pre-wrap text-[13px] leading-6 text-zinc-800"
+                        >
                           {output ||
                             (streaming
                               ? "AI 正在构思…"

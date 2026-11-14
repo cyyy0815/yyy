@@ -883,6 +883,7 @@ function ResumeWorkspace() {
         <CorruptDataBanner />
         {tab === "edit" ? (
           <>
+            <h1 className="sr-only">简历编辑工作台</h1>
             <div
               role="group"
               aria-label="编辑与预览切换"
@@ -1054,7 +1055,11 @@ function ResumeWorkspace() {
                   aiOpenRequest={aiOpenRequest}
                   onAiOpenConsumed={() => setAiOpenRequest(0)}
                 />
-                <p className="mt-4 flex items-center gap-1.5 px-1 text-[11px] text-zinc-500">
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className="mt-4 flex items-center gap-1.5 px-1 text-[11px] text-zinc-500"
+                >
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${
                       isSample
@@ -1199,7 +1204,11 @@ function ResumeWorkspace() {
             onChange={updateResume}
           />
         ) : (
-          <AgentWorkbench resume={resume} onChange={updateResume} />
+          <AgentWorkbench
+            resume={resume}
+            onChange={updateResume}
+            onGoJobs={() => setTab("jobs")}
+          />
         )}
       </main>
 

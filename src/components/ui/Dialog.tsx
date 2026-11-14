@@ -65,6 +65,7 @@ export function Dialog({
   const titleId = useId();
   const descriptionId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
 
   useEffect(() => {
@@ -79,6 +80,25 @@ export function Dialog({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+
+    // 背景整体 inert：键盘/鼠标已被焦点陷阱挡住，但读屏的虚拟光标仍会读到背后的表单。
+    const backdrop = backdropRef.current;
+    const background = Array.from(document.body.children).filter(
+      (element): element is HTMLElement =>
+        element !== backdrop &&
+        element instanceof HTMLElement &&
+        element.tagName !== "SCRIPT" &&
+        element.tagName !== "STYLE",
+    );
+    const previousInert = background.map((element) => ({
+      element,
+      inert: element.inert,
+      ariaHidden: element.getAttribute("aria-hidden"),
+    }));
+    for (const element of background) {
+      element.inert = true;
+      element.setAttribute("aria-hidden", "true");
+    }
 
     const previousOverflow = document.body.style.overflow;
     const previousPaddingRight = document.body.style.paddingRight;
@@ -150,6 +170,14 @@ export function Dialog({
       document.removeEventListener("focusin", handleFocusIn);
       document.body.style.overflow = previousOverflow;
       document.body.style.paddingRight = previousPaddingRight;
+      for (const item of previousInert) {
+        item.element.inert = item.inert;
+        if (item.ariaHidden === null) {
+          item.element.removeAttribute("aria-hidden");
+        } else {
+          item.element.setAttribute("aria-hidden", item.ariaHidden);
+        }
+      }
       if (trigger && document.contains(trigger)) {
         trigger.focus({ preventScroll: true });
       }
@@ -161,6 +189,7 @@ export function Dialog({
 
   return createPortal(
     <div
+      ref={backdropRef}
       className="print-hide fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/40 backdrop-blur-sm sm:items-center sm:p-4"
       onMouseDown={(event) => {
         if (event.button === 0 && event.target === event.currentTarget) {

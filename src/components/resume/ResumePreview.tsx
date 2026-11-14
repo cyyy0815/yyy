@@ -51,7 +51,7 @@ export function ResumePreview({
 
     const update = () => {
       const available = element.clientWidth - 24;
-      const next = Math.min(1, Math.max(0.42, available / A4_WIDTH_PX));
+      const next = Math.min(1, Math.max(0.28, available / A4_WIDTH_PX));
       setScale(next);
     };
 

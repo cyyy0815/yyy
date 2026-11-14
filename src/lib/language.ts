@@ -55,6 +55,7 @@ export type ResumeLabels = {
   skills: string;
   skillsProfessional: string;
   intent: string;
+  contact: string;
   otherInfo: string;
   emptyPreview: string;
   present: string;
@@ -91,6 +92,7 @@ const ZH_LABELS: ResumeLabels = {
   skills: "技能",
   skillsProfessional: "专业技能",
   intent: "求职意向",
+  contact: "联系方式",
   otherInfo: "其他信息",
   emptyPreview: "在左侧填写内容，这里会实时预览",
   present: "至今",
@@ -127,6 +129,7 @@ const EN_LABELS: ResumeLabels = {
   skills: "SKILLS",
   skillsProfessional: "SKILLS",
   intent: "OBJECTIVE",
+  contact: "CONTACT",
   otherInfo: "ADDITIONAL",
   emptyPreview: "Fill in the form on the left to see a live preview",
   present: "Present",

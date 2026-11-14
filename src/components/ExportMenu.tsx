@@ -29,6 +29,7 @@ export function ExportMenu({
 }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -36,7 +37,9 @@ export function ExportMenu({
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.focus();
     };
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -54,10 +57,10 @@ export function ExportMenu({
   return (
     <div className="relative" ref={rootRef}>
       <Button
+        ref={triggerRef}
         variant="outline"
         size="sm"
         data-qa="export-menu"
-        aria-haspopup="menu"
         aria-expanded={open}
         disabled={busy}
         onClick={() => setOpen((value) => !value)}
@@ -67,7 +70,8 @@ export function ExportMenu({
 
       {open ? (
         <div
-          role="menu"
+          role="group"
+          aria-label="导出选项"
           data-qa="export-panel"
           className="absolute right-0 z-30 mt-2 w-60 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-lg"
         >
@@ -76,7 +80,6 @@ export function ExportMenu({
           </p>
           <button
             type="button"
-            role="menuitem"
             data-qa="export-json-all"
             className="block w-full px-3 py-2 text-left text-[12.5px] text-zinc-700 hover:bg-zinc-50"
             onClick={() => run(onJsonArchive)}
@@ -85,7 +88,6 @@ export function ExportMenu({
           </button>
           <button
             type="button"
-            role="menuitem"
             data-qa="export-json-single"
             className="block w-full px-3 py-2 text-left text-[12.5px] text-zinc-700 hover:bg-zinc-50"
             onClick={() => run(onJsonSingle)}
@@ -99,7 +101,6 @@ export function ExportMenu({
           </p>
           <button
             type="button"
-            role="menuitem"
             data-qa="export-word"
             className="block w-full px-3 py-2 text-left text-[12.5px] text-zinc-700 hover:bg-zinc-50"
             onClick={() => run(onWord)}
@@ -108,7 +109,6 @@ export function ExportMenu({
           </button>
           <button
             type="button"
-            role="menuitem"
             data-qa="export-pdf"
             className="block w-full px-3 py-2 text-left text-[12.5px] text-zinc-700 hover:bg-zinc-50"
             onClick={() => run(onPdf)}
@@ -117,7 +117,6 @@ export function ExportMenu({
           </button>
           <button
             type="button"
-            role="menuitem"
             data-qa="export-ats"
             className="block w-full px-3 py-2 text-left text-[12.5px] text-zinc-700 hover:bg-zinc-50"
             onClick={() => run(onAts)}

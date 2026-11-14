@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const alt =
-  "Resume Workshop — local-first resume builder with 5 templates, JD matching and AI writing";
+  "Resume Workshop — local-first resume builder with 8 templates, JD matching and AI writing";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -117,7 +117,7 @@ export default function OpengraphImage() {
                 color: "#52525b",
               }}
             >
-              5 templates · JD matching · AI writing
+              8 templates · JD matching · AI writing
             </div>
           </div>
 
