@@ -32,6 +32,13 @@ body {
   color: #111827;
 }
 
+/* 首屏 SSR 覆盖层淡出，交接到编辑器 */
+@keyframes splash-out {
+  to {
+    opacity: 0;
+  }
+}
+
 /* 键盘焦点：只在键盘导航时显示，输入框保留各自的 focus ring */
 :where(
   button,

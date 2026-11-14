@@ -167,12 +167,33 @@ export function AppShell() {
     getClientSnapshot,
     getServerSnapshot,
   );
+  // 水合完成后让首屏覆盖层淡出，避免从静态首屏瞬间「跳」进编辑器。
+  const [splashVisible, setSplashVisible] = useState(true);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const timer = window.setTimeout(() => setSplashVisible(false), 260);
+    return () => window.clearTimeout(timer);
+  }, [hydrated]);
 
   if (!hydrated) {
     return <AppFirstScreen />;
   }
 
-  return <ResumeWorkspace />;
+  return (
+    <>
+      <ResumeWorkspace />
+      {splashVisible ? (
+        <div
+          aria-hidden="true"
+          data-splash="true"
+          className="print-hide pointer-events-none fixed inset-0 z-[80] overflow-hidden bg-[#faf9f7] motion-safe:animate-[splash-out_240ms_ease-out_forwards] motion-reduce:hidden"
+        >
+          <AppFirstScreen />
+        </div>
+      ) : null}
+    </>
+  );
 }
 
 function ResumeWorkspace() {
