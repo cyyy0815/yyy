@@ -15,6 +15,8 @@ type Props = {
   onChange: Dispatch<SetStateAction<Resume>>;
   /** 没有待投岗位时，切到「职位推荐」添加 */
   onGoJobs?: () => void;
+  /** 没有待投岗位时，直接载入演示场景并留在工作台 */
+  onLoadDemo?: () => void;
 };
 
 /**
@@ -23,7 +25,7 @@ type Props = {
  * 页面本身负责三件事：选岗位、按当前岗位与 AI 状态预演计划、启动；
  * 真正的执行仍在 Agent 面板里，这样执行状态、事实核对、采用与撤销的逻辑只有一份。
  */
-export function AgentWorkbench({ resume, onChange, onGoJobs }: Props) {
+export function AgentWorkbench({ resume, onChange, onGoJobs, onLoadDemo }: Props) {
   const { applications } = useApplications();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
@@ -142,19 +144,26 @@ export function AgentWorkbench({ resume, onChange, onGoJobs }: Props) {
             还没有待投岗位
           </p>
           <p className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-6 text-zinc-500">
-            先去「职位推荐」粘贴一段 JD 加入待投清单；也可以点顶栏「演示场景」，
-            用「小林 + 3 个目标岗位」直接体验完整工作流。
+            先去「职位推荐」粘贴一段 JD 加入待投清单；也可以直接载入演示场景，
+            用「小林 + 6 个目标岗位」体验从高匹配到跨方向的完整工作流。
           </p>
-          {onGoJobs ? (
-            <Button
-              variant="primary"
-              size="sm"
-              className="mt-4"
-              onClick={onGoJobs}
-            >
-              去职位推荐添加岗位
-            </Button>
-          ) : null}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {onLoadDemo ? (
+              <Button
+                variant="primary"
+                size="sm"
+                data-qa="agent-load-demo"
+                onClick={onLoadDemo}
+              >
+                载入演示场景（6 个岗位）
+              </Button>
+            ) : null}
+            {onGoJobs ? (
+              <Button variant="outline" size="sm" onClick={onGoJobs}>
+                去职位推荐添加岗位
+              </Button>
+            ) : null}
+          </div>
         </section>
       ) : (
         <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">

@@ -718,7 +718,7 @@ function ResumeWorkspace() {
     }
   };
 
-  const handleLoadDemo = () => {
+  const handleLoadDemo = (options?: { stay?: boolean }) => {
     if (
       !window.confirm(
         "载入演示场景会用「小林」的简历和 6 个目标岗位替换当前简历与待投清单，确定继续吗？",
@@ -732,13 +732,15 @@ function ResumeWorkspace() {
     window.dispatchEvent(new Event(APPLICATIONS_EVENT));
     saveJd(DEMO_JOBS[0].jd);
     setResumeVersion((value) => value + 1);
-    setTab("jobs");
-    // 待投清单在职位推荐页首屏下方，切页后滚过去，否则看起来像「没有演示数据」
-    window.setTimeout(() => {
-      document
-        .querySelector('[data-qa="job-queue"]')
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 400);
+    if (!options?.stay) {
+      setTab("jobs");
+      // 待投清单在职位推荐页首屏下方，切页后滚过去，否则看起来像「没有演示数据」
+      window.setTimeout(() => {
+        document
+          .querySelector('[data-qa="job-queue"]')
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 400);
+    }
     setNotice({
       type: "ok",
       message: `已载入演示场景：${DEMO_TITLE} + 6 个目标岗位`,
@@ -1173,7 +1175,7 @@ function ResumeWorkspace() {
                       variant="ghost"
                       size="sm"
                       data-qa="load-demo"
-                      onClick={handleLoadDemo}
+                      onClick={() => handleLoadDemo()}
                       title="载入「小林」的简历 + 6 个目标岗位，用于演示全链路"
                     >
                       演示场景
@@ -1208,6 +1210,7 @@ function ResumeWorkspace() {
             resume={resume}
             onChange={updateResume}
             onGoJobs={() => setTab("jobs")}
+            onLoadDemo={() => handleLoadDemo({ stay: true })}
           />
         )}
       </main>
