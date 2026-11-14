@@ -36,11 +36,13 @@ describe("useResume 保存时序", () => {
     });
     // 防抖窗口内还没写盘。
     expect(loadResume()?.basic.name).toBe("林一");
+    expect(result.current.isDirty).toBe(true);
 
     act(() => {
       window.dispatchEvent(new Event("pagehide"));
     });
     expect(loadResume()?.basic.name).toBe("林一改");
+    expect(result.current.isDirty).toBe(false);
   });
 
   it("replaceResume 立即写盘，导入后马上刷新也不会回到旧简历", () => {

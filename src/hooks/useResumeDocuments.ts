@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   deriveResumeTitle,
+  LIBRARY_KEY,
   loadResumeLibrary,
+  parseResumeLibrary,
   saveResumeLibrary,
   uniqueTitle,
   type ResumeLibrary,
@@ -21,6 +23,8 @@ type Args = {
   resume: Resume;
   template: TemplateId;
   isSample: boolean;
+  /** 本页有未保存修改时，不跟随其他标签页切换当前文档，避免内容写到错误的文档。 */
+  hasUnsavedChanges: boolean;
   replaceResume: (resume: Resume) => void;
   setTemplate: (template: TemplateId) => void;
 };
@@ -48,6 +52,7 @@ export function useResumeDocuments({
   resume,
   template,
   isSample,
+  hasUnsavedChanges,
   replaceResume,
   setTemplate,
 }: Args) {
@@ -79,8 +84,53 @@ export function useResumeDocuments({
     resume,
   });
 
+  /**
+   * 写入文档列表前先和最新存储合并：另一个标签页新增的文档不会被本次写入覆盖。
+   * 如果对方已经切换了当前文档（activeId 不同），本页基于过期身份的操作直接失败。
+   */
+  const persistLibrary = (
+    next: ResumeLibrary,
+    options?: { replace?: boolean },
+  ): boolean => {
+    if (options?.replace) return saveResumeLibrary(next);
+    const stored = loadResumeLibrary();
+    if (!stored) return saveResumeLibrary(next);
+    if (stored.activeId !== activeId) return false;
+    const known = new Set(next.others.map((document) => document.id));
+    const extras = stored.others.filter(
+      (document) => !known.has(document.id) && document.id !== next.activeId,
+    );
+    return saveResumeLibrary(
+      extras.length > 0
+        ? { ...next, others: [...next.others, ...extras] }
+        : next,
+    );
+  };
+
+  // 其他标签页改文档列表：新增 / 重命名直接同步；切换当前文档时，
+  // 只有本页没有未保存修改才跟随，避免把本地内容写到别的文档槽位。
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== LIBRARY_KEY) return;
+      const incoming = parseResumeLibrary(event.newValue);
+      if (!incoming) return;
+      setState((current) => {
+        const currentId = current.library?.activeId ?? "default";
+        if (incoming.activeId !== currentId && hasUnsavedChanges) {
+          return current;
+        }
+        return {
+          library: incoming,
+          activeTitle: incoming.activeTitle.trim() || null,
+        };
+      });
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [hasUnsavedChanges]);
+
   const commit = (library: ResumeLibrary): boolean => {
-    if (!saveResumeLibrary(library)) return false;
+    if (!persistLibrary(library)) return false;
     setState({
       library,
       activeTitle: library.activeTitle.trim() || null,
@@ -129,7 +179,7 @@ export function useResumeDocuments({
       activeTitle: target.title,
       others: nextOthers,
     };
-    if (!saveResumeLibrary(library)) {
+    if (!persistLibrary(library)) {
       saveResume(backdrop ? backdrop.resume : resume);
       return false;
     }
@@ -154,7 +204,7 @@ export function useResumeDocuments({
         ? [...(backdrop ? [backdrop] : []), ...others]
         : [currentDocument(), ...others],
     };
-    if (!saveResumeLibrary(library)) {
+    if (!persistLibrary(library)) {
       saveResume(backdrop ? backdrop.resume : resume);
       return false;
     }
@@ -179,7 +229,7 @@ export function useResumeDocuments({
         ? [...(backdrop ? [backdrop] : []), ...others]
         : [currentDocument(), ...others],
     };
-    if (!saveResumeLibrary(library)) {
+    if (!persistLibrary(library)) {
       saveResume(backdrop ? backdrop.resume : resume);
       return false;
     }
@@ -208,7 +258,7 @@ export function useResumeDocuments({
         ? [...(backdrop ? [backdrop] : []), ...others]
         : [currentDocument(), ...others],
     };
-    if (!saveResumeLibrary(library)) {
+    if (!persistLibrary(library)) {
       saveResume(backdrop ? backdrop.resume : resume);
       return null;
     }
@@ -237,7 +287,7 @@ export function useResumeDocuments({
         { id: newId(), title, template: nextTemplate, resume: nextResume },
       ],
     };
-    if (!saveResumeLibrary(library)) return null;
+    if (!persistLibrary(library)) return null;
     setState({ library, activeTitle: currentTitle });
     return title;
   };
@@ -257,7 +307,7 @@ export function useResumeDocuments({
       activeTitle: currentTitle,
       others: [...others, ...remapped],
     };
-    if (!saveResumeLibrary(library)) return false;
+    if (!persistLibrary(library)) return false;
     setState({ library, activeTitle: currentTitle });
     return true;
   };
@@ -295,7 +345,7 @@ export function useResumeDocuments({
       activeTitle: target.title,
       others: remapped.filter((document) => document.id !== target.id),
     };
-    if (!saveResumeLibrary(library)) {
+    if (!persistLibrary(library, { replace: true })) {
       saveResume(previousStored ?? resume);
       return false;
     }
@@ -317,7 +367,7 @@ export function useResumeDocuments({
       activeTitle: next.title,
       others: rest,
     };
-    if (!saveResumeLibrary(library)) {
+    if (!persistLibrary(library)) {
       saveResume(previousStored ?? resume);
       return false;
     }

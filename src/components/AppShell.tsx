@@ -183,6 +183,7 @@ function ResumeWorkspace() {
     saveState,
     lastSavedAt,
     hasConflict,
+    isDirty,
     keepLocalVersion,
     clearAll,
     loadSample,
@@ -225,6 +226,7 @@ function ResumeWorkspace() {
     resume,
     template,
     isSample,
+    hasUnsavedChanges: isDirty,
     replaceResume,
     setTemplate,
   });
@@ -236,6 +238,16 @@ function ResumeWorkspace() {
       // ignore
     }
   }, [template]);
+
+  // 另一个标签页切换文档会连带切换模板；本页没有未保存修改时跟随，避免预览突然换版。
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== TEMPLATE_KEY || isDirty) return;
+      if (isTemplateId(event.newValue)) setTemplate(event.newValue);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [isDirty]);
 
   useEffect(() => {
     document.documentElement.dataset.pageNumbers = showPageNumbers

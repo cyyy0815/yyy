@@ -8,6 +8,7 @@ import { isTemplateId, newId, type Resume, type TemplateId } from "./types";
  * 这样旧版本和现有数据可以无缝继续使用，也不需要重复存储当前文档。
  */
 export const LIBRARY_KEY = "resume-workshop:library:v1";
+const MAX_DOCUMENTS = 50;
 
 export type StoredDocument = {
   id: string;
@@ -39,6 +40,33 @@ function normalizeDocument(value: unknown): StoredDocument | null {
   };
 }
 
+/** 解析一段文档列表原始 JSON（storage 事件的 newValue 也能直接用）；失败返回 null。 */
+export function parseResumeLibrary(raw: string | null): ResumeLibrary | null {
+  if (!raw) return null;
+  try {
+    const data: unknown = JSON.parse(raw);
+    if (!data || typeof data !== "object") return null;
+    const source = data as Record<string, unknown>;
+    const activeId = asString(source.activeId) || newId();
+    const seen = new Set([activeId]);
+    const others: StoredDocument[] = [];
+    for (const value of Array.isArray(source.others) ? source.others : []) {
+      const document = normalizeDocument(value);
+      if (!document || seen.has(document.id)) continue;
+      if (others.length >= MAX_DOCUMENTS) break;
+      seen.add(document.id);
+      others.push(document);
+    }
+    return {
+      activeId,
+      activeTitle: asString(source.activeTitle).trim().slice(0, 60),
+      others,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** 只读取除当前文档外的快照；当前文档仍以 v1 为准。 */
 export function loadResumeLibrary(): ResumeLibrary | null {
   if (typeof window === "undefined") return null;
@@ -54,23 +82,7 @@ export function loadResumeLibrary(): ResumeLibrary | null {
         return false;
       }
     });
-    const data: unknown = JSON.parse(raw);
-    if (!data || typeof data !== "object") return null;
-    const source = data as Record<string, unknown>;
-    const activeId = asString(source.activeId) || newId();
-    const seen = new Set([activeId]);
-    const others: StoredDocument[] = [];
-    for (const value of Array.isArray(source.others) ? source.others : []) {
-      const document = normalizeDocument(value);
-      if (!document || seen.has(document.id)) continue;
-      seen.add(document.id);
-      others.push(document);
-    }
-    return {
-      activeId,
-      activeTitle: asString(source.activeTitle).trim().slice(0, 60),
-      others,
-    };
+    return parseResumeLibrary(raw);
   } catch {
     return null;
   }

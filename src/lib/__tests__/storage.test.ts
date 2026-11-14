@@ -50,6 +50,41 @@ describe("normalizeResume", () => {
     }
   });
 
+  it("导入时限制数组条数与超长文本，避免大文件卡死页面", () => {
+    const long = "x".repeat(30_000);
+    const resume = normalizeResume({
+      basic: { summary: long },
+      educations: Array.from({ length: 100 }, (_, index) => ({
+        school: `学校 ${index}`,
+      })),
+      experiences: Array.from({ length: 200 }, (_, index) => ({
+        company: `公司 ${index}`,
+        description: long,
+      })),
+      projects: Array.from({ length: 200 }, (_, index) => ({
+        name: `项目 ${index}`,
+      })),
+      customSections: Array.from({ length: 100 }, (_, index) => ({
+        title: `板块 ${index}`,
+        items: Array.from({ length: 100 }, (_, item) => ({
+          title: `条目 ${item}`,
+        })),
+      })),
+      skills: Array.from({ length: 500 }, (_, index) => `技能 ${index}`),
+      skillGroups: Array.from({ length: 100 }, (_, index) => `分组 ${index}`),
+    });
+
+    expect(resume.educations).toHaveLength(20);
+    expect(resume.experiences).toHaveLength(50);
+    expect(resume.projects).toHaveLength(50);
+    expect(resume.customSections).toHaveLength(20);
+    expect(resume.customSections[0].items).toHaveLength(50);
+    expect(resume.skills).toHaveLength(100);
+    expect(resume.skillGroups).toHaveLength(30);
+    expect(resume.basic.summary).toHaveLength(20_000);
+    expect(resume.experiences[0].description).toHaveLength(20_000);
+  });
+
   it("字体搭配：保留合法值，旧数据与非法值回退 auto", () => {
     expect(normalizeResume({ basic: { name: "林一" } }).font).toBe("auto");
     expect(normalizeResume({ font: "serif" }).font).toBe("serif");

@@ -40,6 +40,8 @@ export type UseResume = {
   lastSavedAt: number | null;
   /** 另一个标签页改过 storage，本页暂停写入，等用户选择保留哪一份。 */
   hasConflict: boolean;
+  /** 本页是否有尚未写入 localStorage 的修改（供多标签页身份同步判断）。 */
+  isDirty: boolean;
   keepLocalVersion: () => boolean;
   clearAll: () => void;
   loadSample: () => void;
@@ -74,6 +76,7 @@ export function useResume(): UseResume {
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(readLastSavedAt);
   const [hasConflict, setHasConflict] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   // 事件处理里需要同步读取最新值，state 在同一个事件中不会立即更新。
   const resumeRef = useRef(resume);
@@ -155,12 +158,14 @@ export function useResume(): UseResume {
       return false;
     }
     if (!saveResume(resumeRef.current)) {
+      setIsDirty(true);
       setSaveState("error");
       return false;
     }
     lastWrittenRef.current = next;
     dirtyRef.current = false;
     dirtySinceRef.current = 0;
+    setIsDirty(false);
     setLastSavedAt(Date.now());
     setSaveState("saved");
     // 只持久化与已保存内容对应的历史，避免刷新后撤销到未落盘的状态。
@@ -225,6 +230,7 @@ export function useResume(): UseResume {
       setIsSample(false);
       if (!dirtyRef.current) dirtySinceRef.current = Date.now();
       dirtyRef.current = true;
+      setIsDirty(true);
       editedRef.current = true;
       // 冲突期间保存被暂停，不要让状态又回到「保存中」。
       setSaveState(hasConflict ? "conflict" : "saving");
@@ -248,11 +254,13 @@ export function useResume(): UseResume {
       lastWrittenRef.current = JSON.stringify(empty);
       dirtyRef.current = false;
       dirtySinceRef.current = 0;
+      setIsDirty(false);
       setSaveState("saved");
     } else {
       lastWrittenRef.current = readStoredResumeRaw();
       dirtyRef.current = true;
       dirtySinceRef.current = Date.now();
+      setIsDirty(true);
       setSaveState("error");
     }
     editedRef.current = true;
@@ -275,6 +283,7 @@ export function useResume(): UseResume {
     // 示例不落盘；但用户主动换了内容，之后别的标签页写入时仍应让他选择。
     dirtyRef.current = false;
     dirtySinceRef.current = 0;
+    setIsDirty(false);
     editedRef.current = true;
     setResume(sample);
     setIsSample(true);
@@ -303,6 +312,7 @@ export function useResume(): UseResume {
         lastWrittenRef.current = readStoredResumeRaw();
         dirtyRef.current = false;
         dirtySinceRef.current = 0;
+        setIsDirty(false);
         editedRef.current = false;
         setSaveState("saved");
         setLastSavedAt(readLastSavedAt());
@@ -316,12 +326,14 @@ export function useResume(): UseResume {
         lastWrittenRef.current = json;
         dirtyRef.current = false;
         dirtySinceRef.current = 0;
+        setIsDirty(false);
         setSaveState("saved");
         setLastSavedAt(Date.now());
       } else {
         lastWrittenRef.current = readStoredResumeRaw();
         dirtyRef.current = true;
         dirtySinceRef.current = Date.now();
+        setIsDirty(true);
         setSaveState("error");
       }
       editedRef.current = true;
@@ -365,6 +377,7 @@ export function useResume(): UseResume {
       isSampleRef.current = snapshot.isSample;
       if (!dirtyRef.current) dirtySinceRef.current = Date.now();
       dirtyRef.current = true;
+      setIsDirty(true);
       editedRef.current = true;
       setResume(snapshot.resume);
       setIsSample(snapshot.isSample);
@@ -395,12 +408,14 @@ export function useResume(): UseResume {
 
   const keepLocalVersion = useCallback(() => {
     if (!saveResume(resume)) {
+      setIsDirty(true);
       setSaveState("error");
       return false;
     }
     lastWrittenRef.current = JSON.stringify(resume);
     dirtyRef.current = false;
     dirtySinceRef.current = 0;
+    setIsDirty(false);
     editedRef.current = true;
     setLastSavedAt(Date.now());
     setHasConflict(false);
@@ -416,6 +431,7 @@ export function useResume(): UseResume {
     saveState,
     lastSavedAt,
     hasConflict,
+    isDirty,
     keepLocalVersion,
     clearAll,
     loadSample,

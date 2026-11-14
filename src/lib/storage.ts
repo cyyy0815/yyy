@@ -32,7 +32,9 @@ export const BACKUP_SNOOZE_KEY = "resume-workshop:backup-snooze-at";
 export const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 
 function asString(value: unknown, fallback = ""): string {
-  return typeof value === "string" ? value : fallback;
+  return typeof value === "string"
+    ? value.slice(0, MAX_TEXT_LENGTH)
+    : fallback;
 }
 
 function asArray<T>(value: unknown): T[] {
@@ -48,6 +50,16 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 const MAX_SKILL_GROUP_LENGTH = 24;
+/** 导入 / 读取时的结构上限：防止 5MB JSON 塞进十几万条经历把页面卡死。 */
+const MAX_TEXT_LENGTH = 20_000;
+const MAX_SKILLS = 100;
+const MAX_SKILL_GROUPS = 30;
+const MAX_EDUCATIONS = 20;
+const MAX_EXPERIENCES = 50;
+const MAX_PROJECTS = 50;
+const MAX_CUSTOM_SECTIONS = 20;
+const MAX_CUSTOM_ITEMS = 50;
+const MAX_TRANSLATION_ENTRIES = 200;
 
 /**
  * 技能分组与熟练度是展示层数据：只保留仍存在于 skills 里的技能，
@@ -68,7 +80,7 @@ function normalizeSkillDetails(
     return group;
   };
 
-  for (const value of asArray<unknown>(rawGroups)) {
+  for (const value of asArray<unknown>(rawGroups).slice(0, MAX_SKILL_GROUPS)) {
     if (typeof value === "string") addGroup(value);
   }
 
@@ -95,8 +107,13 @@ function translationEntries<T>(
 ): Record<string, T> {
   const source = asRecord(value);
   const result: Record<string, T> = {};
+  let count = 0;
   for (const [id, item] of Object.entries(source)) {
-    if (isRecord(item)) result[id] = map(item);
+    if (count >= MAX_TRANSLATION_ENTRIES) break;
+    if (isRecord(item)) {
+      result[id] = map(item);
+      count += 1;
+    }
   }
   return result;
 }
@@ -169,6 +186,7 @@ export function normalizeResume(input: unknown): Resume {
   const intent = asRecord(raw.intent);
   const theme = asRecord(raw.theme);
   const skills = asArray<unknown>(raw.skills)
+    .slice(0, MAX_SKILLS)
     .filter((skill): skill is string => typeof skill === "string")
     .map((skill) => skill.trim())
     .filter((skill, index, list) => Boolean(skill) && list.indexOf(skill) === index);
@@ -199,7 +217,10 @@ export function normalizeResume(input: unknown): Resume {
       jobType: asString(intent.jobType, "全职"),
       experience: asString(intent.experience),
     },
-    educations: asArray<unknown>(raw.educations).filter(isRecord).map((item) => ({
+    educations: asArray<unknown>(raw.educations)
+      .slice(0, MAX_EDUCATIONS)
+      .filter(isRecord)
+      .map((item) => ({
       id: asString(item.id) || newId(),
       school: asString(item.school),
       major: asString(item.major),
@@ -211,7 +232,10 @@ export function normalizeResume(input: unknown): Resume {
       courses: asString(item.courses),
       honors: asString(item.honors),
     })),
-    experiences: asArray<unknown>(raw.experiences).filter(isRecord).map((item) => ({
+    experiences: asArray<unknown>(raw.experiences)
+      .slice(0, MAX_EXPERIENCES)
+      .filter(isRecord)
+      .map((item) => ({
       id: asString(item.id) || newId(),
       company: asString(item.company),
       role: asString(item.role),
@@ -220,7 +244,10 @@ export function normalizeResume(input: unknown): Resume {
       description: asString(item.description),
       ...(item.pageBreakBefore === true ? { pageBreakBefore: true } : {}),
     })),
-    projects: asArray<unknown>(raw.projects).filter(isRecord).map((item) => ({
+    projects: asArray<unknown>(raw.projects)
+      .slice(0, MAX_PROJECTS)
+      .filter(isRecord)
+      .map((item) => ({
       id: asString(item.id) || newId(),
       name: asString(item.name),
       role: asString(item.role),
@@ -231,12 +258,16 @@ export function normalizeResume(input: unknown): Resume {
       ...(item.pageBreakBefore === true ? { pageBreakBefore: true } : {}),
     })),
     customSections: asArray<unknown>(raw.customSections)
+      .slice(0, MAX_CUSTOM_SECTIONS)
       .filter(isRecord)
       .map((section) => ({
         id: asString(section.id) || newId(),
         title: asString(section.title),
         visible: section.visible !== false,
-        items: asArray<unknown>(section.items).filter(isRecord).map((item) => ({
+        items: asArray<unknown>(section.items)
+          .slice(0, MAX_CUSTOM_ITEMS)
+          .filter(isRecord)
+          .map((item) => ({
           id: asString(item.id) || newId(),
           title: asString(item.title),
           subtitle: asString(item.subtitle),
