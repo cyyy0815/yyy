@@ -23,6 +23,10 @@ export const metadata: Metadata = {
     "AI 写简历",
   ],
   category: "productivity",
+  other: {
+    // Vercel 构建时注入提交号，便于确认线上部署的是哪个版本；本地构建为 dev。
+    "build-sha": process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "dev",
+  },
   alternates: {
     canonical: "/",
   },
