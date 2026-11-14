@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useDeferredValue, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { AppSkeleton } from "@/components/AppSkeleton";
+import { AppFirstScreen } from "@/components/AppFirstScreen";
 import { ExportMenu } from "@/components/ExportMenu";
 import { ResumeDocumentsBar } from "@/components/resume/ResumeDocumentsBar";
 import { ResumeForm } from "@/components/resume/ResumeForm";
@@ -169,7 +169,7 @@ export function AppShell() {
   );
 
   if (!hydrated) {
-    return <AppSkeleton />;
+    return <AppFirstScreen />;
   }
 
   return <ResumeWorkspace />;

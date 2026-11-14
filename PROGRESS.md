@@ -1343,3 +1343,21 @@ docs/eval-report.md             ✅ 生成物（随仓库提交，便于评审�
 - `tsc`、`eslint` 干净
 - 生产构建 + 完整 QA：全部通过（含撤销历史、Service Worker 与离线缓存）
 - SW 实测：`scriptURL = /sw.js?v=dev`，缓存键为 `resume-workshop-{shell,static,runtime}-dev`
+
+---
+
+## 阶段 55（2026-11-14）：首屏 SSR 内容化
+
+### 实现
+
+- `AppSkeleton` 换成 `AppFirstScreen`：服务端直接输出真实顶栏、`h1`、产品说明、四条能力点、纸面预览、载入状态与页脚，不再是一屏灰块
+- 首屏 HTML 自带 `noscript` 说明；`prefers-reduced-motion` 下脉冲动画自动降级
+- 简历数据只存在 localStorage，编辑器仍在水合后接管；这一步先把 LCP 文本与爬虫可读内容提前到服务端
+
+### 验证
+
+- 服务端 HTML 实测包含「在浏览器里写简历」「8 套 A4 模板」「正在载入编辑器」，首屏 HTML 约 16KB
+- 单测：33 文件 / 300 用例；`tsc`、`eslint` 干净
+- 生产构建 + 完整 QA：全部通过（水合接管、离线缓存、多标签页都正常）
+
+> 边界：编辑器内容依赖本机 localStorage，若要让表格与预览也 SSR，需要把初始状态改成确定值再在 effect 里读存储，会带来「空表单闪一下」与数据层回归风险，暂不混在这一批。
