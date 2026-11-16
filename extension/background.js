@@ -52,52 +52,6 @@ async function deliver(tabId, lead) {
   return false;
 }
 
-async function deliverJobs(tabId, jobs) {
-  for (let attempt = 0; attempt < DELIVER_ATTEMPTS; attempt += 1) {
-    try {
-      const response = await chrome.tabs.sendMessage(tabId, {
-        type: "job-list",
-        jobs,
-      });
-      if (response && response.ok) return true;
-    } catch {
-      // content script 还没注入（页面刚打开）时继续重试
-    }
-    await sleep(DELIVER_INTERVAL_MS);
-  }
-  return false;
-}
-
-/** 把一页岗位发到应用；只搬运，不落扩展存储。 */
-async function sendJobsToApp(jobs) {
-  if (!Array.isArray(jobs) || jobs.length === 0) {
-    return { ok: false, error: "当前页没有可发送的岗位" };
-  }
-
-  const appUrl = await getAppUrl();
-  let tab = await findAppTab(appUrl);
-  let created = false;
-
-  if (!tab) {
-    tab = await chrome.tabs.create({ url: appUrl, active: true });
-    created = true;
-  } else {
-    await chrome.tabs.update(tab.id, { active: true });
-  }
-
-  if (created) {
-    await waitForTabComplete(tab.id);
-  }
-
-  const ok = await deliverJobs(tab.id, jobs.slice(0, 50));
-  return ok
-    ? { ok: true, count: jobs.length }
-    : {
-        ok: false,
-        error: "没能连上简历工坊页面：确认应用已打开、地址一致，然后重试",
-      };
-}
-
 async function sendToApp(lead) {
   if (!lead || typeof lead.jd !== "string" || !lead.jd.trim()) {
     return { ok: false, error: "没有可发送的岗位内容" };
@@ -171,11 +125,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message?.type === "send-lead") {
     sendToApp(message.lead).then(sendResponse);
-    return true; // 异步响应
-  }
-
-  if (message?.type === "send-job-list") {
-    sendJobsToApp(message.jobs).then(sendResponse);
     return true; // 异步响应
   }
 

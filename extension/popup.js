@@ -189,24 +189,6 @@ document.getElementById("copy").addEventListener("click", async () => {
   }
 });
 
-document.getElementById("collectList").addEventListener("click", async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) {
-    setResult("没有可采集的标签页", "error");
-    return;
-  }
-  try {
-    const response = await chrome.tabs.sendMessage(tab.id, { type: "collect-list" });
-    if (response?.ok) {
-      setResult(`已发送 ${response.count ?? ""} 个岗位到简历工坊`, "ok");
-    } else {
-      setResult(response?.error || "当前页没有识别到职位卡片", "error");
-    }
-  } catch {
-    setResult("当前页不支持采集：请先打开招聘网站的搜索结果页", "error");
-  }
-});
-
 document.getElementById("saveUrl").addEventListener("click", async () => {
   const url = $("appUrl").value.trim();
   await chrome.runtime.sendMessage({ type: "set-app-url", url });

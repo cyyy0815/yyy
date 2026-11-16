@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/Button";
 import { ApplicationBoard } from "./ApplicationBoard";
 import { CoverLetterWriter } from "./CoverLetterWriter";
 import { JdMatcher } from "./JdMatcher";
-import { JobPoolPanel } from "./JobPoolPanel";
 import { JobQueuePanel } from "./JobQueuePanel";
 import { SkillChip } from "./SkillChip";
 
@@ -166,8 +165,7 @@ export function JobsPanel({
             去填写
           </Button>
         </div>
-        {/* 简历还没填时也保留岗位池与待投清单：扩展采集的岗位不能因为没简历就丢掉 */}
-        <JobPoolPanel resume={resume} resumeTitle={resumeTitle} />
+        {/* 简历还没填时也保留待投清单：扩展发来的岗位不能因为没简历就丢掉 */}
         <JobQueuePanel
           resume={resume}
           resumeTitle={resumeTitle}
@@ -217,7 +215,6 @@ export function JobsPanel({
       <nav className="flex flex-wrap gap-2 text-[12px] text-zinc-500" aria-label="页内导航">
         {[
           { label: "匹配结果", target: '[data-qa="match-section"]' },
-          { label: "推荐岗位池", target: '[data-qa="job-pool"]' },
           { label: "待投清单", target: '[data-qa="job-queue"]' },
           { label: "投递看板", target: '[data-qa="application-board"]' },
         ].map((item) => (
@@ -293,7 +290,6 @@ export function JobsPanel({
         <nav className="flex flex-wrap gap-2 text-[12px] text-zinc-500" aria-label="页内导航">
         {[
           { label: "匹配结果", target: '[data-qa="match-section"]' },
-          { label: "推荐岗位池", target: '[data-qa="job-pool"]' },
           { label: "待投清单", target: '[data-qa="job-queue"]' },
           { label: "投递看板", target: '[data-qa="application-board"]' },
         ].map((item) => (
@@ -400,7 +396,6 @@ export function JobsPanel({
         <nav className="flex flex-wrap gap-2 text-[12px] text-zinc-500" aria-label="页内导航">
         {[
           { label: "匹配结果", target: '[data-qa="match-section"]' },
-          { label: "推荐岗位池", target: '[data-qa="job-pool"]' },
           { label: "待投清单", target: '[data-qa="job-queue"]' },
           { label: "投递看板", target: '[data-qa="application-board"]' },
         ].map((item) => (
@@ -441,8 +436,6 @@ export function JobsPanel({
         </section>
       </div>
 
-      <JobPoolPanel resume={resume} resumeTitle={resumeTitle} />
-
       <JdMatcher resume={resume} onAddSkill={onAddSkill} />
 
       <JobQueuePanel
@@ -464,7 +457,6 @@ export function JobsPanel({
       <nav className="flex flex-wrap gap-2 text-[12px] text-zinc-500" aria-label="页内导航">
         {[
           { label: "匹配结果", target: '[data-qa="match-section"]' },
-          { label: "推荐岗位池", target: '[data-qa="job-pool"]' },
           { label: "待投清单", target: '[data-qa="job-queue"]' },
           { label: "投递看板", target: '[data-qa="application-board"]' },
         ].map((item) => (
