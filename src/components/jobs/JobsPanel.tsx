@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { ApplicationBoard } from "./ApplicationBoard";
 import { CoverLetterWriter } from "./CoverLetterWriter";
 import { JdMatcher } from "./JdMatcher";
+import { JobCaptureCard } from "./JobCaptureCard";
 import { JobQueuePanel } from "./JobQueuePanel";
 import { SkillChip } from "./SkillChip";
 
@@ -165,7 +166,8 @@ export function JobsPanel({
             去填写
           </Button>
         </div>
-        {/* 简历还没填时也保留待投清单：扩展发来的岗位不能因为没简历就丢掉 */}
+        {/* 简历还没填时也保留采集入口与待投清单：扩展/书签发来的岗位不能因为没简历就丢掉 */}
+        <JobCaptureCard />
         <JobQueuePanel
           resume={resume}
           resumeTitle={resumeTitle}
@@ -211,6 +213,8 @@ export function JobsPanel({
           所有分析都在你的浏览器里完成，简历不会上传。
         </p>
       </header>
+
+      <JobCaptureCard />
 
       <nav className="flex flex-wrap gap-2 text-[12px] text-zinc-500" aria-label="页内导航">
         {[

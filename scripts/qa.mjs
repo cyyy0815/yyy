@@ -3682,6 +3682,7 @@ expect("导出 JSON 保留字体搭配", exportedFont === "serif", exportedFont)
 
 await pause(900);
 await clickFont("等宽");
+await waitFontStored("mono");
 const monoBeforeUndo = await readFontState();
 await fontPage.evaluate(() => {
   const root = document.querySelector('[data-qa="history-controls"]');
@@ -6080,6 +6081,75 @@ expect(
   }),
 );
 await menuPage.close();
+// 书签采集：职位页生成 javascript: 书签，带 capture hash 打开时先预览再导入
+const capturePage = await open({ width: 1440, height: 1000 });
+await capturePage.goto(`${BASE}/#jobs`, { waitUntil: "networkidle0" });
+await capturePage.waitForSelector('[data-qa="job-capture"]', { timeout: 15000 });
+const bookmarkletHref = await capturePage.$eval(
+  '[data-qa="bookmarklet-link"]',
+  (element) => element.getAttribute("href") ?? "",
+);
+expect(
+  "职位页提供可拖拽的采集书签",
+  bookmarkletHref.startsWith("javascript:") &&
+    bookmarkletHref.includes("#jobs?capture="),
+  bookmarkletHref.slice(0, 120),
+);
+await capturePage.close();
+
+const capturePayload = encodeURIComponent(
+  JSON.stringify({
+    jobs: [
+      {
+        company: "书签公司",
+        role: "React 工程师",
+        city: "上海",
+        salary: "25-35K",
+        tags: ["React", "TypeScript"],
+        url: "https://www.zhipin.com/job_detail/qa-bookmarklet-1.html",
+        source: "boss",
+        jdPreview: "React TypeScript 组件库",
+      },
+    ],
+  }),
+);
+const captureAppPage = await open({ width: 1440, height: 1000 });
+await captureAppPage.goto(`${BASE}/#jobs?capture=${capturePayload}`, {
+  waitUntil: "networkidle0",
+});
+await captureAppPage.waitForSelector('[data-qa="job-capture-dialog"]', {
+  timeout: 15000,
+});
+const captureItems = await captureAppPage.evaluate(
+  () => document.querySelectorAll('[data-qa="job-capture-item"]').length,
+);
+expect("书签采集结果先进入预览弹窗", captureItems === 1, String(captureItems));
+
+await captureAppPage.click('[data-qa="job-capture-import"]');
+await pause(600);
+const capturedApplication = await captureAppPage.evaluate(() => {
+  const apps = JSON.parse(
+    localStorage.getItem("resume-workshop:applications:v1") ?? "[]",
+  );
+  return apps.find((app) => app.company === "书签公司") ?? null;
+});
+expect(
+  "书签采集的岗位可加入待投清单",
+  Boolean(capturedApplication) && capturedApplication.role === "React 工程师",
+  JSON.stringify(capturedApplication),
+);
+
+await captureAppPage.evaluate(() => {
+  const apps = JSON.parse(
+    localStorage.getItem("resume-workshop:applications:v1") ?? "[]",
+  );
+  localStorage.setItem(
+    "resume-workshop:applications:v1",
+    JSON.stringify(apps.filter((app) => app.company !== "书签公司")),
+  );
+});
+await captureAppPage.close();
+
 // P3 扩展桥：页面收到 postMessage 后自动切到推荐页并预填导入弹窗
 const bridgePage = await open({ width: 1440, height: 1000 });
 await bridgePage.goto(BASE, { waitUntil: "networkidle0" });

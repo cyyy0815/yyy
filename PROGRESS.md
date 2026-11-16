@@ -1392,3 +1392,31 @@ docs/eval-report.md             ✅ 生成物（随仓库提交，便于评审�
 
 - 回退后单测：33 文件 / 300 用例；`tsc`、`eslint` 干净
 - 完整 QA：全部通过（岗位池用例已移除，JD 竞态用例仍覆盖）
+
+---
+
+## 阶段 59（2026-11-16）：无插件采集书签
+
+### 背景
+
+用户明确不要安装插件。最初尝试书签跨窗口 `postMessage`，但应用的
+`Cross-Origin-Opener-Policy: same-origin` 会切断 opener，消息无法送达；
+改为把采集结果放在 URL hash 里，书签直接打开 `#jobs?capture=...`，不依赖 opener，
+也不需要放宽 COOP。
+
+### 实现
+
+- `bookmarklet.ts`：用自包含函数 `toString()` 生成 `javascript:` 书签，支持 BOSS / 拉勾 / 猎聘 / 智联 / 前程无忧；只读当前页已渲染卡片，最多 40 条；URL 超过 60k 时从尾部裁剪
+- `capturedJobs.ts`：采集字段校验、http(s) 限制、按 URL / 公司岗位城市去重、多次采集合并
+- `captureHash.ts`：解析 `#jobs?capture=`，消费后恢复普通 `#jobs`，刷新不重复弹
+- `JobCaptureCard`：职位推荐页生成可拖拽书签 + 复制代码 + 使用说明
+- `JobCaptureDialog`：采集结果先预览、勾选、去重后加入待投清单；不落临时池
+- `AppShell`：启动时/`hashchange` 读取采集数据，自动切到职位推荐页
+- 旧版 Chrome 扩展保留在 `extension/` 但标注为旧路径，不再作为主入口
+
+### 验证
+
+- 单测：36 文件 / 309 用例（新增 capturedJobs 5、captureHash 2、bookmarklet 2）
+- `tsc`、`eslint` 干净
+- BOSS 列表 fixture 实测：书签生成 → 新标签打开应用 → 预览弹窗 1 条 → 加入待投成功
+- 完整 QA：全部通过，新增「职位页提供可拖拽的采集书签」「书签采集结果先进入预览弹窗」「书签采集的岗位可加入待投清单」；顺带把字体撤销用例改成等待落盘，消除原有 400ms 时序抖动

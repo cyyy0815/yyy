@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { CorruptDataBanner } from "@/components/CorruptDataBanner";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { JobCaptureDialog } from "@/components/jobs/JobCaptureDialog";
 import { useResume } from "@/hooks/useResume";
 import { useResumeDocuments } from "@/hooks/useResumeDocuments";
 import {
@@ -45,6 +46,8 @@ import {
   installJobBridge,
   subscribeJobBridge,
 } from "@/lib/jobBridge";
+import { mergeCapturedJobs, capturedJobKey, type CapturedJob } from "@/lib/capturedJobs";
+import { clearCaptureHash, readCaptureHash } from "@/lib/captureHash";
 import { resolveSectionLayout } from "@/lib/layout";
 import {
   isTemplateId,
@@ -169,6 +172,16 @@ export function AppShell() {
   );
   // 水合完成后让首屏覆盖层淡出，避免从静态首屏瞬间「跳」进编辑器。
   const [splashVisible, setSplashVisible] = useState(true);
+  // 书签采集到的岗位先放内存，用户在预览弹窗里确认后才写入待投清单。
+  const [capturedJobs, setCapturedJobs] = useState<CapturedJob[]>(() =>
+    typeof window === "undefined" ? [] : readCaptureHash(window.location.hash),
+  );
+
+  // 消费掉 hash 里的采集数据，刷新时不再重复弹预览。
+  useEffect(() => {
+    if (!hydrated) return;
+    if (capturedJobs.length > 0) clearCaptureHash();
+  }, [hydrated, capturedJobs.length]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -182,7 +195,13 @@ export function AppShell() {
 
   return (
     <>
-      <ResumeWorkspace />
+      <ResumeWorkspace
+        capturedJobs={capturedJobs}
+        onCapturedJobs={(jobs) =>
+          setCapturedJobs((current) => mergeCapturedJobs(current, jobs))
+        }
+        onCapturedHandled={() => setCapturedJobs([])}
+      />
       {splashVisible ? (
         <div
           aria-hidden="true"
@@ -196,7 +215,15 @@ export function AppShell() {
   );
 }
 
-function ResumeWorkspace() {
+function ResumeWorkspace({
+  capturedJobs,
+  onCapturedJobs,
+  onCapturedHandled,
+}: {
+  capturedJobs: CapturedJob[];
+  onCapturedJobs: (jobs: CapturedJob[]) => void;
+  onCapturedHandled: () => void;
+}) {
   const {
     resume,
     updateResume,
@@ -216,9 +243,9 @@ function ResumeWorkspace() {
   } = useResume();
 
   const [tab, setTab] = useState<Tab>(() =>
-    window.location.hash === "#agent"
+    window.location.hash.startsWith("#agent")
       ? "agent"
-      : window.location.hash === "#jobs"
+      : window.location.hash.startsWith("#jobs")
         ? "jobs"
         : "edit",
   );
@@ -303,7 +330,25 @@ function ResumeWorkspace() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
-  // 浏览器扩展抓到岗位后会用 postMessage 投递过来：切到推荐页，由待投清单接收。
+  // 书签重新打开应用时可能只改 hash（不刷新页面），这里增量接收。
+  const capturedJobsHandlerRef = useRef(onCapturedJobs);
+  useEffect(() => {
+    capturedJobsHandlerRef.current = onCapturedJobs;
+  }, [onCapturedJobs]);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const jobs = readCaptureHash(window.location.hash);
+      if (jobs.length === 0) return;
+      capturedJobsHandlerRef.current(jobs);
+      setTab("jobs");
+      clearCaptureHash();
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  // 旧版扩展的单条 JD：切到职位推荐页，由待投清单接收。
   useEffect(() => {
     const uninstall = installJobBridge();
     const unsubscribe = subscribeJobBridge(() => setTab("jobs"));
@@ -1251,6 +1296,23 @@ function ResumeWorkspace() {
       <footer className="print-hide mx-auto w-full max-w-[1500px] px-4 pb-8 text-[11px] text-zinc-500 lg:px-6">
         数据仅保存在本机浏览器 · 导出 JSON 可备份或迁移 · 求职推荐基于本地岗位画像
       </footer>
+
+      {capturedJobs.length > 0 ? (
+        <JobCaptureDialog
+          key={capturedJobs.map((job) => capturedJobKey(job)).join("|")}
+          jobs={capturedJobs}
+          resume={resume}
+          resumeTitle={documents.currentTitle}
+          onClose={onCapturedHandled}
+          onImported={(count) => {
+            setNotice({
+              type: "ok",
+              message: `已加入待投清单：${count} 个岗位`,
+            });
+            onCapturedHandled();
+          }}
+        />
+      ) : null}
 
       {atsOpen ? (
         <AtsExportDialog

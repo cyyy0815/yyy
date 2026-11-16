@@ -77,7 +77,7 @@
 - **AI 工作台**：顶栏一级页面，选一个待投岗位后按当前简历与 JD 预演四步计划；启动后本地两步自动跑完，AI 两步逐条确认。未配置 Key 时自动切到本地模式，按钮与步骤会标出「需配置 Key」
 - **离线评测**：`npm run eval` 用岗位画像库与 5 段手写 JD 跑一遍指标（画像识别、覆盖率、核心要求分组收益、事实核对检出率），产出 `docs/eval-report.md`，改词库后可直接对比
 - **演示场景**：顶栏「演示场景」一键载入「小林（2026 届）+ 6 个目标岗位」，从高匹配前端到 Vue、数据、Java、产品，匹配度明显拉开，适合现场演示与录屏；数据全部本地生成
-- **浏览器扩展（可选）**：`extension/` 里的 Chrome MV3 扩展从 BOSS直聘 / 拉勾 / 猎聘 / 智联 / 前程无忧的岗位页抓取 JD，一键发送到待投清单；在投递表单页还能一键填充姓名 / 手机 / 邮箱 / 期望城市等文本字段（不提交、跳过身份证与密码、附件手动上传）
+- **采集书签（无需安装插件）**：职位推荐页生成「采集本页职位」书签，拖到书签栏；在 BOSS直聘 / 拉勾 / 猎聘 / 智联 / 前程无忧的搜索结果页点一下，当前页已渲染的岗位卡片进入应用预览，再选择加入待投清单。不自动翻页、不后台抓取、不绕过验证码
 - 生成 BOSS直聘、拉勾、猎聘、智联招聘、前程无忧的精准搜索链接
 - 支持城市参数（BOSS直聘覆盖 40 个城市编码，拉勾/智联带城市名）
 
@@ -227,8 +227,10 @@ src/
       templates.tsx     现代 / 经典 / 紧凑 / 侧栏 / 时间轴 / 极简 / 学术 / 卡片，按布局排序与显隐
       __tests__/        SectionLayoutEditor 隐藏不删内容 / 排序 / 恢复默认
     jobs/
-      JobsPanel.tsx     匹配结果、优化建议、招聘站入口
+      JobsPanel.tsx     匹配结果、采集书签、优化建议、招聘站入口
       JdMatcher.tsx     粘贴 JD 测匹配度
+      JobCaptureCard.tsx 生成「采集本页职位」书签与使用说明
+      JobCaptureDialog.tsx 书签采集结果预览、勾选并加入待投
       JobQueuePanel.tsx 待投清单：批量导入 JD、按匹配度排序、准备材料与标记已投
       CoverLetterWriter.tsx AI 求职信生成、编辑、复制与下载
       ApplicationBoard.tsx 投递看板、状态流转与多 JD 管理
@@ -260,6 +262,9 @@ src/
     skillSynonyms.ts    技能同义词归一与规范标签
     jdMatch.ts          JD 关键词识别、覆盖率、年限/学历核验
     jobLeads.ts         批量粘贴 JD 的解析（分隔线、表头、上限与截断）
+    capturedJobs.ts     书签采集结果的校验、去重与预览合并
+    captureHash.ts      #jobs?capture= 的解析与消费
+    bookmarklet.ts      生成自包含的「采集本页职位」书签
     jdStorage.ts        JD 本地保存与 AI 参考 JD 读取
     links.ts            安全链接判断与展示用短链接
     jobBoards.ts        招聘站 URL 与城市编码
@@ -280,7 +285,7 @@ src/
       http.ts           SSE 编码、限额读取、同源校验、限流（IP 解析 + 桶回收）与错误响应
       deepseek.ts       上游请求、重试、SSE 解析
       client.ts         浏览器端 SSE 客户端
-    __tests__/          Vitest：storage / matching / skillSynonyms / jdMatch / jobLeads / jobBridge / validate / SSE / 整份解析 / 撤销栈与会话持久化 / 技能分组 / 提示词 / AI 输出语言 / 投递 / 布局 / 字体搭配 / 简历语言 / ATS / 事实核对 / 安全响应头（249 个）
+    __tests__/          Vitest：storage / matching / skillSynonyms / jdMatch / jobLeads / jobBridge / capturedJobs / captureHash / bookmarklet / validate / SSE / 整份解析 / 撤销栈与会话持久化 / 技能分组 / 提示词 / AI 输出语言 / 投递 / 布局 / 字体搭配 / 简历语言 / ATS / 事实核对 / 安全响应头（309 个）
   test/setup.ts         Vitest + jest-dom 初始化与自动 cleanup
 public/
   sw.js                 Service Worker：外壳 / 静态资源离线缓存与更新
@@ -318,7 +323,7 @@ PROGRESS.md             工作流与进度（中断后从这里继续）
 - 证件照只在浏览器内压缩为 400×400 JPEG，不保留原图，也不做抠图或美颜；照片会增加 JSON 备份与 localStorage 的体积
 - 多份简历只保存在当前浏览器；JSON 导出会包含全部简历，导入整库备份会替换当前全部简历（操作前会确认）；删除简历不可撤销
 - 离线缓存覆盖应用外壳与构建静态资源，不含 AI 接口、招聘站内容或简历数据；首次访问必须联网，清空浏览器站点数据会同时清掉缓存。开发模式不注册 SW，离线行为只能在生产构建（`npm run build && npm run start`）验证
-- 浏览器扩展只做「读当前岗位页 → 发送到本地应用」与「按标签填充投递表单的文本字段」，不自动提交投递、不抓列表页、不保存登录态、不填身份证 / 银行卡 / 密码；招聘平台改版后提取与填表的选择器可能失效，此时在扩展弹窗里手改或直接粘贴即可
+- 采集书签只在你点击时读取当前已打开搜索结果页中已渲染的卡片，不自动翻页、不后台定时抓取、不绕过验证码、不保存账号；职位信息可能过期，以原站为准。旧版 Chrome 扩展仍保留在 `extension/`，但已不是主路径
 - 分享卡片文案为英文：`ImageResponse` 默认字体不含中文字形，直接渲染中文会变成方框
 - 字体搭配只使用系统字体栈，不下载或嵌入字体文件；不同系统上的衬线 / 等宽字形由本机字体决定。字体不改字号与行高，不能替代内容精简或一页适配
 
@@ -338,4 +343,4 @@ PROGRESS.md             工作流与进度（中断后从这里继续）
 - 技术文档：[提交材料/技术文档.pdf](提交材料/技术文档.pdf)（17 页）
 - 离线评测报告：[docs/eval-report.md](docs/eval-report.md)（`npm run eval` 生成）
 - 部署说明：[docs/DEPLOY.md](docs/DEPLOY.md)
-- 浏览器扩展：[extension/README.md](extension/README.md)
+- 旧版浏览器扩展（可选，已不作为主路径）：[extension/README.md](extension/README.md)
