@@ -32,9 +32,16 @@ function bookmarkletMain(appOrigin: string) {
       "www.zhipin.com": {
         card: [".job-card-wrapper", ".job-card-box", ".job-list-box .job-card-wrapper"],
         role: [".job-name", ".job-title"],
-        company: [".company-name", ".company-info .name"],
-        city: [".job-area", ".job-city"],
-        salary: [".salary", ".job-salary"],
+        company: [
+          ".company-name",
+          ".company-info .name",
+          ".company-info a",
+          'a[href*="/gongsi/"]',
+          "[class*='company-name']",
+          "[class*='companyName']",
+        ],
+        city: [".job-area", ".job-city", ".job-area-wrapper", "[class*='job-area']"],
+        salary: [".salary", ".job-pay", ".job-salary", "[class*='salary']", "[class*='pay']"],
         tags: [".tag-list li", ".job-card-footer .tag-list li", ".job-tags span"],
         link: ['a[href*="/job_detail/"]', "a[href]"],
       },
@@ -120,7 +127,14 @@ function bookmarkletMain(appOrigin: string) {
     }
 
     function clean(value: string, max: number): string {
-      return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
+      return String(value || "")
+        // BOSS 等站点会用私有区字形混淆城市 / 薪资，innerText 读出来是方框。
+        .replace(/[\uE000-\uF8FF]/g, "")
+        .replace(/[□�]/g, "")
+        .replace(/\s+/g, " ")
+        .replace(/^[\s\-–—·|/]+|[\s\-–—·|/]+$/g, "")
+        .trim()
+        .slice(0, max);
     }
 
     function firstText(root: Element, selectors: string[], max: number): string {
@@ -144,6 +158,40 @@ function bookmarkletMain(appOrigin: string) {
           if (url.protocol === "http:" || url.protocol === "https:") return url.href;
         } catch (error) {
           // 继续尝试下一个
+        }
+      }
+      return "";
+    }
+
+    function firstAttr(
+      root: Element,
+      selectors: string[],
+      attributes: string[],
+      max: number,
+    ): string {
+      for (let i = 0; i < selectors.length; i += 1) {
+        try {
+          const node = root.querySelector(selectors[i]);
+          if (!node) continue;
+          for (let a = 0; a < attributes.length; a += 1) {
+            const value = clean(node.getAttribute(attributes[a]) || "", max);
+            if (value) return value;
+          }
+        } catch (error) {
+          // ignore
+        }
+      }
+      return "";
+    }
+
+    function firstAlt(root: Element, selectors: string[], max: number): string {
+      for (let i = 0; i < selectors.length; i += 1) {
+        try {
+          const node = root.querySelector(selectors[i]);
+          const alt = clean(node?.getAttribute("alt") || "", max);
+          if (alt && !/logo|icon|头像/i.test(alt)) return alt;
+        } catch (error) {
+          // ignore
         }
       }
       return "";
@@ -179,12 +227,24 @@ function bookmarkletMain(appOrigin: string) {
       if (rect.width === 0 || rect.height === 0) continue;
 
       const role = firstText(card, rule.role, 100);
-      const company = firstText(card, rule.company, 100);
+      let company = firstText(card, rule.company, 100);
+      if (!company) {
+        company = firstAttr(
+          card,
+          ["[data-company]", "[data-company-name]", "[data-brand]"],
+          ["data-company", "data-company-name", "data-brand"],
+          100,
+        );
+      }
+      if (!company) company = firstAlt(card, ["img[alt]"], 100);
       const url = firstHref(card, rule.link);
       if (!role && !company && !url) continue;
 
-      const city = firstText(card, rule.city, 50);
-      const salary = firstText(card, rule.salary, 50);
+      let city = firstText(card, rule.city, 50);
+      if (!/[\u4e00-\u9fa5A-Za-z]/.test(city)) city = "";
+      let salary = firstText(card, rule.salary, 50);
+      // 混淆字形被清掉后可能只剩 "K" / "-K"，没有数字就不要展示。
+      if (!/[0-9]/.test(salary)) salary = "";
       const tags: string[] = [];
       for (let t = 0; t < rule.tags.length; t += 1) {
         try {
@@ -231,25 +291,82 @@ function bookmarkletMain(appOrigin: string) {
       return;
     }
 
-    let payload = encodeURIComponent(JSON.stringify({ jobs: jobs }));
-    let appUrl = appOrigin.replace(/\/+$/, "") + "/#jobs?capture=" + payload;
-    // 极端情况下限制 URL 长度，优先保留前面的岗位。
-    while (appUrl.length > 60000 && jobs.length > 1) {
-      jobs.pop();
-      payload = encodeURIComponent(JSON.stringify({ jobs: jobs }));
-      appUrl = appOrigin.replace(/\/+$/, "") + "/#jobs?capture=" + payload;
+    const payload = JSON.stringify({ jobs: jobs });
+
+    function fallbackCopy(text: string): boolean {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0";
+      document.body.appendChild(area);
+      area.select();
+      let ok = false;
+      try {
+        ok = document.execCommand("copy");
+      } catch (error) {
+        ok = false;
+      }
+      area.remove();
+      return ok;
     }
 
-    const opened = window.open(appUrl, "resume-workshop");
-    if (!opened) {
-      alert("浏览器拦截了弹出窗口。请允许本站弹出窗口，或在应用里手动打开职位推荐页后重试。");
-      return;
+    function copyText(text: string): Promise<boolean> {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(text).then(
+            function () {
+              return true;
+            },
+            function () {
+              return fallbackCopy(text);
+            },
+          );
+        }
+      } catch (error) {
+        // ignore
+      }
+      return Promise.resolve(fallbackCopy(text));
     }
-    try {
-      opened.focus();
-    } catch (error) {
-      // ignore
+
+    function showToast(message: string) {
+      const toast = document.createElement("div");
+      toast.textContent = message;
+      toast.style.cssText = [
+        "position:fixed",
+        "left:50%",
+        "bottom:24px",
+        "transform:translateX(-50%)",
+        "z-index:2147483000",
+        "max-width:min(92vw,520px)",
+        "padding:12px 16px",
+        "border-radius:12px",
+        "background:#18181b",
+        "color:#fff",
+        "font:500 13px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif",
+        "box-shadow:0 12px 30px -10px rgba(0,0,0,.5)",
+      ].join(";");
+      document.body.appendChild(toast);
+      window.setTimeout(function () {
+        toast.remove();
+      }, 9000);
     }
+
+    copyText(payload).then(function (ok) {
+      if (ok) {
+        showToast(
+          "已复制 " +
+            jobs.length +
+            " 个岗位。回到简历工坊（" +
+            appOrigin +
+            "）→ 职位推荐 → 点「粘贴采集结果」。",
+        );
+      } else {
+        window.prompt(
+          "复制失败：请按 Ctrl+C 复制下面的内容，再回到简历工坊点「粘贴采集结果」。",
+          payload,
+        );
+      }
+    });
   } catch (error) {
     alert("采集失败：" + String(error));
   }

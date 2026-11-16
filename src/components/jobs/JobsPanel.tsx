@@ -11,6 +11,7 @@ import { CoverLetterWriter } from "./CoverLetterWriter";
 import { JdMatcher } from "./JdMatcher";
 import { JobCaptureCard } from "./JobCaptureCard";
 import { JobQueuePanel } from "./JobQueuePanel";
+import type { CapturedJob } from "@/lib/capturedJobs";
 import { SkillChip } from "./SkillChip";
 
 function ScoreRing({
@@ -134,6 +135,7 @@ export function JobsPanel({
   onGoEdit,
   onAddSkill,
   onOpenAiWriter,
+  onCapturedJobs,
   onChange,
 }: {
   resume: Resume;
@@ -142,6 +144,8 @@ export function JobsPanel({
   onAddSkill: (skill: string) => void;
   /** 打开编辑页的 AI 写作弹窗（待投清单「按 JD 优化简历」用） */
   onOpenAiWriter: () => void;
+  /** 书签粘贴/采集结果交给预览弹窗 */
+  onCapturedJobs: (jobs: CapturedJob[]) => void;
   /** Agent 采用改写后写回简历 */
   onChange: Dispatch<SetStateAction<Resume>>;
 }) {
@@ -167,7 +171,7 @@ export function JobsPanel({
           </Button>
         </div>
         {/* 简历还没填时也保留采集入口与待投清单：扩展/书签发来的岗位不能因为没简历就丢掉 */}
-        <JobCaptureCard />
+        <JobCaptureCard onCapturedJobs={onCapturedJobs} />
         <JobQueuePanel
           resume={resume}
           resumeTitle={resumeTitle}
@@ -214,7 +218,7 @@ export function JobsPanel({
         </p>
       </header>
 
-      <JobCaptureCard />
+      <JobCaptureCard onCapturedJobs={onCapturedJobs} />
 
       <nav className="flex flex-wrap gap-2 text-[12px] text-zinc-500" aria-label="页内导航">
         {[

@@ -392,7 +392,7 @@ const jdPage = await open({ width: 1440, height: 1000 });
 await jdPage.goto(`${BASE}/#jobs`, { waitUntil: "networkidle0" });
 await new Promise((resolve) => setTimeout(resolve, 900));
 await jdPage.type(
-  "textarea",
+  '[data-qa="jd-matcher"] textarea',
   "岗位职责：负责 Web 前端开发，使用 React、TypeScript 构建页面。\n" +
     "任职要求：3年以上经验，本科及以上学历，熟悉 HTML、CSS、JavaScript、Vue、Webpack、Vite。",
 );
@@ -4742,7 +4742,7 @@ await jobsP3Page.evaluate(() => {
 await jobsP3Page.reload({ waitUntil: "networkidle0" });
 await pause(800);
 await jobsP3Page.type(
-  "textarea",
+  '[data-qa="jd-matcher"] textarea',
   "任职要求：熟悉 Vue、Webpack、Vite，了解 Node.js 与前端工程化。",
 );
 await clickText(jobsP3Page, "分析匹配度");
@@ -4863,7 +4863,7 @@ expect(
 );
 
 await jobsP3Page.type(
-  "textarea",
+  '[data-qa="jd-matcher"] textarea',
   "熟悉 JS/TS、K8s、Golang、Postgres 与 SpringBoot，了解 CI/CD。",
 );
 await clickText(jobsP3Page, "分析匹配度");
@@ -6081,8 +6081,11 @@ expect(
   }),
 );
 await menuPage.close();
-// 书签采集：职位页生成 javascript: 书签，带 capture hash 打开时先预览再导入
+// 书签采集：书签复制到剪贴板，应用里「粘贴采集结果」先预览再导入
 const capturePage = await open({ width: 1440, height: 1000 });
+await browser
+  .defaultBrowserContext()
+  .overridePermissions(BASE, ["clipboard-read", "clipboard-write"]);
 await capturePage.goto(`${BASE}/#jobs`, { waitUntil: "networkidle0" });
 await capturePage.waitForSelector('[data-qa="job-capture"]', { timeout: 15000 });
 const bookmarkletHref = await capturePage.$eval(
@@ -6092,12 +6095,15 @@ const bookmarkletHref = await capturePage.$eval(
 expect(
   "职位页提供可拖拽的采集书签",
   bookmarkletHref.startsWith("javascript:") &&
-    bookmarkletHref.includes("#jobs?capture="),
+    bookmarkletHref.includes("clipboard") &&
+    bookmarkletHref.includes("粘贴采集结果"),
   bookmarkletHref.slice(0, 120),
 );
-await capturePage.close();
 
-const capturePayload = encodeURIComponent(
+await capturePage.bringToFront();
+await capturePage.click('[data-qa="capture-manual"] summary');
+await capturePage.type(
+  '[data-qa="capture-text"]',
   JSON.stringify({
     jobs: [
       {
@@ -6113,33 +6119,30 @@ const capturePayload = encodeURIComponent(
     ],
   }),
 );
-const captureAppPage = await open({ width: 1440, height: 1000 });
-await captureAppPage.goto(`${BASE}/#jobs?capture=${capturePayload}`, {
-  waitUntil: "networkidle0",
-});
-await captureAppPage.waitForSelector('[data-qa="job-capture-dialog"]', {
+await capturePage.click('[data-qa="capture-text-import"]');
+await capturePage.waitForSelector('[data-qa="job-capture-dialog"]', {
   timeout: 15000,
 });
-const captureItems = await captureAppPage.evaluate(
+const captureItems = await capturePage.evaluate(
   () => document.querySelectorAll('[data-qa="job-capture-item"]').length,
 );
-expect("书签采集结果先进入预览弹窗", captureItems === 1, String(captureItems));
+expect("粘贴采集结果先进入预览弹窗", captureItems === 1, String(captureItems));
 
-await captureAppPage.click('[data-qa="job-capture-import"]');
+await capturePage.click('[data-qa="job-capture-import"]');
 await pause(600);
-const capturedApplication = await captureAppPage.evaluate(() => {
+const capturedApplication = await capturePage.evaluate(() => {
   const apps = JSON.parse(
     localStorage.getItem("resume-workshop:applications:v1") ?? "[]",
   );
   return apps.find((app) => app.company === "书签公司") ?? null;
 });
 expect(
-  "书签采集的岗位可加入待投清单",
+  "粘贴采集的岗位可加入待投清单",
   Boolean(capturedApplication) && capturedApplication.role === "React 工程师",
   JSON.stringify(capturedApplication),
 );
 
-await captureAppPage.evaluate(() => {
+await capturePage.evaluate(() => {
   const apps = JSON.parse(
     localStorage.getItem("resume-workshop:applications:v1") ?? "[]",
   );
@@ -6148,7 +6151,7 @@ await captureAppPage.evaluate(() => {
     JSON.stringify(apps.filter((app) => app.company !== "书签公司")),
   );
 });
-await captureAppPage.close();
+await capturePage.close();
 
 // P3 扩展桥：页面收到 postMessage 后自动切到推荐页并预填导入弹窗
 const bridgePage = await open({ width: 1440, height: 1000 });

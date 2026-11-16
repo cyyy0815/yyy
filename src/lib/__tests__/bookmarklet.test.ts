@@ -6,8 +6,9 @@ describe("buildBookmarklet", () => {
     const code = buildBookmarklet("https://yyy-sandy.vercel.app/");
     expect(code.startsWith("javascript:")).toBe(true);
     expect(code).toContain('"https://yyy-sandy.vercel.app"');
-    expect(code).toContain("capture=");
-    expect(code).toContain("jobs");
+    expect(code).toContain("clipboard");
+    expect(code).toContain("粘贴采集结果");
+    expect(code).not.toContain("window.open");
     expect(code).not.toContain("\n");
   });
 

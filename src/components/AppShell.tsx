@@ -1281,6 +1281,7 @@ function ResumeWorkspace({
             onGoEdit={() => setTab("edit")}
             onAddSkill={handleAddSkill}
             onOpenAiWriter={handleOpenAiWriter}
+            onCapturedJobs={onCapturedJobs}
             onChange={updateResume}
           />
         ) : (

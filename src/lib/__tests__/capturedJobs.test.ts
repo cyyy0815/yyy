@@ -3,6 +3,7 @@ import {
   capturedJobKey,
   mergeCapturedJobs,
   normalizeCapturedJob,
+  parseCapturedClipboard,
   parseCapturedJobs,
 } from "../capturedJobs";
 
@@ -41,6 +42,12 @@ describe("normalizeCapturedJob", () => {
 });
 
 describe("parseCapturedJobs", () => {
+  it("从剪贴板 JSON 读取并过滤坏数据", () => {
+    const text = JSON.stringify({ jobs: [makeJob(1), { company: "" }] });
+    expect(parseCapturedClipboard(text)).toHaveLength(1);
+    expect(parseCapturedClipboard("not json")).toEqual([]);
+  });
+
   it("同一路径不同跟踪参数只保留一条", () => {
     const jobs = parseCapturedJobs({
       jobs: [

@@ -142,6 +142,15 @@ export function parseCapturedJobs(payload: unknown): CapturedJob[] {
   return result;
 }
 
+/** 解析书签复制到剪贴板的 JSON；不是该格式时返回空数组。 */
+export function parseCapturedClipboard(text: string): CapturedJob[] {
+  try {
+    return parseCapturedJobs(JSON.parse(text.trim()));
+  } catch {
+    return [];
+  }
+}
+
 /** 多次点击书签时把新结果合并到当前预览里，按 key 去重。 */
 export function mergeCapturedJobs(
   current: CapturedJob[],

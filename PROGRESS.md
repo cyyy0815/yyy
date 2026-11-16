@@ -1401,22 +1401,23 @@ docs/eval-report.md             ✅ 生成物（随仓库提交，便于评审�
 
 用户明确不要安装插件。最初尝试书签跨窗口 `postMessage`，但应用的
 `Cross-Origin-Opener-Policy: same-origin` 会切断 opener，消息无法送达；
-改为把采集结果放在 URL hash 里，书签直接打开 `#jobs?capture=...`，不依赖 opener，
-也不需要放宽 COOP。
+也验证过 `window.name` 复用已打开标签页，COOP 下跨标签仍会新开页面。
+最终改为：书签只把采集结果复制到剪贴板，用户在已打开的应用里点
+「粘贴采集结果」，不新开网页。
 
 ### 实现
 
-- `bookmarklet.ts`：用自包含函数 `toString()` 生成 `javascript:` 书签，支持 BOSS / 拉勾 / 猎聘 / 智联 / 前程无忧；只读当前页已渲染卡片，最多 40 条；URL 超过 60k 时从尾部裁剪
-- `capturedJobs.ts`：采集字段校验、http(s) 限制、按 URL / 公司岗位城市去重、多次采集合并
-- `captureHash.ts`：解析 `#jobs?capture=`，消费后恢复普通 `#jobs`，刷新不重复弹
-- `JobCaptureCard`：职位推荐页生成可拖拽书签 + 复制代码 + 使用说明
-- `JobCaptureDialog`：采集结果先预览、勾选、去重后加入待投清单；不落临时池
-- `AppShell`：启动时/`hashchange` 读取采集数据，自动切到职位推荐页
+- `bookmarklet.ts`：用自包含函数 `toString()` 生成 `javascript:` 书签，支持 BOSS / 拉勾 / 猎聘 / 智联 / 前程无忧；只读当前页已渲染卡片，最多 40 条；复制 JSON 到剪贴板并在页面上显示 9 秒提示
+- 采集字段清洗：移除 BOSS 私有区混淆字形（方框），城市/薪资清洗后为空则不展示；公司名增加 `.company-info a`、`a[href*="/gongsi/"]`、`data-company*`、`img[alt]` 等兜底
+- `capturedJobs.ts`：采集字段校验、http(s) 限制、按 URL / 公司岗位城市去重、多次采集合并；新增 `parseCapturedClipboard`
+- `JobCaptureCard`：拖拽书签 / 复制代码 / **粘贴采集结果**（读剪贴板后交给预览弹窗）；剪贴板权限被拒时提供「手动粘贴采集结果」文本框
+- `JobCaptureDialog`：预览、勾选、去重后加入待投清单；不落临时池
+- `captureHash.ts` 保留 `#jobs?capture=` 直达解析作为兼容路径，但书签默认不再打开新页面
 - 旧版 Chrome 扩展保留在 `extension/` 但标注为旧路径，不再作为主入口
 
 ### 验证
 
-- 单测：36 文件 / 309 用例（新增 capturedJobs 5、captureHash 2、bookmarklet 2）
+- 单测：36 文件 / 310 用例（新增 capturedJobs 6、captureHash 2、bookmarklet 2）
 - `tsc`、`eslint` 干净
-- BOSS 列表 fixture 实测：书签生成 → 新标签打开应用 → 预览弹窗 1 条 → 加入待投成功
-- 完整 QA：全部通过，新增「职位页提供可拖拽的采集书签」「书签采集结果先进入预览弹窗」「书签采集的岗位可加入待投清单」；顺带把字体撤销用例改成等待落盘，消除原有 400ms 时序抖动
+- BOSS 列表 fixture 实测：书签复制 3 条 → 不新开页面 → 应用粘贴 → 公司名从链接/alt 兜底、混淆城市/薪资清空 → 预览 3 条 → 加入待投成功
+- 完整 QA：全部通过，新增「职位页提供可拖拽的采集书签」「粘贴采集结果先进入预览弹窗」「粘贴采集的岗位可加入待投清单」；顺带把字体撤销用例改成等待落盘，消除原有 400ms 时序抖动
