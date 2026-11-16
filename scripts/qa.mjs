@@ -6118,6 +6118,83 @@ await bridgePage.evaluate(() => {
   document.querySelector('[data-qa="job-import-close"]')?.click();
 });
 await pause(300);
+// 一页岗位：扩展投递的数组应写入推荐岗位池，并可加入待投
+await bridgePage.evaluate(() => {
+  window.postMessage(
+    {
+      source: "resume-workshop-extension",
+      type: "job-list",
+      payload: {
+        jobs: [
+          {
+            company: "采集公司",
+            role: "React 工程师",
+            city: "上海",
+            salary: "25-35K",
+            tags: ["React", "TypeScript"],
+            url: "https://www.zhipin.com/job_detail/qa-pool-1.html",
+            source: "boss",
+            jdPreview: "React TypeScript 组件库",
+          },
+        ],
+      },
+    },
+    window.location.origin,
+  );
+});
+await pause(900);
+const poolState = await bridgePage.evaluate(() => ({
+  hash: location.hash,
+  count:
+    document.querySelector('[data-qa="job-pool-count"]')?.textContent?.trim() ?? "",
+  items: document.querySelectorAll('[data-qa="job-pool-item"]').length,
+  add: Boolean(document.querySelector('[data-qa^="pool-add-"]')),
+}));
+expect(
+  "扩展投递的一页岗位进入推荐岗位池",
+  poolState.hash === "#jobs" &&
+    poolState.items === 1 &&
+    poolState.count.includes("1") &&
+    poolState.add,
+  JSON.stringify(poolState),
+);
+
+await bridgePage.evaluate(() => {
+  document.querySelector('[data-qa^="pool-add-"]')?.click();
+});
+await pause(600);
+const poolQueued = await bridgePage.evaluate(() => {
+  const apps = JSON.parse(
+    window.localStorage.getItem("resume-workshop:applications:v1") ?? "[]",
+  );
+  const pool = JSON.parse(
+    window.localStorage.getItem("resume-workshop:job-pool:v1") ?? "[]",
+  );
+  return {
+    application: apps.find(
+      (app) => app.company === "采集公司" && app.role === "React 工程师",
+    ),
+    state: pool[0]?.state,
+  };
+});
+expect(
+  "推荐池岗位可加入待投",
+  Boolean(poolQueued.application) && poolQueued.state === "queued",
+  JSON.stringify(poolQueued),
+);
+
+// 清掉这条测试数据，避免影响后续用例
+await bridgePage.evaluate(() => {
+  window.localStorage.removeItem("resume-workshop:job-pool:v1");
+  const apps = JSON.parse(
+    window.localStorage.getItem("resume-workshop:applications:v1") ?? "[]",
+  );
+  window.localStorage.setItem(
+    "resume-workshop:applications:v1",
+    JSON.stringify(apps.filter((app) => app.company !== "采集公司")),
+  );
+});
+await pause(300);
 await bridgePage.evaluate(() => {
   window.postMessage(
     { source: "evil", type: "lead", payload: { jd: "伪造内容" } },

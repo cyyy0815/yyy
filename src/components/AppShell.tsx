@@ -44,7 +44,9 @@ import { saveJd } from "@/lib/jdStorage";
 import {
   installJobBridge,
   subscribeJobBridge,
+  takePendingJobs,
 } from "@/lib/jobBridge";
+import { ingestJobPool } from "@/lib/jobPool";
 import { resolveSectionLayout } from "@/lib/layout";
 import {
   isTemplateId,
@@ -303,10 +305,29 @@ function ResumeWorkspace() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
-  // 浏览器扩展抓到岗位后会用 postMessage 投递过来：切到推荐页，由待投清单接收。
+  // 浏览器扩展投递岗位：单条 JD 交给待投清单；一页岗位写入推荐岗位池。
   useEffect(() => {
     const uninstall = installJobBridge();
-    const unsubscribe = subscribeJobBridge(() => setTab("jobs"));
+    const consumeJobs = () => {
+      const jobs = takePendingJobs();
+      if (jobs.length === 0) return false;
+      const result = ingestJobPool(jobs);
+      setTab("jobs");
+      setNotice({
+        type: result.saved ? "ok" : "error",
+        message: result.saved
+          ? `已采集 ${jobs.length} 个岗位`
+          : "岗位已采集，但浏览器存储写入失败",
+      });
+      return true;
+    };
+    const onBridge = () => {
+      // 没有岗位池消息时保持原有行为：切到职位推荐页，由待投清单处理单条 JD。
+      if (!consumeJobs()) setTab("jobs");
+    };
+    const unsubscribe = subscribeJobBridge(onBridge);
+    // 扩展可能在页面挂载前就发过消息，挂载时补消费一次。
+    consumeJobs();
     return () => {
       unsubscribe();
       uninstall();

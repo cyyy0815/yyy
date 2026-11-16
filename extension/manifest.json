@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "简历工坊 · JD 助手",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "从招聘网站抓取岗位描述，一键发送到简历工坊的待投清单。",
   "permissions": ["storage", "tabs"],
   "host_permissions": [
@@ -43,6 +43,19 @@
         "https://yyy-sandy.vercel.app/*"
       ],
       "js": ["content-app.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.zhipin.com/*",
+        "https://www.lagou.com/*",
+        "https://www.liepin.com/*",
+        "https://www.zhaopin.com/*",
+        "https://sou.zhaopin.com/*",
+        "https://we.51job.com/*",
+        "https://jobs.51job.com/*"
+      ],
+      "js": ["content-list.js"],
       "run_at": "document_idle"
     },
     {

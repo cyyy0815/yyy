@@ -43,6 +43,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
 
+  if (message.type === "job-list") {
+    window.postMessage(
+      {
+        source: "resume-workshop-extension",
+        type: "job-list",
+        payload: { jobs: message.jobs },
+      },
+      window.location.origin,
+    );
+    sendResponse({ ok: true });
+    return false;
+  }
+
   if (message.type === "profile") {
     const profile = readProfile();
     sendResponse(

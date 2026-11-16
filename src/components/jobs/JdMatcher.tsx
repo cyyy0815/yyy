@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { analyzeJd } from "@/lib/jdMatch";
 import { clearSavedJd, readSavedJd, saveJd } from "@/lib/jdStorage";
 import type { Resume } from "@/lib/types";
@@ -17,6 +17,9 @@ export function JdMatcher({
 }) {
   const [jd, setJd] = useState(readSavedJd);
   const [showResult, setShowResult] = useState(false);
+  // 只有用户在本页改过才回写；否则挂载 500ms 后会用初始空值把别的标签页 /
+  // 扩展刚写入的「当前 JD」清掉。
+  const editedRef = useRef(false);
 
   const result = useMemo(
     () => (showResult && jd.trim() ? analyzeJd(jd, resume) : null),
@@ -24,11 +27,13 @@ export function JdMatcher({
   );
 
   useEffect(() => {
+    if (!editedRef.current) return;
     const timer = window.setTimeout(() => saveJd(jd), 500);
     return () => window.clearTimeout(timer);
   }, [jd]);
 
   const clear = () => {
+    editedRef.current = true;
     setJd("");
     setShowResult(false);
     clearSavedJd();
@@ -68,7 +73,10 @@ export function JdMatcher({
 
       <TextArea
         value={jd}
-        onChange={(event) => setJd(event.target.value)}
+        onChange={(event) => {
+          editedRef.current = true;
+          setJd(event.target.value);
+        }}
         placeholder={
           "例如：\n岗位职责：负责 Web 前端开发，使用 React、TypeScript 构建页面……\n任职要求：3 年以上经验，本科及以上学历，熟悉 HTML、CSS、JavaScript……"
         }

@@ -5,11 +5,16 @@
  * 应用只接受同窗口、带正确 source 的消息，并把内容当成纯文本渲染（不走 innerHTML）。
  * 桥只负责排队与通知，弹窗与导入仍由待投清单决定。
  */
+import {
+  normalizePoolJob,
+  type PoolJob,
+} from "./jobPool";
 import { MAX_LEAD_JD_CHARS, type ParsedJobLead } from "./jobLeads";
 
 export const JOB_BRIDGE_SOURCE = "resume-workshop-extension";
 const MAX_COMPANY_CHARS = 100;
 const MAX_ROLE_CHARS = 100;
+const MAX_BRIDGE_JOBS = 50;
 
 function asText(value: unknown, max: number): string {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -32,12 +37,38 @@ export function parseBridgeLead(payload: unknown): ParsedJobLead | null {
 
 const listeners = new Set<() => void>();
 let pending: ParsedJobLead[] = [];
+let pendingJobs: PoolJob[] = [];
 let installed = false;
+
+/** 校验并收敛扩展传来的「一页岗位」；不合法时返回空数组。 */
+export function parseBridgeJobs(payload: unknown): PoolJob[] {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return [];
+  }
+  const jobs = (payload as { jobs?: unknown }).jobs;
+  if (!Array.isArray(jobs)) return [];
+  const result: PoolJob[] = [];
+  const seen = new Set<string>();
+  for (const item of jobs.slice(0, MAX_BRIDGE_JOBS)) {
+    const job = normalizePoolJob(item);
+    if (!job || seen.has(job.key)) continue;
+    seen.add(job.key);
+    result.push(job);
+  }
+  return result;
+}
 
 /** 取走尚未处理的岗位（挂载时调用一次，避免错过页面切换前的消息）。 */
 export function takePendingLeads(): ParsedJobLead[] {
   const drained = pending;
   pending = [];
+  return drained;
+}
+
+/** 取走尚未处理的推荐岗位池条目。 */
+export function takePendingJobs(): PoolJob[] {
+  const drained = pendingJobs;
+  pendingJobs = [];
   return drained;
 }
 
@@ -55,16 +86,25 @@ export function installJobBridge(): () => void {
   installed = true;
 
   const onMessage = (event: MessageEvent) => {
-    // 只接受同窗口消息：扩展注入的 content script 与页面共享 window。
-    if (event.source !== window) return;
+    // 同窗口、同源：扩展注入的 content script 与页面共享 window，但 origin 仍是站点自身。
+    if (event.source !== window || event.origin !== window.location.origin) return;
     const data = event.data as
       | { source?: unknown; type?: unknown; payload?: unknown }
       | null;
-    if (!data || data.source !== JOB_BRIDGE_SOURCE || data.type !== "lead") return;
-    const lead = parseBridgeLead(data.payload);
-    if (!lead) return;
-    pending.push(lead);
-    for (const listener of listeners) listener();
+    if (!data || data.source !== JOB_BRIDGE_SOURCE) return;
+    if (data.type === "lead") {
+      const lead = parseBridgeLead(data.payload);
+      if (!lead) return;
+      pending.push(lead);
+      for (const listener of listeners) listener();
+      return;
+    }
+    if (data.type === "job-list") {
+      const jobs = parseBridgeJobs(data.payload);
+      if (jobs.length === 0) return;
+      pendingJobs.push(...jobs);
+      for (const listener of listeners) listener();
+    }
   };
 
   window.addEventListener("message", onMessage);

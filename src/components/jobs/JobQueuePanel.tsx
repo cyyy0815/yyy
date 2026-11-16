@@ -12,6 +12,7 @@ import {
 } from "@/lib/applications";
 import { analyzeJd } from "@/lib/jdMatch";
 import { formatJobLeads, parseJobLeads } from "@/lib/jobLeads";
+import { releasePoolJobByApplication } from "@/lib/jobPool";
 import {
   subscribeJobBridge,
   takePendingLeads,
@@ -165,6 +166,8 @@ export function JobQueuePanel({
       setNotice("移除失败：浏览器存储不可用或空间已满");
       return;
     }
+    // 从推荐池加入的岗位，移除投递记录后回到「未处理」，可以重新决定。
+    releasePoolJobByApplication(application.id);
     setNotice("已从待投清单移除");
   };
 
