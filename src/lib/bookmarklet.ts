@@ -36,12 +36,26 @@ function bookmarkletMain(appOrigin: string) {
           ".company-name",
           ".company-info .name",
           ".company-info a",
+          ".job-card-footer .company-name",
           'a[href*="/gongsi/"]',
           "[class*='company-name']",
           "[class*='companyName']",
         ],
-        city: [".job-area", ".job-city", ".job-area-wrapper", "[class*='job-area']"],
-        salary: [".salary", ".job-pay", ".job-salary", "[class*='salary']", "[class*='pay']"],
+        city: [
+          ".job-area",
+          ".job-city",
+          ".job-area-wrapper",
+          "[class*='job-area']",
+          "[data-city]",
+        ],
+        salary: [
+          ".salary",
+          ".job-pay",
+          ".job-salary",
+          "[class*='salary']",
+          "[class*='pay']",
+          "[data-salary]",
+        ],
         tags: [".tag-list li", ".job-card-footer .tag-list li", ".job-tags span"],
         link: ['a[href*="/job_detail/"]', "a[href]"],
       },
@@ -128,7 +142,11 @@ function bookmarkletMain(appOrigin: string) {
 
     function clean(value: string, max: number): string {
       return String(value || "")
-        // BOSS 等站点会用私有区字形混淆城市 / 薪资，innerText 读出来是方框。
+        // BOSS 把薪资数字映射到 U+E031..U+E03A：减去 0xE001 就是 0..9。
+        .replace(/[\uE031-\uE03A]/g, function (char) {
+          return String.fromCharCode(char.charCodeAt(0) - 0xe001);
+        })
+        // 其余私有区字形没有可靠映射，清掉避免显示方框。
         .replace(/[\uE000-\uF8FF]/g, "")
         .replace(/[□�]/g, "")
         .replace(/\s+/g, " ")
@@ -141,7 +159,8 @@ function bookmarkletMain(appOrigin: string) {
       for (let i = 0; i < selectors.length; i += 1) {
         try {
           const value = textOf(root.querySelector(selectors[i]));
-          if (value) return clean(value, max);
+          const cleaned = clean(value, max);
+          if (cleaned) return cleaned;
         } catch (error) {
           // 某个候选选择器写错时继续尝试下一个
         }
@@ -241,8 +260,27 @@ function bookmarkletMain(appOrigin: string) {
       if (!role && !company && !url) continue;
 
       let city = firstText(card, rule.city, 50);
+      if (!city) {
+        city = firstAttr(card, ["[data-city]"], ["data-city"], 50);
+      }
       if (!/[\u4e00-\u9fa5A-Za-z]/.test(city)) city = "";
       let salary = firstText(card, rule.salary, 50);
+      if (!salary) {
+        salary = firstAttr(
+          card,
+          ["[data-salary]", "[data-pay]", ".salary", ".job-pay"],
+          ["data-salary", "data-pay"],
+          50,
+        );
+      }
+      // 如果薪资候选里仍有未映射的混淆字符，再从卡片纯文本里找一次。
+      if (!salary || !/[0-9]/.test(salary)) {
+        const plain = clean(textOf(card), 5000);
+        const match = plain.match(
+          /\d{1,3}(?:\.\d+)?\s*[-~至]\s*\d{1,3}(?:\.\d+)?\s*[Kk万]/,
+        );
+        if (match) salary = clean(match[0], 50);
+      }
       // 混淆字形被清掉后可能只剩 "K" / "-K"，没有数字就不要展示。
       if (!/[0-9]/.test(salary)) salary = "";
       const tags: string[] = [];
