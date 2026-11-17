@@ -1,4 +1,4 @@
-# 简历工坊 (Resume Workshop)
+﻿# 简历工坊 (Resume Workshop)
 
 浏览器里的简历制作 + 求职搜索推荐工具。简历数据只保存在本机 localStorage，无账号、无云端同步。可选的**AI 写简历**通过本项目的 Next.js 服务端路由调用 DeepSeek，API Key 不会进入浏览器。
 
@@ -300,7 +300,7 @@ scripts/eval.mjs        生成离线评测报告（写入 docs/eval-report.md）
 docs/eval-report.md     离线评测结果：画像识别 / JD 覆盖率 / 分组收益 / 事实核对
 docs/DEPLOY.md         部署与在线演示说明（Vercel / Node + nginx、环境变量、限流与同源注意事项）
 提交材料/技术文档.pdf   参赛技术文档（17 页：概述 / 需求 / 架构 / AI 方案 / 实现 / 测试部署 / 创新点）
-提交材料/作品说明文档.pdf 参赛作品说明（12 页：摘要 / 目录 / 项目详情 / 亮点 / AI 落地 / 关键技术 / 截图 / 附录）
+提交材料/作品说明文档.pdf 参赛作品说明（13 页：摘要 / 目录 / 项目详情 / 亮点 / AI 落地 / 关键技术 / 截图 / 附录）
 docs/build-tech-doc.py 技术文档生成脚本（输出 docs/技术文档.docx，PDF 导出到 提交材料/）
 extension/              旧版 Chrome MV3 扩展（兼容保留；当前主路径是职位页的采集书签）
 .github/workflows/ci.yml lint + 类型检查 + 单测 / 组件测试 + 构建 + 生产模式浏览器 QA
@@ -347,8 +347,9 @@ PROGRESS.md             工作流与进度（中断后从这里继续）
 ## 相关链接
 
 - 技术文档：[提交材料/技术文档.pdf](提交材料/技术文档.pdf)（17 页）
-- 作品说明文档：[提交材料/作品说明文档.pdf](提交材料/作品说明文档.pdf)（12 页）
+- 作品说明文档：[提交材料/作品说明文档.pdf](提交材料/作品说明文档.pdf)（13 页）
 - 在线演示：[https://yyy-sandy.vercel.app/](https://yyy-sandy.vercel.app/)
 - 离线评测报告：[docs/eval-report.md](docs/eval-report.md)（`npm run eval` 生成）
 - 部署说明：[docs/DEPLOY.md](docs/DEPLOY.md)
 - 旧版浏览器扩展（可选，已不作为主路径）：[extension/README.md](extension/README.md)
+

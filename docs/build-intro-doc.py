@@ -45,6 +45,7 @@ for name, size in (("Heading 1", 15), ("Heading 2", 12.5)):
     set_font(document.styles[name], HEAD_FONT, size, bold=True, color=RGBColor(0x18, 0x18, 0x1B))
     document.styles[name].paragraph_format.space_before = Pt(12)
     document.styles[name].paragraph_format.space_after = Pt(5)
+    document.styles[name].paragraph_format.keep_with_next = True
 
 
 def body(text, bold=False, indent=True, size=10.5):
@@ -80,10 +81,16 @@ def table(headers, rows, widths):
         cell._tc.get_or_add_tcPr().append(shading)
     for row in rows:
         cells = result.add_row().cells
+        result.rows[-1].allow_break_across_pages = False
         for index, value in enumerate(row):
             cells[index].text = ""
             run = cells[index].paragraphs[0].add_run(str(value))
             run.font.size = Pt(9.5)
+    result.rows[0].allow_break_across_pages = False
+    for row in result.rows:
+        for cell in row.cells:
+            for paragraph in cell.paragraphs:
+                paragraph.paragraph_format.keep_with_next = row is not result.rows[-1]
     result.autofit = False
     layout = OxmlElement("w:tblLayout")
     layout.set(qn("w:type"), "fixed")
@@ -185,12 +192,6 @@ for label, value in info_rows:
     value_run = paragraph.add_run("\t" + value)
     value_run.font.size = Pt(10.5)
 
-centered(
-    "本文件包含：项目说明 / 使用方式 / 项目亮点 / AI 落地 / 关键技术 / 成果展示 / 原创说明",
-    9.5,
-    color=GRAY,
-    before=42,
-)
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 # ---------- 摘要与目录 ----------
@@ -205,7 +206,18 @@ body(
     "AI 工作台把求职 Agent 的四步计划、工具调用、流式改写、事实核对和人工采用放在一个可观察的界面里。"
     "简历与投递记录只保存在 localStorage；服务端只承担同源 AI 代理，不存简历、不收集联系方式。"
 )
+body(
+    "关键词：本地优先 / 可解释匹配 / AI 工作流 / 采集书签 / 事实核对 / 人工采用。",
+    indent=False,
+    size=10,
+)
+body(
+    "核心数据：310 个单元 / 组件用例；岗位画像识别 26 / 26；6 个演示岗位；5 家招聘网站适配；3 类 AI 任务。",
+    indent=False,
+    size=10,
+)
 
+document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 document.add_heading("目录", level=1)
 for item in (
     "一、项目详情及使用方式",
@@ -219,6 +231,17 @@ for item in (
     "附录 B  提交文件与隐私说明",
 ):
     body(item, indent=False)
+body(
+    "阅读建议：先看摘要、项目亮点与 AI 技术落地，再看关键技术、截图和附录；"
+    "每节都对应赛事七项要求中的一项。",
+    indent=False,
+    size=10,
+)
+body(
+    "文档约定：页眉为赛事与团队标识，页脚为页码；图号按出现顺序编号；代码与命令使用等宽字体。",
+    indent=False,
+    size=10,
+)
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 # ---------- 一 ----------
@@ -297,8 +320,19 @@ body(
     "Lighthouse 实测：性能 93、无障碍 100、最佳实践 96、SEO 100；"
     "本地生产构建在 4 倍 CPU 降速下首屏内容 0.76 秒出现。线上耗时主要来自跨境网络往返，已在文档中如实标注。"
 )
+body(
+    "这些设计共同指向一个目标：让用户在投递前能回答「这个岗位要什么、我差在哪、下一步做什么」，"
+    "而不是在排版、复制粘贴和多个网站之间来回切换。",
+    indent=False,
+)
+body(
+    "与只做排版的工具相比，简历工坊把岗位数据、匹配解释、AI 改写和投递记录放在同一条链路里；"
+    "与通用 AI 写作工具相比，它先做本地匹配、再做事实核对，最后把采用权交还给用户。",
+    indent=False,
+)
 
 # ---------- 三 ----------
+document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 document.add_heading("三、AI 技术落地使用情况", level=1)
 body("AI 在产品中承担四类任务，边界清晰：", indent=False)
 table(
@@ -331,21 +365,14 @@ bullet("输入裁剪：JD 2000 字、技能 20 个、观察 8 条封顶，避免
 bullet("输出校验：规划结果必须是工具白名单内的 JSON，≤5 步、去重、超长截断；不合规直接丢弃。")
 bullet("失败降级：模型异常时重试一次，仍失败则回退本地规则计划；没有 Key 时整条链路仍可演示。")
 bullet("事实核对：每次生成后本地比对数字、技能、名称，列出待核对项。")
-body("质量数据（可复现，仓库内 `npm run eval` 生成）：", bold=True, indent=False)
-table(
-    ["指标", "结果"],
-    [
-        ["岗位画像识别", "26 / 26"],
-        ["核心要求分组收益（逐项 82% → 分组 100%）", "+18 个百分点"],
-        ["5 段手写 JD 的画像识别 / 缺口提示", "5 / 5、5 / 5"],
-        ["事实核对：注入 20 条素材外事实", "20 / 20 检出"],
-        ["事实核对：5 条干净文本", "0 误报"],
-        ["单元测试 / 浏览器端到端", "310 个单元 / 组件用例；完整浏览器 QA"],
-    ],
-    [10.4, 5.8],
+body(
+    "质量数据：岗位画像识别 26 / 26，核心要求分组收益 +18 个百分点，事实核对 20 / 20 检出；"
+    "完整测试表见附录 A。",
+    indent=False,
 )
 
 # ---------- 四 ----------
+document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 document.add_heading("四、关键技术", level=1)
 table(
     ["技术", "在项目中的作用"],
@@ -363,10 +390,22 @@ table(
     ],
     [5.6, 10.6],
 )
+body(
+    "取舍：没有为排版引入重型富文本编辑器，也没有为采集引入后端爬虫；"
+    "把复杂度留在本地计算和用户确认上，换取更低的部署成本、更清晰的隐私边界，"
+    "以及断网 / 无 Key 时仍可演示的稳定性。",
+    indent=False,
+)
+body("技术风险与应对", bold=True, indent=False)
+bullet("模型输出不稳定：结构化校验 + 本地规则计划兜底，失败不阻断主流程。")
+bullet("招聘页面改版：从职位链接向上找卡片，选择器失配时给出明确提示而不是静默失败。")
+bullet("本地数据丢失：JSON 备份导出 + 超过 7 天未导出提醒。")
+bullet("跨境网络慢：首屏服务端输出真实内容，静态资源优先，AI 请求独立流式。")
 
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 # ---------- 五 ----------
+document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 document.add_heading("五、项目图片", level=1)
 body("以下截图均来自真实运行环境（演示场景 + 真实模型调用）。", indent=False)
 figure("D:/web/docs/img/editor.png", "图 1  编辑页：左侧表单、右侧实时预览，可直接打印为 PDF")
