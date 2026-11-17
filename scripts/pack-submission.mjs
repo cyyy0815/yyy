@@ -32,17 +32,7 @@ for (const [name, source] of guides) {
   entries.push({ name, path });
 }
 
-// 参考资料：引用仓库原文，避免两份内容不一致
-const references = [
-  ["参考资料/项目说明.md", join(root, "README.md")],
-  ["参考资料/离线评测报告.md", join(root, "docs/eval-report.md")],
-  ["参考资料/部署说明.md", join(root, "docs/DEPLOY.md")],
-  ["参考资料/扩展说明.md", join(root, "extension/README.md")],
-];
-for (const [name, path] of references) {
-  if (existsSync(path)) entries.push({ name, path });
-}
-
+// 提交包不再附带「参考资料」，只保留 PDF、提交说明、截图与源码
 const imageDir = join(root, "docs/img");
 if (existsSync(imageDir)) {
   for (const file of readdirSync(imageDir).sort()) {
