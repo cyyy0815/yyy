@@ -1,4 +1,4 @@
-"""生成「作品介绍文档」：对应报名表单 6 的七项要求，含界面截图。"""
+"""生成「作品说明文档」：对应报名表单 6 的七项要求，含界面截图。"""
 
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
@@ -139,7 +139,7 @@ run._element.rPr.rFonts.set(qn("w:eastAsia"), HEAD_FONT)
 
 subtitle = document.add_paragraph()
 subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = subtitle.add_run("作品介绍文档")
+run = subtitle.add_run("作品说明文档")
 run.font.size = Pt(16)
 run.font.color.rgb = ACCENT
 
@@ -335,5 +335,5 @@ body(
     "并通过无需插件的采集书签接入真实岗位数据、通过可解释的匹配与 Agent 工作流把 AI 放在流程主导位置。"
 )
 
-document.save("D:/web/docs/作品介绍文档.docx")
+document.save("D:/web/docs/作品说明文档.docx")
 print("intro docx saved")
