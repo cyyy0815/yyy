@@ -18,6 +18,9 @@ function bookmarkletMain(appOrigin: string) {
       "jobs.51job.com": "51job",
     };
 
+    const CITY_NAMES =
+      /(北京|上海|广州|深圳|杭州|成都|武汉|南京|西安|苏州|天津|重庆|长沙|郑州|青岛|厦门|合肥|福州|济南|大连|宁波|无锡|东莞|佛山|珠海|昆明|南昌|贵阳|石家庄|太原|沈阳|长春|哈尔滨|兰州|南宁|海口)/;
+
     type Rule = {
       card: string[];
       role: string[];
@@ -106,49 +109,170 @@ function bookmarkletMain(appOrigin: string) {
         ],
       },
       "www.liepin.com": {
-        card: [".job-list-item", ".job-card-pc-container", ".job-card"],
-        role: [".job-title-box", ".job-title", ".name-box .name"],
-        company: [".company-name", ".company-box .name"],
-        city: [".job-dq-box", ".job-area", ".area"],
-        salary: [".job-salary", ".salary"],
-        tags: [".job-labels-box span", ".labels span", ".tag"],
+        card: [
+          ".job-list-item",
+          ".job-card-pc-container",
+          ".job-card",
+          "[class*='job-list-item']",
+          "[class*='job-card']",
+          "li[data-jobid]",
+        ],
+        role: [
+          ".job-title-box",
+          ".job-title",
+          ".name-box .name",
+          "[class*='job-title']",
+          "h3",
+        ],
+        company: [
+          ".company-name",
+          ".company-box .name",
+          "[class*='company-name']",
+          "[class*='company']",
+        ],
+        city: [".job-dq-box", ".job-area", ".area", "[class*='area']"],
+        salary: [".job-salary", ".salary", "[class*='salary']"],
+        tags: [
+          ".job-labels-box span",
+          ".labels span",
+          ".tag",
+          "[class*='label'] span",
+          "[class*='tag'] span",
+        ],
         link: ['a[href*="/job/"]', "a[href]"],
       },
       "www.zhaopin.com": {
-        card: [".joblist-box__item", ".job-list-box .item"],
-        role: [".iteminfo__line1__jobname", ".jobname"],
-        company: [".iteminfo__line1__compname", ".companyname"],
-        city: [".iteminfo__line2__jobdesc", ".jobarea"],
-        salary: [".iteminfo__line2__jobdesc__salary"],
-        tags: [".iteminfo__line2__jobdesc span", ".tag"],
-        link: ['a[href*="/jobdetail/"]', "a[href]"],
+        card: [
+          ".joblist-box__item",
+          ".job-list-box .item",
+          ".joblist-item",
+          ".job-item",
+          "[class*='joblist']",
+          "[class*='job-item']",
+          "li[data-jobid]",
+        ],
+        role: [
+          ".iteminfo__line1__jobname",
+          ".jobname",
+          "[class*='jobname']",
+          "[class*='job-title']",
+          "h3",
+        ],
+        company: [
+          ".iteminfo__line1__compname",
+          ".companyname",
+          "[class*='companyname']",
+          "[class*='company-name']",
+          "[class*='company']",
+        ],
+        city: [
+          ".iteminfo__line2__jobdesc",
+          ".jobarea",
+          "[class*='job-area']",
+          "[class*='address']",
+          "[class*='city']",
+        ],
+        salary: [
+          ".iteminfo__line2__jobdesc__salary",
+          "[class*='salary']",
+          "[class*='pay']",
+        ],
+        tags: [
+          ".iteminfo__line2__jobdesc span",
+          ".tag",
+          "[class*='tag'] span",
+          "[class*='label'] span",
+        ],
+        link: ['a[href*="/jobdetail/"]', 'a[href*="/jobs/"]', "a[href]"],
       },
       "sou.zhaopin.com": {
-        card: [".joblist-box__item", ".job-list-box .item"],
-        role: [".iteminfo__line1__jobname", ".jobname"],
-        company: [".iteminfo__line1__compname", ".companyname"],
-        city: [".iteminfo__line2__jobdesc", ".jobarea"],
-        salary: [".iteminfo__line2__jobdesc__salary"],
-        tags: [".iteminfo__line2__jobdesc span", ".tag"],
-        link: ['a[href*="/jobdetail/"]', "a[href]"],
+        card: [
+          ".joblist-box__item",
+          ".job-list-box .item",
+          ".joblist-item",
+          ".job-item",
+          "[class*='joblist']",
+          "[class*='job-item']",
+          "li[data-jobid]",
+        ],
+        role: [
+          ".iteminfo__line1__jobname",
+          ".jobname",
+          "[class*='jobname']",
+          "[class*='job-title']",
+          "h3",
+        ],
+        company: [
+          ".iteminfo__line1__compname",
+          ".companyname",
+          "[class*='companyname']",
+          "[class*='company-name']",
+          "[class*='company']",
+        ],
+        city: [
+          ".iteminfo__line2__jobdesc",
+          ".jobarea",
+          "[class*='job-area']",
+          "[class*='address']",
+          "[class*='city']",
+        ],
+        salary: [
+          ".iteminfo__line2__jobdesc__salary",
+          "[class*='salary']",
+          "[class*='pay']",
+        ],
+        tags: [
+          ".iteminfo__line2__jobdesc span",
+          ".tag",
+          "[class*='tag'] span",
+          "[class*='label'] span",
+        ],
+        link: ['a[href*="/jobdetail/"]', 'a[href*="/jobs/"]', "a[href]"],
       },
       "we.51job.com": {
-        card: [".j_joblist .e", ".joblist .e", ".j_joblist .el"],
-        role: [".jname", ".job-name"],
-        company: [".cname", ".company-name"],
-        city: [".d", ".area"],
-        salary: [".sal", ".salary"],
-        tags: [".tags span", ".tag"],
-        link: ['a[href*="/job/"]', "a[href]"],
+        card: [
+          ".j_joblist .e",
+          ".joblist .e",
+          ".j_joblist .el",
+          ".joblist-item",
+          ".job-item",
+          "[class*='joblist']",
+          "[class*='job-item']",
+          "li[data-jobid]",
+        ],
+        role: [".jname", ".job-name", "[class*='job-name']", "h3"],
+        company: [
+          ".cname",
+          ".company-name",
+          "[class*='company-name']",
+          "[class*='company']",
+        ],
+        city: [".d", ".area", "[class*='area']", "[class*='city']"],
+        salary: [".sal", ".salary", "[class*='salary']", "[class*='pay']"],
+        tags: [".tags span", ".tag", "[class*='tag'] span"],
+        link: ['a[href*="/pc/job/"]', 'a[href*="/job/"]', "a[href]"],
       },
       "jobs.51job.com": {
-        card: [".j_joblist .e", ".joblist .e"],
-        role: [".jname", ".job-name"],
-        company: [".cname", ".company-name"],
-        city: [".d", ".area"],
-        salary: [".sal", ".salary"],
-        tags: [".tags span", ".tag"],
-        link: ['a[href*="/job/"]', "a[href]"],
+        card: [
+          ".j_joblist .e",
+          ".joblist .e",
+          ".joblist-item",
+          ".job-item",
+          "[class*='joblist']",
+          "[class*='job-item']",
+          "li[data-jobid]",
+        ],
+        role: [".jname", ".job-name", "[class*='job-name']", "h3"],
+        company: [
+          ".cname",
+          ".company-name",
+          "[class*='company-name']",
+          "[class*='company']",
+        ],
+        city: [".d", ".area", "[class*='area']", "[class*='city']"],
+        salary: [".sal", ".salary", "[class*='salary']", "[class*='pay']"],
+        tags: [".tags span", ".tag", "[class*='tag'] span"],
+        link: ['a[href*="/pc/job/"]', 'a[href*="/job/"]', "a[href]"],
       },
     };
 
@@ -265,6 +389,38 @@ function bookmarkletMain(appOrigin: string) {
       }
     }
 
+    // 新版站点经常整体换 class；没有命中时，从职位详情链接向上找卡片容器。
+    if (cards.length === 0) {
+      const linkSelectors =
+        host === "www.zhaopin.com" || host === "sou.zhaopin.com"
+          ? ['a[href*="/jobdetail/"]', 'a[href*="/jobs/"]']
+          : host === "we.51job.com" || host === "jobs.51job.com"
+            ? ['a[href*="/pc/job/"]', 'a[href*="/job/"]']
+            : ['a[href*="/job/"]', 'a[href*="/jobs/"]', 'a[href*="/wn/jobs/"]'];
+      for (let s = 0; s < linkSelectors.length && cards.length < 40; s += 1) {
+        try {
+          const links = document.querySelectorAll(linkSelectors[s]);
+          for (let l = 0; l < links.length && cards.length < 40; l += 1) {
+            const link = links[l];
+            const rawHref = link.getAttribute("href") || "";
+            // 书签自己的 javascript: 地址里包含选择器字符串，不能当成职位链接。
+            if (/^\s*javascript:/i.test(rawHref)) continue;
+            const text = clean(textOf(link), 100);
+            if (!text) continue;
+            const container =
+              link.closest(
+                'li, article, div[class*="card"], div[class*="job"], div[class*="item"]',
+              ) || link.parentElement;
+            if (!container) continue;
+            if (textOf(container).trim().length < 10) continue;
+            if (cards.indexOf(container) < 0) cards.push(container);
+          }
+        } catch (error) {
+          // ignore
+        }
+      }
+    }
+
     const jobs: Array<{
       company: string;
       role: string;
@@ -297,6 +453,12 @@ function bookmarkletMain(appOrigin: string) {
           break;
         }
       }
+      if (!role) {
+        const titleLink = card.querySelector(
+          'a[href*="/jobdetail/"], a[href*="/pc/job/"], a[href*="/job/"], a[href*="/wn/jobs/"]',
+        );
+        if (titleLink) role = clean(textOf(titleLink), 100);
+      }
       let company = firstText(card, rule.company, 100);
       if (!company) {
         company = firstAttr(
@@ -313,6 +475,21 @@ function bookmarkletMain(appOrigin: string) {
       let city = firstText(card, rule.city, 50);
       if (!city) {
         city = firstAttr(card, ["[data-city]"], ["data-city"], 50);
+      }
+      if (!city) {
+        const lines = textOf(card)
+          .split(/\n+/)
+          .map(function (line) {
+            return clean(line, 100);
+          })
+          .filter(Boolean);
+        for (let l = 0; l < lines.length; l += 1) {
+          const cityMatch = lines[l].match(CITY_NAMES);
+          if (cityMatch) {
+            city = cityMatch[1];
+            break;
+          }
+        }
       }
       if (!/[\u4e00-\u9fa5A-Za-z]/.test(city)) city = "";
       let salary = firstText(card, rule.salary, 50);
