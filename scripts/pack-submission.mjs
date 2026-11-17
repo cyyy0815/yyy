@@ -12,7 +12,7 @@ const root = process.cwd();
 const folder = join(root, "提交材料");
 const target = join(folder, "简历工坊-完整作品.zip");
 
-const deliverables = ["技术文档.pdf", "作品介绍文档.pdf", "README.md"];
+const deliverables = ["技术文档.pdf", "作品介绍文档.pdf"];
 // 包里只留一份入口说明，其余说明文档不再随包分发
 const guides = [["00-提交说明.md", "提交说明.md"]];
 
