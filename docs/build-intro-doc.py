@@ -115,10 +115,12 @@ def figure(path, caption, width=15.0):
     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
     paragraph.paragraph_format.space_before = Pt(4)
     paragraph.paragraph_format.space_after = Pt(2)
+    paragraph.paragraph_format.keep_with_next = True
     paragraph.add_run().add_picture(path, width=Cm(width))
     caption_paragraph = document.add_paragraph()
     caption_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
     caption_paragraph.paragraph_format.space_after = Pt(8)
+    caption_paragraph.paragraph_format.keep_together = True
     run = caption_paragraph.add_run(caption)
     run.font.name = BODY_FONT
     run._element.rPr.rFonts.set(qn("w:eastAsia"), BODY_FONT)
@@ -350,7 +352,6 @@ body(
 )
 
 # ---------- 三 ----------
-document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 document.add_heading("三、AI 技术落地使用情况", level=1)
 body("AI 在产品中承担四类任务，边界清晰：", indent=False)
 table(
@@ -424,11 +425,13 @@ document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 # ---------- 五 ----------
 document.add_heading("五、项目图片", level=1)
 body("以下截图均来自真实运行环境（演示场景 + 真实模型调用）。", indent=False)
-figure("D:/web/docs/img/editor.png", "图 1  编辑页：左侧表单、右侧实时预览，可直接打印为 PDF", 11.5)
-figure("D:/web/docs/img/match.png", "图 2  职位推荐：匹配分、核心要求命中与可点击的缺口", 11.5)
-figure("D:/web/docs/img/agent.png", "图 3  求职 Agent：四步计划、流式输出、事实核对与工具轨迹", 8.5)
-figure("D:/web/docs/img/queue.png", "图 4  待投清单：批量导入的岗位按匹配度排序，右侧可直接「AI 准备」", 11.5)
-figure("D:/web/docs/img/workbench.png", "图 5  AI 工作台：左侧选目标岗位，右侧是四步流水线与执行说明", 11.5)
+figure("D:/web/docs/img/editor.png", "图 1  编辑页：左侧表单、右侧实时预览，可直接打印为 PDF", 10.5)
+figure("D:/web/docs/img/match.png", "图 2  职位推荐：匹配分、核心要求命中与可点击的缺口", 10.5)
+document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+figure("D:/web/docs/img/agent.png", "图 3  求职 Agent：四步计划、流式输出、事实核对与工具轨迹", 8.0)
+figure("D:/web/docs/img/queue.png", "图 4  待投清单：批量导入的岗位按匹配度排序，右侧可直接「AI 准备」", 10.5)
+document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+figure("D:/web/docs/img/workbench.png", "图 5  AI 工作台：左侧选目标岗位，右侧是四步流水线与执行说明", 10.5)
 
 # ---------- 六 ----------
 document.add_heading("六、发表与获奖情况", level=1)
