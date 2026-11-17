@@ -10,6 +10,7 @@ from docx.shared import Cm, Pt, RGBColor
 BODY_FONT = "宋体"
 HEAD_FONT = "微软雅黑"
 ACCENT = RGBColor(0x1D, 0x4E, 0xD8)
+BROWN = RGBColor(0x8B, 0x3A, 0x2E)
 GRAY = RGBColor(0x60, 0x64, 0x6B)
 
 document = Document()
@@ -125,48 +126,99 @@ def footer_page_number():
     run.font.color.rgb = GRAY
 
 
+def header_text():
+    paragraph = section.header.paragraphs[0]
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    run = paragraph.add_run(
+        "2026 第九届传智杯 · AI WEB 网页开发挑战赛 · offer加速器"
+    )
+    run.font.size = Pt(9)
+    run.font.color.rgb = GRAY
+
+
+header_text()
 footer_page_number()
 
 # ---------- 封面 ----------
-title = document.add_paragraph()
-title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-title.paragraph_format.space_before = Pt(90)
-run = title.add_run("简历工坊")
-run.font.name = HEAD_FONT
-run.font.size = Pt(34)
-run.font.bold = True
-run._element.rPr.rFonts.set(qn("w:eastAsia"), HEAD_FONT)
+def centered(text, size, bold=False, color=None, before=0, after=0):
+    paragraph = document.add_paragraph()
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph.paragraph_format.space_before = Pt(before)
+    paragraph.paragraph_format.space_after = Pt(after)
+    run = paragraph.add_run(text)
+    run.font.name = HEAD_FONT
+    run._element.rPr.rFonts.set(qn("w:eastAsia"), HEAD_FONT)
+    run.font.size = Pt(size)
+    run.font.bold = bold
+    if color is not None:
+        run.font.color.rgb = color
+    return paragraph
 
-subtitle = document.add_paragraph()
-subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = subtitle.add_run("作品说明文档")
-run.font.size = Pt(16)
-run.font.color.rgb = ACCENT
 
-meta = document.add_paragraph()
-meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = meta.add_run("2026第九届传智杯全国大学生数智创新与 AI 应用大赛")
-run.font.size = Pt(11)
-run.font.color.rgb = GRAY
+centered("2026 第九届传智杯", 24, bold=True, before=28)
+centered("全国大学生数智创新与 AI 应用大赛", 16, bold=True, before=8)
+centered("AI WEB 网页开发挑战赛 · 作品说明文档", 12, color=GRAY, before=12)
 
-track = document.add_paragraph()
-track.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = track.add_run("AI WEB 网页开发挑战赛 · 2026-11-17")
-run.font.size = Pt(11)
-run.font.color.rgb = GRAY
+centered("简历工坊", 40, bold=True, color=BROWN, before=54)
+centered("把求职判断、简历修改和投递跟进串成一条链路", 12, color=GRAY, before=8, after=30)
 
-team = document.add_paragraph()
-team.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = team.add_run("团队：offer加速器（团队编号 40292）· 商洛学院 · B组")
-run.font.size = Pt(10.5)
-run.font.color.rgb = GRAY
+info_rows = [
+    ("作品版本", "v1.0 · 2026-11"),
+    ("团队名称", "offer加速器"),
+    ("团队编号", "40292"),
+    ("参赛组别", "B 组"),
+    ("学校 / 院系", "商洛学院"),
+    ("团队成员", "陈云（队长）、张雅轩、李子怡"),
+    ("指导教师", "殷静蔚"),
+    ("提交日期", "2026 年 11 月"),
+]
+for label, value in info_rows:
+    paragraph = document.add_paragraph()
+    paragraph.paragraph_format.left_indent = Cm(2.4)
+    paragraph.paragraph_format.space_after = Pt(9)
+    paragraph.paragraph_format.tab_stops.add_tab_stop(Cm(9.0))
+    label_run = paragraph.add_run(label)
+    label_run.font.name = HEAD_FONT
+    label_run._element.rPr.rFonts.set(qn("w:eastAsia"), HEAD_FONT)
+    label_run.font.size = Pt(10.5)
+    label_run.font.bold = True
+    value_run = paragraph.add_run("\t" + value)
+    value_run.font.size = Pt(10.5)
 
-members = document.add_paragraph()
-members.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = members.add_run("队长：陈云 · 队员：张雅轩、李子怡 · 指导教师：殷静蔚")
-run.font.size = Pt(10.5)
-run.font.color.rgb = GRAY
+centered(
+    "本文件包含：项目说明 / 使用方式 / 项目亮点 / AI 落地 / 关键技术 / 成果展示 / 原创说明",
+    9.5,
+    color=GRAY,
+    before=42,
+)
+document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
+# ---------- 摘要与目录 ----------
+document.add_heading("作品摘要", level=1)
+body(
+    "简历工坊是一个本地优先的 AI 求职工作台，把「看懂岗位要求 → 判断匹配 → 定向修改简历 → "
+    "准备求职信 → 记录投递」串成一条可解释、可撤销、数据留在本机的链路。"
+    "它面向应届生与 1–5 年经验的转岗者，解决三件事：这个岗位到底要什么、我的简历差在哪、投完以后怎么跟。"
+)
+body(
+    "产品由三块组成：编辑简历负责内容与排版；职位推荐负责可解释匹配、采集真实岗位与投递管理；"
+    "AI 工作台把求职 Agent 的四步计划、工具调用、流式改写、事实核对和人工采用放在一个可观察的界面里。"
+    "简历与投递记录只保存在 localStorage；服务端只承担同源 AI 代理，不存简历、不收集联系方式。"
+)
+
+document.add_heading("目录", level=1)
+for item in (
+    "一、项目详情及使用方式",
+    "二、项目亮点",
+    "三、AI 技术落地使用情况",
+    "四、关键技术",
+    "五、项目图片",
+    "六、发表与获奖情况",
+    "七、原创性与参考说明",
+    "附录 A  测试与质量记录",
+    "附录 B  提交文件与隐私说明",
+):
+    body(item, indent=False)
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 # ---------- 一 ----------
@@ -345,6 +397,51 @@ body(
 body(
     "需要说明的是：产品定位与主流简历工具不同——它们聚焦「排版」，本项目聚焦「投什么、怎么投、投了没」，"
     "并通过无需插件的采集书签接入真实岗位数据、通过可解释的匹配与 Agent 工作流把 AI 放在流程主导位置。"
+)
+
+document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+
+# ---------- 附录 A ----------
+document.add_heading("附录 A  测试与质量记录", level=1)
+body(
+    "项目以单元测试、组件测试和浏览器端到端 QA 三层验证核心链路；以下结果均可从仓库脚本复现。",
+    indent=False,
+)
+table(
+    ["项目", "结果"],
+    [
+        ["单元 / 组件测试", "310 个用例，36 个测试文件"],
+        ["浏览器端到端 QA", "覆盖打印 / 多标签页 / 离线缓存 / 采集书签 / Agent"],
+        ["岗位画像识别", "26 / 26"],
+        ["核心要求分组收益", "逐项 82% → 分组 100%"],
+        ["事实核对", "注入 20 条素材外事实，20 / 20 检出；5 条干净文本 0 误报"],
+        ["构建与类型检查", "TypeScript strict、ESLint、生产构建通过"],
+    ],
+    [9.0, 7.0],
+)
+body(
+    "复现命令：`npm test`、`npm run qa`（需先 build + start）、`npm run eval`。"
+    "QA 针对生产构建运行，避免开发模式行为差异。",
+    indent=False,
+)
+
+# ---------- 附录 B ----------
+document.add_heading("附录 B  提交文件与隐私说明", level=1)
+body(
+    "提交包按赛事材料组织为：01_作品说明文档、02_源代码、03_演示视频、04_界面截图、"
+    "05_体验说明、06_测试记录、07_附件。根目录 README.txt 说明每个目录的内容与提交前检查项。",
+    indent=False,
+)
+body(
+    "隐私与安全：简历、投递记录、当前 JD 与撤销栈只保存在浏览器 localStorage；"
+    "AI 请求只发送当前板块文本、岗位关键词与参考 JD，不发送姓名、电话、邮箱与整份简历；"
+    "API Key 只存在服务端环境变量，公开仓库只提交 `.env.example`，不包含任何真实密钥。",
+    indent=False,
+)
+body(
+    "在线演示：https://yyy-sandy.vercel.app/ ，无需登录；"
+    "代码仓库：https://github.com/cyyy0815/yyy 。",
+    indent=False,
 )
 
 document.save("D:/web/docs/作品说明文档.docx")
