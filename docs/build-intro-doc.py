@@ -145,7 +145,7 @@ run.font.color.rgb = ACCENT
 
 meta = document.add_paragraph()
 meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = meta.add_run("传智杯 · AI Agent 智能助手 · 2026-11-17")
+run = meta.add_run("传智杯 · AI WEB 网页开发挑战赛 · 2026-11-17")
 run.font.size = Pt(11)
 run.font.color.rgb = GRAY
 

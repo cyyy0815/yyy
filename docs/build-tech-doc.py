@@ -224,7 +224,7 @@ document.add_paragraph()
 
 meta = document.add_paragraph()
 meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = meta.add_run("传智杯 · AI 应用开发赛道 · 技术文档")
+run = meta.add_run("传智杯 · AI WEB 网页开发挑战赛 · 技术文档")
 run.font.size = Pt(11.5)
 run.font.color.rgb = GRAY
 
@@ -233,7 +233,7 @@ info = document.add_table(rows=4, cols=2)
 info.alignment = WD_TABLE_ALIGNMENT.CENTER
 info_rows = [
     ("作品名称", "简历工坊 Resume Workshop"),
-    ("参赛赛道", "AI Agent 智能助手"),
+    ("参赛赛道", "AI WEB 网页开发挑战赛"),
     ("技术栈", "Next.js 16 / React 19 / TypeScript"),
     ("文档版本", "v1.1 · 2026-11-17"),
 ]
