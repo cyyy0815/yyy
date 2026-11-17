@@ -8,7 +8,8 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
 BODY_FONT = "宋体"
-HEAD_FONT = "微软雅黑"
+HEAD_FONT = "思源黑体"
+COVER_FONT = "华文中宋"
 ACCENT = RGBColor(0x1D, 0x4E, 0xD8)
 BROWN = RGBColor(0x8B, 0x3A, 0x2E)
 GRAY = RGBColor(0x60, 0x64, 0x6B)
@@ -39,12 +40,12 @@ def set_font(style, name, size, bold=False, color=None):
 
 
 set_font(document.styles["Normal"], BODY_FONT, 10.5)
-document.styles["Normal"].paragraph_format.line_spacing = 1.5
+document.styles["Normal"].paragraph_format.line_spacing = 1.55
 document.styles["Normal"].paragraph_format.space_after = Pt(4)
-for name, size in (("Heading 1", 15), ("Heading 2", 12.5)):
+for name, size in (("Heading 1", 16), ("Heading 2", 13)):
     set_font(document.styles[name], HEAD_FONT, size, bold=True, color=RGBColor(0x18, 0x18, 0x1B))
-    document.styles[name].paragraph_format.space_before = Pt(12)
-    document.styles[name].paragraph_format.space_after = Pt(5)
+    document.styles[name].paragraph_format.space_before = Pt(14)
+    document.styles[name].paragraph_format.space_after = Pt(6)
     document.styles[name].paragraph_format.keep_with_next = True
 
 
@@ -74,7 +75,9 @@ def table(headers, rows, widths):
         cell.text = ""
         run = cell.paragraphs[0].add_run(header)
         run.font.bold = True
-        run.font.size = Pt(9.5)
+        run.font.size = Pt(10)
+        run.font.name = HEAD_FONT
+        run._element.rPr.rFonts.set(qn("w:eastAsia"), HEAD_FONT)
         shading = OxmlElement("w:shd")
         shading.set(qn("w:val"), "clear")
         shading.set(qn("w:fill"), "F4F4F5")
@@ -85,7 +88,7 @@ def table(headers, rows, widths):
         for index, value in enumerate(row):
             cells[index].text = ""
             run = cells[index].paragraphs[0].add_run(str(value))
-            run.font.size = Pt(9.5)
+            run.font.size = Pt(10)
     result.rows[0].allow_break_across_pages = False
     header_props = result.rows[0]._tr.get_or_add_trPr()
     table_header = OxmlElement("w:tblHeader")
@@ -117,7 +120,9 @@ def figure(path, caption, width=15.0):
     caption_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
     caption_paragraph.paragraph_format.space_after = Pt(8)
     run = caption_paragraph.add_run(caption)
-    run.font.size = Pt(9)
+    run.font.name = BODY_FONT
+    run._element.rPr.rFonts.set(qn("w:eastAsia"), BODY_FONT)
+    run.font.size = Pt(9.5)
     run.font.color.rgb = GRAY
 
 
@@ -151,14 +156,15 @@ header_text()
 footer_page_number()
 
 # ---------- 封面 ----------
-def centered(text, size, bold=False, color=None, before=0, after=0):
+def centered(text, size, bold=False, color=None, before=0, after=0, font=None):
     paragraph = document.add_paragraph()
     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
     paragraph.paragraph_format.space_before = Pt(before)
     paragraph.paragraph_format.space_after = Pt(after)
     run = paragraph.add_run(text)
-    run.font.name = HEAD_FONT
-    run._element.rPr.rFonts.set(qn("w:eastAsia"), HEAD_FONT)
+    family = font or HEAD_FONT
+    run.font.name = family
+    run._element.rPr.rFonts.set(qn("w:eastAsia"), family)
     run.font.size = Pt(size)
     run.font.bold = bold
     if color is not None:
@@ -166,12 +172,12 @@ def centered(text, size, bold=False, color=None, before=0, after=0):
     return paragraph
 
 
-centered("2026 第九届传智杯", 24, bold=True, before=28)
-centered("全国大学生数智创新与 AI 应用大赛", 16, bold=True, before=8)
-centered("AI WEB 网页开发挑战赛 · 作品说明文档", 12, color=GRAY, before=12)
+centered("2026 第九届传智杯", 26, bold=True, before=20, font=COVER_FONT)
+centered("全国大学生数智创新与 AI 应用大赛", 17, bold=True, before=6, font=COVER_FONT)
+centered("AI WEB 网页开发挑战赛 · 作品说明文档", 12, color=GRAY, before=10)
 
-centered("简历工坊", 40, bold=True, color=BROWN, before=54)
-centered("把求职判断、简历修改和投递跟进串成一条链路", 12, color=GRAY, before=8, after=30)
+centered("简历工坊", 42, bold=True, color=BROWN, before=42, font=COVER_FONT)
+centered("把求职判断、简历修改和投递跟进串成一条链路", 12, color=GRAY, before=6, after=20, font=BODY_FONT)
 
 info_rows = [
     ("作品版本", "v1.0 · 2026-11"),
@@ -186,7 +192,7 @@ info_rows = [
 for label, value in info_rows:
     paragraph = document.add_paragraph()
     paragraph.paragraph_format.left_indent = Cm(2.4)
-    paragraph.paragraph_format.space_after = Pt(9)
+    paragraph.paragraph_format.space_after = Pt(6)
     paragraph.paragraph_format.tab_stops.add_tab_stop(Cm(9.0))
     label_run = paragraph.add_run(label)
     label_run.font.name = HEAD_FONT
@@ -194,6 +200,8 @@ for label, value in info_rows:
     label_run.font.size = Pt(10.5)
     label_run.font.bold = True
     value_run = paragraph.add_run("\t" + value)
+    value_run.font.name = BODY_FONT
+    value_run._element.rPr.rFonts.set(qn("w:eastAsia"), BODY_FONT)
     value_run.font.size = Pt(10.5)
 
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
@@ -416,13 +424,11 @@ document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 # ---------- 五 ----------
 document.add_heading("五、项目图片", level=1)
 body("以下截图均来自真实运行环境（演示场景 + 真实模型调用）。", indent=False)
-figure("D:/web/docs/img/editor.png", "图 1  编辑页：左侧表单、右侧实时预览，可直接打印为 PDF")
-figure("D:/web/docs/img/match.png", "图 2  职位推荐：匹配分、核心要求命中与可点击的缺口")
-figure("D:/web/docs/img/agent.png", "图 3  求职 Agent：四步计划、流式输出、事实核对与工具轨迹", 9.8)
-figure("D:/web/docs/img/queue.png", "图 4  待投清单：批量导入的岗位按匹配度排序，右侧可直接「AI 准备」", 13.2)
-figure("D:/web/docs/img/workbench.png", "图 5  AI 工作台：左侧选目标岗位，右侧是四步流水线与执行说明", 14.5)
-
-document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+figure("D:/web/docs/img/editor.png", "图 1  编辑页：左侧表单、右侧实时预览，可直接打印为 PDF", 11.5)
+figure("D:/web/docs/img/match.png", "图 2  职位推荐：匹配分、核心要求命中与可点击的缺口", 11.5)
+figure("D:/web/docs/img/agent.png", "图 3  求职 Agent：四步计划、流式输出、事实核对与工具轨迹", 8.5)
+figure("D:/web/docs/img/queue.png", "图 4  待投清单：批量导入的岗位按匹配度排序，右侧可直接「AI 准备」", 11.5)
+figure("D:/web/docs/img/workbench.png", "图 5  AI 工作台：左侧选目标岗位，右侧是四步流水线与执行说明", 11.5)
 
 # ---------- 六 ----------
 document.add_heading("六、发表与获奖情况", level=1)
@@ -482,12 +488,8 @@ body(
 body(
     "隐私与安全：简历、投递记录、当前 JD 与撤销栈只保存在浏览器 localStorage；"
     "AI 请求只发送当前板块文本、岗位关键词与参考 JD，不发送姓名、电话、邮箱与整份简历；"
-    "API Key 只存在服务端环境变量，公开仓库只提交 `.env.example`，不包含任何真实密钥。",
-    indent=False,
-)
-body(
-    "在线演示：https://yyy-sandy.vercel.app/ ，无需登录；"
-    "代码仓库：https://github.com/cyyy0815/yyy 。",
+    "API Key 只存在服务端环境变量，公开仓库只提交 `.env.example`，不包含任何真实密钥。"
+    "在线演示 https://yyy-sandy.vercel.app/ 无需登录，代码仓库 https://github.com/cyyy0815/yyy 。",
     indent=False,
 )
 
