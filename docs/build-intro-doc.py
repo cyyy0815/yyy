@@ -87,6 +87,10 @@ def table(headers, rows, widths):
             run = cells[index].paragraphs[0].add_run(str(value))
             run.font.size = Pt(9.5)
     result.rows[0].allow_break_across_pages = False
+    header_props = result.rows[0]._tr.get_or_add_trPr()
+    table_header = OxmlElement("w:tblHeader")
+    table_header.set(qn("w:val"), "true")
+    header_props.append(table_header)
     for row in result.rows:
         for cell in row.cells:
             for paragraph in cell.paragraphs:
@@ -216,8 +220,6 @@ body(
     indent=False,
     size=10,
 )
-
-document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 document.add_heading("目录", level=1)
 for item in (
     "一、项目详情及使用方式",
@@ -330,6 +332,12 @@ body(
     "与通用 AI 写作工具相比，它先做本地匹配、再做事实核对，最后把采用权交还给用户。",
     indent=False,
 )
+body("8. 设计取舍：不追求全自动，优先保证可控", bold=True, indent=False)
+body(
+    "不做自动投递、不做云端账号、不把整份简历发给模型；采集书签不自动翻页、不后台抓取；"
+    "匹配与事实核对尽量在本地完成。代价是用户要多点几次确认，换来的是可解释、可撤销、可离线，"
+    "以及出问题时知道是哪一步、为什么。"
+)
 
 # ---------- 三 ----------
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
@@ -372,7 +380,6 @@ body(
 )
 
 # ---------- 四 ----------
-document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 document.add_heading("四、关键技术", level=1)
 table(
     ["技术", "在项目中的作用"],
@@ -405,14 +412,13 @@ bullet("跨境网络慢：首屏服务端输出真实内容，静态资源优先
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 # ---------- 五 ----------
-document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 document.add_heading("五、项目图片", level=1)
 body("以下截图均来自真实运行环境（演示场景 + 真实模型调用）。", indent=False)
 figure("D:/web/docs/img/editor.png", "图 1  编辑页：左侧表单、右侧实时预览，可直接打印为 PDF")
 figure("D:/web/docs/img/match.png", "图 2  职位推荐：匹配分、核心要求命中与可点击的缺口")
-figure("D:/web/docs/img/agent.png", "图 3  求职 Agent：四步计划、流式输出、事实核对与工具轨迹")
-figure("D:/web/docs/img/queue.png", "图 4  待投清单：批量导入的岗位按匹配度排序，右侧可直接「AI 准备」")
-figure("D:/web/docs/img/workbench.png", "图 5  AI 工作台：左侧选目标岗位，右侧是四步流水线与执行说明")
+figure("D:/web/docs/img/agent.png", "图 3  求职 Agent：四步计划、流式输出、事实核对与工具轨迹", 9.8)
+figure("D:/web/docs/img/queue.png", "图 4  待投清单：批量导入的岗位按匹配度排序，右侧可直接「AI 准备」", 13.2)
+figure("D:/web/docs/img/workbench.png", "图 5  AI 工作台：左侧选目标岗位，右侧是四步流水线与执行说明", 14.5)
 
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
