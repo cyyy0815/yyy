@@ -149,6 +149,12 @@ run = meta.add_run("传智杯 · AI WEB 网页开发挑战赛 · 2026-11-17")
 run.font.size = Pt(11)
 run.font.color.rgb = GRAY
 
+team = document.add_paragraph()
+team.alignment = WD_ALIGN_PARAGRAPH.CENTER
+run = team.add_run("团队：offer加速器 · 队长：陈云 · 队员：张雅轩、李子怡")
+run.font.size = Pt(11)
+run.font.color.rgb = GRAY
+
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 # ---------- 一 ----------

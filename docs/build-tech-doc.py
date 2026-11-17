@@ -229,11 +229,12 @@ run.font.size = Pt(11.5)
 run.font.color.rgb = GRAY
 
 document.add_paragraph()
-info = document.add_table(rows=4, cols=2)
+info = document.add_table(rows=5, cols=2)
 info.alignment = WD_TABLE_ALIGNMENT.CENTER
 info_rows = [
     ("作品名称", "简历工坊 Resume Workshop"),
     ("参赛赛道", "AI WEB 网页开发挑战赛"),
+    ("团队", "offer加速器（队长：陈云；队员：张雅轩、李子怡）"),
     ("技术栈", "Next.js 16 / React 19 / TypeScript"),
     ("文档版本", "v1.1 · 2026-11-17"),
 ]
