@@ -265,6 +265,16 @@ body(
     "生成求职信 → 记录投递」串成一条可解释的链路。数据全部保存在访问者自己的浏览器里，"
     "服务端只承担 AI 代理，不存简历、不收集联系方式。"
 )
+table(
+    ["模块", "解决什么", "关键能力"],
+    [
+        ["编辑简历", "内容与排版", "8 套模板、双语、打印 / Word / PDF / ATS"],
+        ["职位推荐", "投什么、差在哪", "匹配分、缺口、采集书签、搜索入口"],
+        ["AI 工作台", "怎么改、怎么准备", "Agent 四步、流式改写、事实核对、撤销"],
+        ["投递管理", "投了没、下一步", "待投清单、看板、跟进日期"],
+    ],
+    [3.0, 5.0, 8.0],
+)
 body("使用流程（约 3 分钟）：", bold=True, indent=False)
 body("① 打开首页 → 顶栏点「演示场景」，载入示例简历与 6 个目标岗位；")
 body("② 顶栏切到「AI 工作台」，左侧按匹配度列出待投岗位，选中一个；")
@@ -305,7 +315,7 @@ body("4. 真实岗位数据，来自无需插件的采集书签", bold=True, ind
 body(
     "职位推荐页生成一个 `javascript:` 采集书签：用户在 BOSS直聘 / 拉勾 / 猎聘等搜索结果页点一下，"
     "书签只读当前页已渲染的岗位卡片，把岗位名、公司、城市、薪资、标签和链接复制到剪贴板；"
-    "回到应用点「粘贴采集结果」，先预览再决定加入待投清单。"
+    "回到应用点「粘贴采集结果」，先预览再决定加入待投清单（见图 3、图 4）。"
     "BOSS 的薪资字体反爬按 `U+E031`～`U+E03A` 映射还原为数字，避免出现方框；"
     "不自动翻页、不后台抓取、不新开网页、不绕过验证码。旧版 Chrome 扩展仍保留在 `extension/`，但已不是主路径。"
 )
@@ -389,8 +399,20 @@ body(
     "完整测试表见附录 A。",
     indent=False,
 )
+body("AI 测试方法", bold=True, indent=False)
+body(
+    "评测分三层：规则与组件的单元测试、固定样本的离线评测、生产构建上的浏览器端到端 QA。"
+    "离线集包含 26 条岗位画像、5 段手写 JD、20 条注入的素材外事实和 5 条干净文本；"
+    "同一份样本可在仓库内用 `npm run eval` 复现，避免只靠演示截图说明效果。"
+)
+body("结果解读", bold=True, indent=False)
+bullet("画像识别 26 / 26：词库覆盖岗位名、技能同义词与方向词，能稳定区分前端、数据、产品等方向。")
+bullet("分组收益 +18 个百分点：同族技能只要求其一，避免「会 React 但不会 Vue」被误判为缺失。")
+bullet("事实核对 20 / 20 检出、0 误报：生成内容中的数字、技能、学校、公司超出素材时会明确标出。")
+bullet("310 个用例 + 完整浏览器 QA：覆盖打印、多标签页、离线缓存、采集书签与 Agent 主链路。")
 
 # ---------- 四 ----------
+document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 document.add_heading("四、关键技术", level=1)
 table(
     ["技术", "在项目中的作用"],
@@ -424,14 +446,21 @@ document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 # ---------- 五 ----------
 document.add_heading("五、项目图片", level=1)
-body("以下截图均来自真实运行环境（演示场景 + 真实模型调用）。", indent=False)
+body(
+    "以下 7 张截图均来自真实运行环境，覆盖完整链路：编辑 → 匹配 → 采集入口 → 采集预览 → "
+    "求职 Agent → 待投清单 → AI 工作台。",
+    indent=False,
+)
 figure("D:/web/docs/img/editor.png", "图 1  编辑页：左侧表单、右侧实时预览，可直接打印为 PDF", 10.5)
 figure("D:/web/docs/img/match.png", "图 2  职位推荐：匹配分、核心要求命中与可点击的缺口", 10.5)
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
-figure("D:/web/docs/img/agent.png", "图 3  求职 Agent：四步计划、流式输出、事实核对与工具轨迹", 8.0)
-figure("D:/web/docs/img/queue.png", "图 4  待投清单：批量导入的岗位按匹配度排序，右侧可直接「AI 准备」", 10.5)
+figure("D:/web/docs/img/capture-entry.png", "图 3  采集书签入口：拖到书签栏，在招聘页点一下即可复制当前页岗位", 13.5)
+figure("D:/web/docs/img/capture-preview.png", "图 4  采集预览：导入前先看公司、岗位、城市、薪资与匹配度，去重后加入待投", 10.5)
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
-figure("D:/web/docs/img/workbench.png", "图 5  AI 工作台：左侧选目标岗位，右侧是四步流水线与执行说明", 10.5)
+figure("D:/web/docs/img/agent.png", "图 5  求职 Agent：四步计划、流式输出、事实核对与工具轨迹", 8.0)
+figure("D:/web/docs/img/queue.png", "图 6  待投清单：批量导入的岗位按匹配度排序，右侧可直接「AI 准备」", 10.5)
+document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+figure("D:/web/docs/img/workbench.png", "图 7  AI 工作台：左侧选目标岗位，右侧是四步流水线与执行说明", 10.5)
 
 # ---------- 六 ----------
 document.add_heading("六、发表与获奖情况", level=1)
