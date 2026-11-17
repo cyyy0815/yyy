@@ -60,13 +60,50 @@ function bookmarkletMain(appOrigin: string) {
         link: ['a[href*="/job_detail/"]', "a[href]"],
       },
       "www.lagou.com": {
-        card: [".positionListItem", ".item__10RTO", ".list_item"],
-        role: [".positionLink", ".position-name", ".name"],
-        company: [".companyName", ".company-name"],
-        city: [".jobCity", ".city"],
-        salary: [".salary"],
-        tags: [".labels span", ".label"],
-        link: ["a.positionLink", 'a[href*="/jobs/"]', "a[href]"],
+        card: [
+          ".positionListItem",
+          ".item__10RTO",
+          ".list_item",
+          "[class*='positionListItem']",
+          "[class*='item__']",
+          "li[data-positionid]",
+        ],
+        role: [
+          ".positionLink",
+          ".position-name",
+          ".name",
+          "[class*='positionName']",
+          "[class*='job-name']",
+          "h3",
+          'a[href*="/wn/jobs/"]',
+          'a[href*="/jobs/"]',
+        ],
+        company: [
+          ".companyName",
+          ".company-name",
+          "[class*='companyName']",
+          "[class*='company-name']",
+        ],
+        city: [
+          ".jobCity",
+          ".city",
+          "[class*='address']",
+          "[class*='city']",
+          "[class*='jobCity']",
+        ],
+        salary: [".salary", ".money", "[class*='salary']", "[class*='money']"],
+        tags: [
+          ".labels span",
+          ".label",
+          "[class*='labels'] span",
+          "[class*='label'] span",
+        ],
+        link: [
+          "a.positionLink",
+          'a[href*="/wn/jobs/"]',
+          'a[href*="/jobs/"]',
+          "a[href]",
+        ],
       },
       "www.liepin.com": {
         card: [".job-list-item", ".job-card-pc-container", ".job-card"],
@@ -245,7 +282,21 @@ function bookmarkletMain(appOrigin: string) {
       const rect = card.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) continue;
 
-      const role = firstText(card, rule.role, 100);
+      let role = firstText(card, rule.role, 100);
+      if (!role && host === "www.lagou.com") {
+        // 拉勾的岗位名类名带构建哈希，选择器失效时取卡片第一行可见文本。
+        const lines = textOf(card)
+          .split(/\n+/)
+          .map(function (line) {
+            return clean(line, 100);
+          })
+          .filter(Boolean);
+        for (let l = 0; l < lines.length; l += 1) {
+          if (/\d+\s*[kK]|经验|本科|大专|硕士|博士|不限/i.test(lines[l])) continue;
+          role = lines[l];
+          break;
+        }
+      }
       let company = firstText(card, rule.company, 100);
       if (!company) {
         company = firstAttr(
@@ -276,9 +327,10 @@ function bookmarkletMain(appOrigin: string) {
       // 如果薪资候选里仍有未映射的混淆字符，再从卡片纯文本里找一次。
       if (!salary || !/[0-9]/.test(salary)) {
         const plain = clean(textOf(card), 5000);
-        const match = plain.match(
-          /\d{1,3}(?:\.\d+)?\s*[-~至]\s*\d{1,3}(?:\.\d+)?\s*[Kk万]/,
-        );
+        const match =
+          plain.match(
+            /\d{1,3}(?:\.\d+)?\s*[kK]?\s*[-~至]\s*\d{1,3}(?:\.\d+)?\s*[kK万]/i,
+          ) || plain.match(/\d{1,3}(?:\.\d+)?\s*[kK]\s*以上/i);
         if (match) salary = clean(match[0], 50);
       }
       // 混淆字形被清掉后可能只剩 "K" / "-K"，没有数字就不要展示。
@@ -296,6 +348,25 @@ function bookmarkletMain(appOrigin: string) {
           // ignore
         }
         if (tags.length >= 8) break;
+      }
+      if (tags.length === 0) {
+        // 类名不可靠时，从卡片里带分隔符的标签行兜底（拉勾常见「A | B | C」）。
+        const lines = textOf(card)
+          .split(/\n+/)
+          .map(function (line) {
+            return clean(line, 200);
+          })
+          .filter(Boolean);
+        const tagLine = lines.find(function (line) {
+          return line.indexOf("|") >= 0 || line.indexOf("、") >= 0;
+        });
+        if (tagLine) {
+          const parts = tagLine.split(/[|、]/);
+          for (let p = 0; p < parts.length && tags.length < 8; p += 1) {
+            const tag = clean(parts[p], 30);
+            if (tag && tags.indexOf(tag) < 0) tags.push(tag);
+          }
+        }
       }
 
       let key = "";
