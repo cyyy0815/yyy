@@ -240,7 +240,7 @@ for item in (
     "四、关键技术",
     "五、项目图片",
     "六、发表与获奖情况",
-    "七、原创性与参考说明",
+    "七、原创性、限制与规划",
     "附录 A  测试与质量记录",
     "附录 B  提交文件与隐私说明",
 ):
@@ -274,6 +274,21 @@ table(
         ["投递管理", "投了没、下一步", "待投清单、看板、跟进日期"],
     ],
     [3.0, 5.0, 8.0],
+)
+body("1.1 背景与用户", bold=True, indent=False)
+body(
+    "求职者真正缺的不是模板，而是判断：同一个岗位，有人只看到「前端开发」四个字，有人能拆出"
+    "框架、工程化、性能优化和业务方向；同一份简历，有人只会改措辞，有人知道该补哪段经历。"
+    "招聘网站又把岗位分散在 BOSS、拉勾、猎聘、智联、前程无忧，投递记录、JD 和简历版本很容易散落。"
+)
+body(
+    "简历工坊面向两类用户：一是缺少求职经验的应届生，需要有人告诉他「差在哪、先补什么」；"
+    "二是有 1–5 年经验、准备转岗或跳槽的人，需要快速判断岗位匹配、定向改写并跟进投递。"
+    "两类用户的共同点是：愿意自己掌控简历和数据，不希望把整份简历上传到云端。"
+)
+body(
+    "因此产品坚持三条原则：匹配先本地算、AI 只做它擅长的改写与规划、所有写入必须由用户确认。"
+    "这也是后文架构、AI 工作台与事实核对设计的出发点。"
 )
 body("使用流程（约 3 分钟）：", bold=True, indent=False)
 body("① 打开首页 → 顶栏点「演示场景」，载入示例简历与 6 个目标岗位；")
@@ -315,7 +330,7 @@ body("4. 真实岗位数据，来自无需插件的采集书签", bold=True, ind
 body(
     "职位推荐页生成一个 `javascript:` 采集书签：用户在 BOSS直聘 / 拉勾 / 猎聘等搜索结果页点一下，"
     "书签只读当前页已渲染的岗位卡片，把岗位名、公司、城市、薪资、标签和链接复制到剪贴板；"
-    "回到应用点「粘贴采集结果」，先预览再决定加入待投清单（见图 3、图 4）。"
+    "回到应用点「粘贴采集结果」，先预览再决定加入待投清单（见图 4、图 5）。"
     "BOSS 的薪资字体反爬按 `U+E031`～`U+E03A` 映射还原为数字，避免出现方框；"
     "不自动翻页、不后台抓取、不新开网页、不绕过验证码。旧版 Chrome 扩展仍保留在 `extension/`，但已不是主路径。"
 )
@@ -442,25 +457,49 @@ bullet("招聘页面改版：从职位链接向上找卡片，选择器失配时
 bullet("本地数据丢失：JSON 备份导出 + 超过 7 天未导出提醒。")
 bullet("跨境网络慢：首屏服务端输出真实内容，静态资源优先，AI 请求独立流式。")
 
+body("4.3 架构与数据流", bold=True, indent=False)
+body(
+    "系统分三层：浏览器端负责编辑、匹配、采集预览与投递管理；服务端 AI 代理只做同源校验、限额、"
+    "限流与流式转发；localStorage 承担持久化。采集书签在招聘页面内执行，不经过中间服务器。"
+)
+figure(
+    "D:/web/docs/img/architecture.png",
+    "图 1  Offer 加速器总体架构：浏览器端应用、服务端 AI 代理与采集书签",
+    15.2,
+)
+table(
+    ["链路", "数据怎么走", "边界"],
+    [
+        ["编辑与保存", "表单 → 内存 → localStorage → 多标签页事件", "不上传服务端"],
+        ["匹配", "JD → 岗位画像 → 同族技能分组 → 分值 / 缺口", "纯本地计算"],
+        ["AI 工作台", "工作台 → Route（同源 / 限额）→ DeepSeek → SSE → 事实核对 → 采用", "不存整份简历"],
+        ["采集", "招聘页书签 → 剪贴板 JSON → 应用预览 → 待投", "不自动翻页"],
+    ],
+    [3.0, 10.2, 3.0],
+)
+
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 # ---------- 五 ----------
 document.add_heading("五、项目图片", level=1)
 body(
-    "以下 7 张截图均来自真实运行环境，覆盖完整链路：编辑 → 匹配 → 采集入口 → 采集预览 → "
-    "求职 Agent → 待投清单 → AI 工作台。",
+    "以下 9 张截图均来自真实运行环境，覆盖完整链路：编辑 → 匹配 → 采集入口 → 采集预览 → "
+    "求职 Agent → 待投清单 → AI 工作台 → 导出 → ATS。",
     indent=False,
 )
-figure("D:/web/docs/img/editor.png", "图 1  编辑页：左侧表单、右侧实时预览，可直接打印为 PDF", 10.5)
-figure("D:/web/docs/img/match.png", "图 2  职位推荐：匹配分、核心要求命中与可点击的缺口", 10.5)
+figure("D:/web/docs/img/editor.png", "图 2  编辑页：左侧表单、右侧实时预览，可直接打印为 PDF", 10.5)
+figure("D:/web/docs/img/match.png", "图 3  职位推荐：匹配分、核心要求命中与可点击的缺口", 10.5)
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
-figure("D:/web/docs/img/capture-entry.png", "图 3  采集书签入口：拖到书签栏，在招聘页点一下即可复制当前页岗位", 13.5)
-figure("D:/web/docs/img/capture-preview.png", "图 4  采集预览：导入前先看公司、岗位、城市、薪资与匹配度，去重后加入待投", 10.5)
+figure("D:/web/docs/img/capture-entry.png", "图 4  采集书签入口：拖到书签栏，在招聘页点一下即可复制当前页岗位", 13.5)
+figure("D:/web/docs/img/capture-preview.png", "图 5  采集预览：导入前先看公司、岗位、城市、薪资与匹配度，去重后加入待投", 10.5)
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
-figure("D:/web/docs/img/agent.png", "图 5  求职 Agent：四步计划、流式输出、事实核对与工具轨迹", 8.0)
-figure("D:/web/docs/img/queue.png", "图 6  待投清单：批量导入的岗位按匹配度排序，右侧可直接「AI 准备」", 10.5)
+figure("D:/web/docs/img/agent.png", "图 6  求职 Agent：四步计划、流式输出、事实核对与工具轨迹", 8.0)
+figure("D:/web/docs/img/queue.png", "图 7  待投清单：批量导入的岗位按匹配度排序，右侧可直接「AI 准备」", 10.5)
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
-figure("D:/web/docs/img/workbench.png", "图 7  AI 工作台：左侧选目标岗位，右侧是四步流水线与执行说明", 10.5)
+figure("D:/web/docs/img/workbench.png", "图 8  AI 工作台：左侧选目标岗位，右侧是四步流水线与执行说明", 10.5)
+figure("D:/web/docs/img/export-menu.png", "图 9  导出菜单：JSON 备份与 Word / PDF / ATS 交付格式分开", 12.0)
+document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
+figure("D:/web/docs/img/ats-export.png", "图 10  ATS 文本导出：线性文本预览、目标 JD 关键词覆盖与下载", 10.5)
 
 # ---------- 六 ----------
 document.add_heading("六、发表与获奖情况", level=1)
@@ -472,7 +511,7 @@ body(
 )
 
 # ---------- 七 ----------
-document.add_heading("七、原创性与参考说明", level=1)
+document.add_heading("七、原创性、限制与规划", level=1)
 body(
     "本项目不是在其他作品基础上的二次开发，代码与设计均为原创。开发过程中参考的公开资料限于："
     "Next.js 官方文档（App Router、Route Handlers、打印相关 CSS）、DeepSeek 官方 API 文档（流式与 JSON 模式）、"
@@ -482,6 +521,23 @@ body(
 body(
     "需要说明的是：产品定位与主流简历工具不同——它们聚焦「排版」，本项目聚焦「投什么、怎么投、投了没」，"
     "并通过无需插件的采集书签接入真实岗位数据、通过可解释的匹配与 Agent 工作流把 AI 放在流程主导位置。"
+)
+body("限制与后续规划", bold=True, indent=False)
+body(
+    "当前版本有意不做自动投递、不做云端账号、不做后台爬虫：自动投递违反平台条款，云端账号会扩大隐私面，"
+    "后台爬虫既不稳定也不合规。代价是用户需要多点几次确认，但每一步都能解释、能撤销、能离线。"
+)
+bullet("短期：补充更多招聘站点的卡片适配与失败提示，减少改版导致的采集失败。")
+bullet("中期：把面试准备、跟进提醒和投递复盘接入同一条工作流，而不是再开一个新工具。")
+bullet("长期：在本地优先的前提下支持多设备加密同步，仍然不把整份简历交给服务端。")
+table(
+    ["限制", "为什么", "替代方案"],
+    [
+        ["不自动投递", "平台条款与账号风险", "复制材料 / 打开原页，由用户提交"],
+        ["不做后台爬虫", "合规、稳定与验证码", "当前页书签，只读已渲染内容"],
+        ["不做云端账号", "隐私与数据面", "localStorage + JSON 备份"],
+    ],
+    [4.0, 6.2, 6.0],
 )
 
 document.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
