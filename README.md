@@ -343,7 +343,6 @@ PROGRESS.md             工作流与进度（中断后从这里继续）
 
 - 技术文档：[提交材料/技术文档.pdf](提交材料/技术文档.pdf)（17 页）
 - 作品介绍文档：[提交材料/作品介绍文档.pdf](提交材料/作品介绍文档.pdf)（8 页）
-- 演示视频脚本：[docs/演示视频脚本.md](docs/演示视频脚本.md)（5–8 分钟分镜与口播）
 - 在线演示：[https://yyy-sandy.vercel.app/](https://yyy-sandy.vercel.app/)
 - 离线评测报告：[docs/eval-report.md](docs/eval-report.md)（`npm run eval` 生成）
 - 部署说明：[docs/DEPLOY.md](docs/DEPLOY.md)
