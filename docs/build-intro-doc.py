@@ -1,4 +1,4 @@
-"""生成「作品说明文档」：对应报名表单 6 的七项要求，含界面截图。"""
+﻿"""生成「作品介绍文档」：对应报名表单 6 的七项要求，含界面截图。"""
 
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
@@ -176,7 +176,7 @@ def centered(text, size, bold=False, color=None, before=0, after=0, font=None):
 
 centered("2026 第九届传智杯", 26, bold=True, before=20, font=COVER_FONT)
 centered("全国大学生数智创新与 AI 应用大赛", 17, bold=True, before=6, font=COVER_FONT)
-centered("AI WEB 网页开发挑战赛 · 作品说明文档", 12, color=GRAY, before=10)
+centered("AI WEB 网页开发挑战赛 · 作品介绍文档", 12, color=GRAY, before=10)
 
 centered("简历工坊", 42, bold=True, color=BROWN, before=42, font=COVER_FONT)
 centered("把求职判断、简历修改和投递跟进串成一条链路", 12, color=GRAY, before=6, after=20, font=BODY_FONT)
@@ -569,7 +569,7 @@ body(
 # ---------- 附录 B ----------
 document.add_heading("附录 B  提交文件与隐私说明", level=1)
 body(
-    "提交包按赛事材料组织为：01_作品说明文档、02_源代码、03_演示视频、04_界面截图、"
+    "提交包按赛事材料组织为：01_作品介绍文档、02_源代码、03_演示视频、04_界面截图、"
     "05_体验说明、06_测试记录、07_附件。根目录 README.txt 说明每个目录的内容与提交前检查项。",
     indent=False,
 )
@@ -581,5 +581,6 @@ body(
     indent=False,
 )
 
-document.save("D:/web/docs/作品说明文档.docx")
+document.save("D:/web/docs/作品介绍文档.docx")
 print("intro docx saved")
+
